@@ -3,8 +3,8 @@ import { MasterFieldDef } from "@/data/mastersSpecData";
 
 interface MasterFieldProps {
   field: MasterFieldDef;
-  value: any;
-  onChange: (val: any) => void;
+  value: unknown;
+  onChange: (val: unknown) => void;
 }
 
 export const MasterField: React.FC<MasterFieldProps> = ({ field, value, onChange }) => {

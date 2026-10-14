@@ -17,7 +17,7 @@ export interface MasterScreenMeta {
   fields: MasterFieldDef[];
   tabs: MasterTabDef[];
   actions: string[];
-  sampleRecord: Record<string, any>;
+  sampleRecord: Record<string, unknown>;
 }
 
 export interface MasterFieldDef {
@@ -36,7 +36,7 @@ export interface MasterTabDef {
   id: string;
   label: string;
   columns: { key: string; label: string; isB1?: boolean; align?: "left" | "right" }[];
-  data: Record<string, any>[];
+  data: Record<string, unknown>[];
 }
 
 export const MASTER_CATEGORIES = [

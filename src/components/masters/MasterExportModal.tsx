@@ -7,7 +7,7 @@ interface MasterExportModalProps {
   onClose: () => void;
   meta: MasterScreenMeta;
   activeTab: MasterTabDef;
-  formData: Record<string, any>;
+  formData: Record<string, unknown>;
 }
 
 export const MasterExportModal: React.FC<MasterExportModalProps> = ({
@@ -24,7 +24,8 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
   if (!isOpen) return null;
 
   const currentDate = new Date().toISOString().replace("T", " ").slice(0, 19);
-  const recordRef = formData[meta.fields[0]?.key] || meta.code;
+  const firstFieldKey = meta.fields[0]?.key;
+  const recordRef = (firstFieldKey ? String(formData[firstFieldKey] ?? "") : "") || meta.code;
 
   const handlePrintPdf = () => {
     // If inside iframe, create an invisible iframe for reliable printing or trigger window.print

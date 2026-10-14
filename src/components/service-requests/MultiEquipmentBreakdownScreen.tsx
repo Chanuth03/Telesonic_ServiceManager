@@ -316,7 +316,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               </label>
               <select
                 value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as any)}
+                onChange={(e) =>
+                  setNewPriority(e.target.value as "Critical" | "High" | "Medium" | "Low")
+                }
                 className="w-full p-1.5 rounded border border-border bg-background text-foreground"
               >
                 <option value="Critical">Critical</option>

@@ -150,10 +150,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
               {profile && (
                 <div className="card-surface rise absolute right-0 mt-2 w-48 p-1.5 text-sm">
-                  {[
-                    [User, "My profile"],
-                    [Settings, "Settings"],
-                  ].map(([I, l]: any) => (
+                  {(
+                    [
+                      [User, "My profile"],
+                      [Settings, "Settings"],
+                    ] as const
+                  ).map(([I, l]) => (
                     <Button
                       variant="ghost"
                       key={l}

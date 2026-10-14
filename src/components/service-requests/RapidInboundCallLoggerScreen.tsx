@@ -21,7 +21,7 @@ import {
 import { SAMPLE_CALL_LOGS, InboundCallLog } from "@/data/serviceRequestsSpecData";
 
 interface RapidInboundCallLoggerScreenProps {
-  onConvertToUnifiedRequest?: (ticketData: any) => void;
+  onConvertToUnifiedRequest?: (ticketData: Record<string, unknown>) => void;
   onNavigateToScreen?: (screenId: string, contextId?: string) => void;
 }
 
@@ -133,7 +133,7 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
   // Call timer effect
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (isTimerRunning) {
       timer = setInterval(() => {
         setCallDuration((prev) => prev + 1);

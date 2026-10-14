@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   Database,
   Headphones,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,6 +40,12 @@ export const Route = createFileRoute("/")({
 });
 
 const modules = [
+  {
+    to: "/transactions",
+    label: "Transactions",
+    icon: ArrowRightLeft,
+    tone: "bg-primary-soft text-primary",
+  },
   { to: "/masters", label: "Masters", icon: Database, tone: "bg-primary-soft text-primary" },
   {
     to: "/service-requests",

@@ -11,7 +11,7 @@ interface MasterScreenViewProps {
 }
 
 export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack }) => {
-  const [formData, setFormData] = useState<Record<string, any>>(meta.sampleRecord);
+  const [formData, setFormData] = useState<Record<string, unknown>>(meta.sampleRecord);
   const [activeTabId, setActiveTabId] = useState<string>(meta.tabs[0]?.id || "");
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -21,7 +21,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
 
   const activeTab = meta.tabs.find((t) => t.id === activeTabId) || meta.tabs[0];
 
-  const handleFieldChange = (key: string, val: any) => {
+  const handleFieldChange = (key: string, val: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: val }));
   };
 

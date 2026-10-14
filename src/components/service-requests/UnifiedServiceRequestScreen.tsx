@@ -432,7 +432,9 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                     value={currentReq.callType}
                     onChange={(e) => {
                       const updated = requests.map((r) =>
-                        r.id === currentReq.id ? { ...r, callType: e.target.value as any } : r,
+                        r.id === currentReq.id
+                          ? { ...r, callType: e.target.value as ServiceRequestRecord["callType"] }
+                          : r,
                       );
                       setRequests(updated);
                     }}
@@ -693,7 +695,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() =>
+                  setActiveTab(
+                    tab.id as "diagnostics" | "commercial" | "history" | "parts" | "audit",
+                  )
+                }
                 className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
                   isActive
                     ? "border-primary text-primary bg-background"
