@@ -1,21 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { 
-  Headphones, 
-  Layers, 
-  RotateCcw, 
-  FileText, 
-  ArrowLeft, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Lock, 
-  Cpu, 
+import {
+  Headphones,
+  Layers,
+  RotateCcw,
+  FileText,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Lock,
+  Cpu,
   ExternalLink,
   ChevronRight,
   ShieldCheck,
   Search,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 import { SERVICE_REQUEST_MODULE_SCREENS } from "@/data/serviceRequestsSpecData";
 import { UnifiedServiceRequestScreen } from "@/components/service-requests/UnifiedServiceRequestScreen";
@@ -27,16 +27,24 @@ export const Route = createFileRoute("/service-requests")({
   head: () => ({
     meta: [
       { title: "Service Request Module — Servio & Telesonic Lanka" },
-      { name: "description", content: "Service Request Transaction Screens Suite (O1-SCR-TRX-01 to TRX-04) synchronized with SAP Business One." },
+      {
+        name: "description",
+        content:
+          "Service Request Transaction Screens Suite (O1-SCR-TRX-01 to TRX-04) synchronized with SAP Business One.",
+      },
       { property: "og:title", content: "Service Request Module — Servio & Telesonic Lanka" },
-      { property: "og:description", content: "Service Request Transaction Screens Suite (O1-SCR-TRX-01 to TRX-04) synchronized with SAP Business One." },
+      {
+        property: "og:description",
+        content:
+          "Service Request Transaction Screens Suite (O1-SCR-TRX-01 to TRX-04) synchronized with SAP Business One.",
+      },
     ],
   }),
   component: ServiceRequestsPage,
 });
 
 function ServiceRequestsPage() {
-  const [activeScreenId, setActiveScreenId] = useState<string>('O1-SCR-TRX-01');
+  const [activeScreenId, setActiveScreenId] = useState<string>("O1-SCR-TRX-01");
   const [contextTicketId, setContextTicketId] = useState<string | undefined>(undefined);
 
   const handleNavigateToScreen = (screenId: string, contextId?: string) => {
@@ -46,7 +54,9 @@ function ServiceRequestsPage() {
     }
   };
 
-  const activeScreenMeta = SERVICE_REQUEST_MODULE_SCREENS.find((s) => s.id === activeScreenId) || SERVICE_REQUEST_MODULE_SCREENS[0];
+  const activeScreenMeta =
+    SERVICE_REQUEST_MODULE_SCREENS.find((s) => s.id === activeScreenId) ||
+    SERVICE_REQUEST_MODULE_SCREENS[0];
 
   return (
     <div className="py-4 sm:py-6 space-y-6">
@@ -80,12 +90,12 @@ function ServiceRequestsPage() {
                 }}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-background text-foreground shadow-xs font-bold border border-border'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                    ? "bg-background text-foreground shadow-xs font-bold border border-border"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
               >
                 <span className="font-mono text-[11px] text-primary">{screen.code}</span>
-                <span className="hidden md:inline">{screen.name.split(' ')[0]}</span>
+                <span className="hidden md:inline">{screen.name.split(" ")[0]}</span>
               </button>
             );
           })}
@@ -104,26 +114,40 @@ function ServiceRequestsPage() {
               Service Request Module
             </h1>
             <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
-              Complete transactional suite (Screen Register O1-SCR-TRX-01 through TRX-04) featuring real-time SAP Business One BP financial health checks, sub-45s rapid call logging, automated 30-day repeat detection, and multi-unit breakdown.
+              Complete transactional suite (Screen Register O1-SCR-TRX-01 through TRX-04) featuring
+              real-time SAP Business One BP financial health checks, sub-45s rapid call logging,
+              automated 30-day repeat detection, and multi-unit breakdown.
             </p>
           </div>
 
           {/* Module Metric Badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
             <div className="p-2.5 rounded-lg bg-muted/60 border border-border">
-              <span className="text-[10px] text-muted-foreground font-medium block">Total Open SRs</span>
+              <span className="text-[10px] text-muted-foreground font-medium block">
+                Total Open SRs
+              </span>
               <span className="text-lg font-bold font-mono text-foreground">18</span>
             </div>
             <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium block">Avg Call Intake</span>
-              <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">38s</span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium block">
+                Avg Call Intake
+              </span>
+              <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                38s
+              </span>
             </div>
             <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium block">Repeat Alerts</span>
-              <span className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400">3 Active</span>
+              <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium block">
+                Repeat Alerts
+              </span>
+              <span className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400">
+                3 Active
+              </span>
             </div>
             <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
-              <span className="text-[10px] text-destructive font-medium block">Commercial Holds</span>
+              <span className="text-[10px] text-destructive font-medium block">
+                Commercial Holds
+              </span>
               <span className="text-lg font-bold font-mono text-destructive">2 Holds</span>
             </div>
           </div>
@@ -142,8 +166,8 @@ function ServiceRequestsPage() {
                 }}
                 className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
                   isSelected
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-xs'
-                    : 'border-border bg-background hover:bg-muted/40 hover:border-primary/40'
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                    : "border-border bg-background hover:bg-muted/40 hover:border-primary/40"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -164,26 +188,22 @@ function ServiceRequestsPage() {
 
       {/* Render the Active Screen Component */}
       <div className="transition-all duration-200">
-        {activeScreenId === 'O1-SCR-TRX-01' && (
-          <UnifiedServiceRequestScreen
-            onNavigateToScreen={handleNavigateToScreen}
-          />
+        {activeScreenId === "O1-SCR-TRX-01" && (
+          <UnifiedServiceRequestScreen onNavigateToScreen={handleNavigateToScreen} />
         )}
 
-        {activeScreenId === 'O1-SCR-TRX-02' && (
-          <RapidInboundCallLoggerScreen
-            onNavigateToScreen={handleNavigateToScreen}
-          />
+        {activeScreenId === "O1-SCR-TRX-02" && (
+          <RapidInboundCallLoggerScreen onNavigateToScreen={handleNavigateToScreen} />
         )}
 
-        {activeScreenId === 'O1-SCR-TRX-03' && (
+        {activeScreenId === "O1-SCR-TRX-03" && (
           <RepeatDetectorHoldScreen
             initialTicketId={contextTicketId}
             onNavigateToScreen={handleNavigateToScreen}
           />
         )}
 
-        {activeScreenId === 'O1-SCR-TRX-04' && (
+        {activeScreenId === "O1-SCR-TRX-04" && (
           <MultiEquipmentBreakdownScreen
             initialTicketId={contextTicketId}
             onNavigateToScreen={handleNavigateToScreen}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, History, Clock } from 'lucide-react';
+import React from "react";
+import { X, History, Clock } from "lucide-react";
 
 interface AuditModalProps {
   isOpen: boolean;
@@ -18,34 +18,34 @@ export const MasterAuditModal: React.FC<AuditModalProps> = ({
 
   const mockAuditLogs = [
     {
-      id: 'AUD-01',
-      date: '2026-10-13 08:45:12',
-      user: 'Kasun Perera (Service Coordinator)',
-      action: 'Field Update',
-      field: 'Preferred Channel',
-      oldVal: 'Service Portal Walk-in',
-      newVal: 'Dedicated Hotline',
-      reason: 'Customer requested direct coordinator routing',
+      id: "AUD-01",
+      date: "2026-10-13 08:45:12",
+      user: "Kasun Perera (Service Coordinator)",
+      action: "Field Update",
+      field: "Preferred Channel",
+      oldVal: "Service Portal Walk-in",
+      newVal: "Dedicated Hotline",
+      reason: "Customer requested direct coordinator routing",
     },
     {
-      id: 'AUD-02',
-      date: '2026-10-11 14:22:09',
-      user: 'SAP_B1_SYNC (Integration Service)',
-      action: 'SAP B1 Synchronize',
-      field: 'Balance (LKR)',
-      oldVal: '1,420,000.00',
-      newVal: '1,250,000.00',
-      reason: 'Incoming Payment RCT-77126 posted in SAP B1',
+      id: "AUD-02",
+      date: "2026-10-11 14:22:09",
+      user: "SAP_B1_SYNC (Integration Service)",
+      action: "SAP B1 Synchronize",
+      field: "Balance (LKR)",
+      oldVal: "1,420,000.00",
+      newVal: "1,250,000.00",
+      reason: "Incoming Payment RCT-77126 posted in SAP B1",
     },
     {
-      id: 'AUD-03',
-      date: '2026-09-28 10:15:00',
-      user: 'Admin (System)',
-      action: 'Record Created',
-      field: 'All Fields',
-      oldVal: '—',
-      newVal: 'Initial Record Committed',
-      reason: 'New Business Partner Onboarding',
+      id: "AUD-03",
+      date: "2026-09-28 10:15:00",
+      user: "Admin (System)",
+      action: "Record Created",
+      field: "All Fields",
+      oldVal: "—",
+      newVal: "Initial Record Committed",
+      reason: "New Business Partner Onboarding",
     },
   ];
 
@@ -79,18 +79,24 @@ export const MasterAuditModal: React.FC<AuditModalProps> = ({
 
         <div className="p-4 flex-1 overflow-y-auto space-y-3">
           <div className="text-xs text-neutral-500">
-            Full tamper-evident audit history showing before/after values, modifying user identity, and change justifications.
+            Full tamper-evident audit history showing before/after values, modifying user identity,
+            and change justifications.
           </div>
 
           <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800 border border-neutral-200 dark:border-neutral-800 rounded-md overflow-hidden bg-white dark:bg-neutral-900/40">
             {mockAuditLogs.map((log) => (
-              <div key={log.id} className="p-3 text-xs space-y-1.5 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
+              <div
+                key={log.id}
+                className="p-3 text-xs space-y-1.5 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30"
+              >
                 <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3" />
                     <span>{log.date}</span>
                     <span>·</span>
-                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">{log.user}</span>
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                      {log.user}
+                    </span>
                   </div>
                   <span className="px-1.5 py-0.5 rounded-xs bg-neutral-100 dark:bg-neutral-800 font-medium">
                     {log.action}
@@ -99,21 +105,33 @@ export const MasterAuditModal: React.FC<AuditModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                   <div>
-                    <span className="text-[10px] text-neutral-400 block uppercase">Field Changed</span>
-                    <span className="font-medium text-neutral-800 dark:text-neutral-200">{log.field}</span>
+                    <span className="text-[10px] text-neutral-400 block uppercase">
+                      Field Changed
+                    </span>
+                    <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                      {log.field}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-neutral-400 block uppercase">Before</span>
-                    <span className="font-mono text-neutral-500 line-through truncate block">{log.oldVal}</span>
+                    <span className="font-mono text-neutral-500 line-through truncate block">
+                      {log.oldVal}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-neutral-400 block uppercase">After Value</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium truncate block">{log.newVal}</span>
+                    <span className="text-[10px] text-neutral-400 block uppercase">
+                      After Value
+                    </span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium truncate block">
+                      {log.newVal}
+                    </span>
                   </div>
                 </div>
 
                 <div className="text-[11px] text-neutral-500 pt-0.5">
-                  <span className="font-medium text-neutral-600 dark:text-neutral-400">Reason: </span>
+                  <span className="font-medium text-neutral-600 dark:text-neutral-400">
+                    Reason:{" "}
+                  </span>
                   {log.reason}
                 </div>
               </div>

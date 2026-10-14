@@ -32,14 +32,86 @@ interface Equipment {
 }
 
 const initialEquipment: Equipment[] = [
-  { id: "EQ-5001", name: "MacBook Pro 14\"", type: "Laptop", serial: "C02XL0ABJHD3", status: "Assigned", assignedTo: "Sarah Chen", location: "Floor 2", warranty: "2027-03-14" },
-  { id: "EQ-5002", name: "Dell Latitude 5540", type: "Laptop", serial: "DL5540-88321", status: "Available", assignedTo: null, location: "IT Store", warranty: "2026-11-02" },
-  { id: "EQ-5003", name: "HP EliteDesk 800", type: "Desktop", serial: "HP800-10293", status: "Assigned", assignedTo: "Tom Okafor", location: "Floor 3", warranty: "2026-08-19" },
-  { id: "EQ-5004", name: "Logitech MX Master 3S", type: "Peripheral", serial: "LGT-55201", status: "Available", assignedTo: null, location: "IT Store", warranty: "2026-05-30" },
-  { id: "EQ-5005", name: "Cisco Catalyst Switch", type: "Network", serial: "CSC-9300-77", status: "In Repair", assignedTo: null, location: "Server Room", warranty: "2028-01-11" },
-  { id: "EQ-5006", name: "Dell UltraSharp 27\"", type: "Monitor", serial: "U2723-4410", status: "Assigned", assignedTo: "Lena Fischer", location: "Floor 4", warranty: "2027-06-25" },
-  { id: "EQ-5007", name: "iPhone 15 Pro", type: "Mobile", serial: "IP15P-90312", status: "Assigned", assignedTo: "Arjun Mehta", location: "Remote", warranty: "2026-09-08" },
-  { id: "EQ-5008", name: "HP LaserJet Pro", type: "Printer", serial: "HPLJ-2201", status: "Retired", assignedTo: null, location: "Storage", warranty: "2024-12-01" },
+  {
+    id: "EQ-5001",
+    name: 'MacBook Pro 14"',
+    type: "Laptop",
+    serial: "C02XL0ABJHD3",
+    status: "Assigned",
+    assignedTo: "Sarah Chen",
+    location: "Floor 2",
+    warranty: "2027-03-14",
+  },
+  {
+    id: "EQ-5002",
+    name: "Dell Latitude 5540",
+    type: "Laptop",
+    serial: "DL5540-88321",
+    status: "Available",
+    assignedTo: null,
+    location: "IT Store",
+    warranty: "2026-11-02",
+  },
+  {
+    id: "EQ-5003",
+    name: "HP EliteDesk 800",
+    type: "Desktop",
+    serial: "HP800-10293",
+    status: "Assigned",
+    assignedTo: "Tom Okafor",
+    location: "Floor 3",
+    warranty: "2026-08-19",
+  },
+  {
+    id: "EQ-5004",
+    name: "Logitech MX Master 3S",
+    type: "Peripheral",
+    serial: "LGT-55201",
+    status: "Available",
+    assignedTo: null,
+    location: "IT Store",
+    warranty: "2026-05-30",
+  },
+  {
+    id: "EQ-5005",
+    name: "Cisco Catalyst Switch",
+    type: "Network",
+    serial: "CSC-9300-77",
+    status: "In Repair",
+    assignedTo: null,
+    location: "Server Room",
+    warranty: "2028-01-11",
+  },
+  {
+    id: "EQ-5006",
+    name: 'Dell UltraSharp 27"',
+    type: "Monitor",
+    serial: "U2723-4410",
+    status: "Assigned",
+    assignedTo: "Lena Fischer",
+    location: "Floor 4",
+    warranty: "2027-06-25",
+  },
+  {
+    id: "EQ-5007",
+    name: "iPhone 15 Pro",
+    type: "Mobile",
+    serial: "IP15P-90312",
+    status: "Assigned",
+    assignedTo: "Arjun Mehta",
+    location: "Remote",
+    warranty: "2026-09-08",
+  },
+  {
+    id: "EQ-5008",
+    name: "HP LaserJet Pro",
+    type: "Printer",
+    serial: "HPLJ-2201",
+    status: "Retired",
+    assignedTo: null,
+    location: "Storage",
+    warranty: "2024-12-01",
+  },
 ];
 
 const statusStyle: Record<EqStatus, string> = {
@@ -63,7 +135,9 @@ function EquipmentPage() {
       items.filter(
         (e) =>
           (statusFilter === "All" || e.status === statusFilter) &&
-          (e.name + e.id + e.serial + (e.assignedTo ?? "")).toLowerCase().includes(query.toLowerCase()),
+          (e.name + e.id + e.serial + (e.assignedTo ?? ""))
+            .toLowerCase()
+            .includes(query.toLowerCase()),
       ),
     [items, query, statusFilter],
   );
@@ -110,7 +184,10 @@ function EquipmentPage() {
       <div className="card-surface">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -118,7 +195,11 @@ function EquipmentPage() {
               className="input-field w-full pl-9"
             />
           </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as EqStatus | "All")} className="input-field sm:w-44">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as EqStatus | "All")}
+            className="input-field sm:w-44"
+          >
             <option value="All">All statuses</option>
             {(Object.keys(statusStyle) as EqStatus[]).map((s) => (
               <option key={s}>{s}</option>
@@ -142,7 +223,10 @@ function EquipmentPage() {
             </thead>
             <tbody>
               {filtered.map((e) => (
-                <tr key={e.id} className="border-b last:border-0 transition-colors hover:bg-muted/50">
+                <tr
+                  key={e.id}
+                  className="border-b last:border-0 transition-colors hover:bg-muted/50"
+                >
                   <td className="px-4 py-3">
                     <p className="font-medium">{e.name}</p>
                     <p className="text-xs text-muted-foreground">{e.id}</p>
@@ -150,14 +234,22 @@ function EquipmentPage() {
                   <td className="px-4 py-3 text-muted-foreground">{e.type}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{e.serial}</td>
                   <td className="px-4 py-3">
-                    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", statusStyle[e.status])}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                        statusStyle[e.status],
+                      )}
+                    >
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
                       {e.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     {e.assignedTo ? (
-                      <span className="flex items-center gap-2"><Avatar name={e.assignedTo} className="h-6 w-6 text-[10px]" />{e.assignedTo}</span>
+                      <span className="flex items-center gap-2">
+                        <Avatar name={e.assignedTo} className="h-6 w-6 text-[10px]" />
+                        {e.assignedTo}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -167,17 +259,32 @@ function EquipmentPage() {
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       {e.status === "Available" && (
-                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAssignTarget(e.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => setAssignTarget(e.id)}
+                        >
                           <UserPlus size={14} /> Assign
                         </Button>
                       )}
                       {e.status === "Assigned" && (
-                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setStatus(e.id, "Available")}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => setStatus(e.id, "Available")}
+                        >
                           <Undo2 size={14} /> Return
                         </Button>
                       )}
                       {e.status === "In Repair" && (
-                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setStatus(e.id, "Available")}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => setStatus(e.id, "Available")}
+                        >
                           <Undo2 size={14} /> Mark fixed
                         </Button>
                       )}
@@ -198,7 +305,13 @@ function EquipmentPage() {
         </div>
       </div>
 
-      {showModal && <AddEquipmentModal onClose={() => setShowModal(false)} onAdd={addEquipment} nextId={items.length + 5001} />}
+      {showModal && (
+        <AddEquipmentModal
+          onClose={() => setShowModal(false)}
+          onAdd={addEquipment}
+          nextId={items.length + 5001}
+        />
+      )}
       {assignTarget && (
         <AssignModal
           equipment={items.find((e) => e.id === assignTarget)!}
@@ -213,7 +326,15 @@ function EquipmentPage() {
   );
 }
 
-function AddEquipmentModal({ onClose, onAdd, nextId }: { onClose: () => void; onAdd: (e: Equipment) => void; nextId: number }) {
+function AddEquipmentModal({
+  onClose,
+  onAdd,
+  nextId,
+}: {
+  onClose: () => void;
+  onAdd: (e: Equipment) => void;
+  nextId: number;
+}) {
   const [name, setName] = useState("");
   const [type, setType] = useState(types[0] ?? "Laptop");
   const [serial, setSerial] = useState("");
@@ -222,71 +343,132 @@ function AddEquipmentModal({ onClose, onAdd, nextId }: { onClose: () => void; on
 
   const submit = () => {
     if (!name.trim()) return;
-    onAdd({ id: `EQ-${nextId}`, name: name.trim(), type, serial: serial.trim() || "—", status: "Available", assignedTo: null, location: location.trim() || "IT Store", warranty: warranty || "—" });
+    onAdd({
+      id: `EQ-${nextId}`,
+      name: name.trim(),
+      type,
+      serial: serial.trim() || "—",
+      status: "Available",
+      assignedTo: null,
+      location: location.trim() || "IT Store",
+      warranty: warranty || "—",
+    });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div className="card-surface w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold">Add Equipment</h2>
-          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted"><X size={18} /></button>
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+            <X size={18} />
+          </button>
         </div>
         <div className="grid gap-4">
           <label className="grid gap-1.5 text-sm font-medium">
             Equipment name *
-            <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" placeholder="e.g. MacBook Air 13&quot;" />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-field"
+              placeholder='e.g. MacBook Air 13"'
+            />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium">
               Type
-              <select value={type} onChange={(e) => setType(e.target.value)} className="input-field">
-                {types.map((t) => <option key={t}>{t}</option>)}
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="input-field"
+              >
+                {types.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
               Serial number
-              <input value={serial} onChange={(e) => setSerial(e.target.value)} className="input-field" placeholder="SN-0000" />
+              <input
+                value={serial}
+                onChange={(e) => setSerial(e.target.value)}
+                className="input-field"
+                placeholder="SN-0000"
+              />
             </label>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium">
               Location
-              <input value={location} onChange={(e) => setLocation(e.target.value)} className="input-field" placeholder="IT Store" />
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="input-field"
+                placeholder="IT Store"
+              />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
               Warranty until
-              <input type="date" value={warranty} onChange={(e) => setWarranty(e.target.value)} className="input-field" />
+              <input
+                type="date"
+                value={warranty}
+                onChange={(e) => setWarranty(e.target.value)}
+                className="input-field"
+              />
             </label>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={!name.trim()}>Add Equipment</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={!name.trim()}>
+            Add Equipment
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-function AssignModal({ equipment, onClose, onAssign }: { equipment: Equipment; onClose: () => void; onAssign: (who: string) => void }) {
+function AssignModal({
+  equipment,
+  onClose,
+  onAssign,
+}: {
+  equipment: Equipment;
+  onClose: () => void;
+  onAssign: (who: string) => void;
+}) {
   const [who, setWho] = useState(agents[0] ?? "");
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div className="card-surface w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold">Assign {equipment.name}</h2>
-          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted"><X size={18} /></button>
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+            <X size={18} />
+          </button>
         </div>
         <label className="grid gap-1.5 text-sm font-medium">
           Assign to
           <select value={who} onChange={(e) => setWho(e.target.value)} className="input-field">
-            {agents.map((a) => <option key={a}>{a}</option>)}
+            {agents.map((a) => (
+              <option key={a}>{a}</option>
+            ))}
           </select>
         </label>
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={() => onAssign(who)}>Assign</Button>
         </div>
       </div>

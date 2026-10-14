@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
-import { 
-  Layers, 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  ArrowLeft, 
-  Printer, 
-  Download, 
-  Users, 
-  Cpu, 
-  Building2, 
+import React, { useState } from "react";
+import {
+  Layers,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  ArrowLeft,
+  Printer,
+  Download,
+  Users,
+  Cpu,
+  Building2,
   Wrench,
   AlertCircle,
-  FileCheck
-} from 'lucide-react';
-import { 
-  SAMPLE_MULTI_EQUIPMENT_ITEMS, 
-  MultiEquipmentItem, 
-  SAMPLE_SERVICE_REQUESTS 
-} from '@/data/serviceRequestsSpecData';
+  FileCheck,
+} from "lucide-react";
+import {
+  SAMPLE_MULTI_EQUIPMENT_ITEMS,
+  MultiEquipmentItem,
+  SAMPLE_SERVICE_REQUESTS,
+} from "@/data/serviceRequestsSpecData";
 
 interface MultiEquipmentBreakdownScreenProps {
   initialTicketId?: string;
@@ -26,21 +26,24 @@ interface MultiEquipmentBreakdownScreenProps {
 }
 
 export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScreenProps> = ({
-  initialTicketId = 'SR-2026-0845',
+  initialTicketId = "SR-2026-0845",
   onNavigateToScreen,
 }) => {
-  const parentRequest = SAMPLE_SERVICE_REQUESTS.find((r) => r.id === initialTicketId) || SAMPLE_SERVICE_REQUESTS[4];
+  const parentRequest =
+    SAMPLE_SERVICE_REQUESTS.find((r) => r.id === initialTicketId) || SAMPLE_SERVICE_REQUESTS[4];
   const [items, setItems] = useState<MultiEquipmentItem[]>(
-    SAMPLE_MULTI_EQUIPMENT_ITEMS[initialTicketId] || SAMPLE_MULTI_EQUIPMENT_ITEMS['SR-2026-0845'] || []
+    SAMPLE_MULTI_EQUIPMENT_ITEMS[initialTicketId] ||
+      SAMPLE_MULTI_EQUIPMENT_ITEMS["SR-2026-0845"] ||
+      [],
   );
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newTag, setNewTag] = useState('');
-  const [newSerial, setNewSerial] = useState('');
-  const [newModel, setNewModel] = useState('');
-  const [newFault, setNewFault] = useState('');
-  const [newPriority, setNewPriority] = useState<'Critical' | 'High' | 'Medium' | 'Low'>('High');
+  const [newTag, setNewTag] = useState("");
+  const [newSerial, setNewSerial] = useState("");
+  const [newModel, setNewModel] = useState("");
+  const [newFault, setNewFault] = useState("");
+  const [newPriority, setNewPriority] = useState<"Critical" | "High" | "Medium" | "Low">("High");
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -50,11 +53,13 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
   const handleGenerateAllJobs = () => {
     const updated = items.map((item, idx) => ({
       ...item,
-      status: 'Generated' as const,
+      status: "Generated" as const,
       childJobId: item.childJobId || `JOB-2026-${1400 + idx + 1}`,
     }));
     setItems(updated);
-    showToast(`Generated ${items.length} child work orders linked to master request ${parentRequest.id}!`);
+    showToast(
+      `Generated ${items.length} child work orders linked to master request ${parentRequest.id}!`,
+    );
   };
 
   const handleAssignTechToAll = (techName: string) => {
@@ -68,38 +73,50 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
 
   const handleAddItem = () => {
     if (!newTag || !newSerial) {
-      alert('Please provide unit tag and serial number');
+      alert("Please provide unit tag and serial number");
       return;
     }
     const newItem: MultiEquipmentItem = {
       id: `MEQ-0${items.length + 1}`,
       unitTag: newTag,
       serialNo: newSerial,
-      model: newModel || 'Daikin FXFQ Cassette Inverter',
-      locationDetails: 'Site Premises',
-      faultSummary: newFault || 'Unit not cooling',
-      warrantyStatus: 'AMC Comprehensive',
+      model: newModel || "Daikin FXFQ Cassette Inverter",
+      locationDetails: "Site Premises",
+      faultSummary: newFault || "Unit not cooling",
+      warrantyStatus: "AMC Comprehensive",
       priority: newPriority,
       childJobId: `JOB-2026-${1400 + items.length + 1}`,
-      assignedTech: 'Sunil Jayatissa',
-      status: 'Generated',
+      assignedTech: "Sunil Jayatissa",
+      status: "Generated",
     };
     setItems([...items, newItem]);
     setIsAddingNew(false);
-    setNewTag('');
-    setNewSerial('');
-    setNewFault('');
+    setNewTag("");
+    setNewSerial("");
+    setNewFault("");
     showToast(`Added unit "${newItem.unitTag}" to breakdown.`);
   };
 
   const handleDeleteItem = (id: string) => {
     setItems(items.filter((i) => i.id !== id));
-    showToast('Equipment line removed.');
+    showToast("Equipment line removed.");
   };
 
   const handleExportCsv = () => {
-    const headers = ['Line ID', 'Unit Tag', 'Serial No', 'Model', 'Location', 'Fault', 'Warranty', 'Priority', 'Child Job ID', 'Technician', 'Status'];
-    const rows = items.map(i => [
+    const headers = [
+      "Line ID",
+      "Unit Tag",
+      "Serial No",
+      "Model",
+      "Location",
+      "Fault",
+      "Warranty",
+      "Priority",
+      "Child Job ID",
+      "Technician",
+      "Status",
+    ];
+    const rows = items.map((i) => [
       i.id,
       `"${i.unitTag}"`,
       i.serialNo,
@@ -108,15 +125,19 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
       `"${i.faultSummary}"`,
       `"${i.warrantyStatus}"`,
       i.priority,
-      i.childJobId || 'Pending',
-      `"${i.assignedTech || 'Unassigned'}"`,
-      i.status
+      i.childJobId || "Pending",
+      `"${i.assignedTech || "Unassigned"}"`,
+      i.status,
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + headers.join(',') + '\n' + rows.map(e => e.join(',')).join('\n');
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      headers.join(",") +
+      "\n" +
+      rows.map((e) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${parentRequest.id}_multi_equipment_breakdown.csv`);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${parentRequest.id}_multi_equipment_breakdown.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -152,14 +173,15 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               <span>Multi-Equipment Service Request Breakdown Screen</span>
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Splits master commercial facility requests into independent equipment work orders with individual faults, technician routing, and tracking.
+              Splits master commercial facility requests into independent equipment work orders with
+              individual faults, technician routing, and tracking.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             {onNavigateToScreen && (
               <button
-                onClick={() => onNavigateToScreen('O1-SCR-TRX-01', parentRequest.id)}
+                onClick={() => onNavigateToScreen("O1-SCR-TRX-01", parentRequest.id)}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -191,7 +213,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
           </div>
           <div>
             <span className="text-[10px] text-muted-foreground block">Customer:</span>
-            <span className="font-semibold text-foreground truncate block">{parentRequest.customer.cardName}</span>
+            <span className="font-semibold text-foreground truncate block">
+              {parentRequest.customer.cardName}
+            </span>
           </div>
           <div>
             <span className="text-[10px] text-muted-foreground block">Facility Site:</span>
@@ -215,7 +239,7 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
             </button>
 
             <button
-              onClick={() => handleAssignTechToAll('Sunil Jayatissa & Team')}
+              onClick={() => handleAssignTechToAll("Sunil Jayatissa & Team")}
               className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-foreground font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Users className="w-3.5 h-3.5 text-primary" />
@@ -241,14 +265,19 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               <Plus className="w-4 h-4 text-purple-600" />
               <span>Add Installed Equipment to Breakdown</span>
             </h4>
-            <button onClick={() => setIsAddingNew(false)} className="text-muted-foreground hover:text-foreground text-xs">
+            <button
+              onClick={() => setIsAddingNew(false)}
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
               ✕ Cancel
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground block mb-1">Unit Tag / Room *</label>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                Unit Tag / Room *
+              </label>
               <input
                 type="text"
                 placeholder="e.g. Server Room Backup Split"
@@ -258,7 +287,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground block mb-1">Serial Number *</label>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                Serial Number *
+              </label>
               <input
                 type="text"
                 placeholder="e.g. TEL-DK-IN-0109"
@@ -268,7 +299,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground block mb-1">Model / Specs</label>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                Model / Specs
+              </label>
               <input
                 type="text"
                 placeholder="e.g. Daikin FXFQ50 18k BTU"
@@ -278,7 +311,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground block mb-1">Priority</label>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                Priority
+              </label>
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as any)}
@@ -293,7 +328,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
           </div>
 
           <div className="text-xs">
-            <label className="text-[11px] font-medium text-muted-foreground block mb-1">Specific Fault / Symptoms for this Unit</label>
+            <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+              Specific Fault / Symptoms for this Unit
+            </label>
             <input
               type="text"
               placeholder="e.g. Louver motor stuck and error code flashing"
@@ -351,13 +388,15 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
                   <td className="p-3 text-foreground font-medium">{item.model}</td>
                   <td className="p-3 text-muted-foreground max-w-xs">{item.faultSummary}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      item.priority === 'Critical'
-                        ? 'bg-destructive/15 text-destructive'
-                        : item.priority === 'High'
-                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        item.priority === "Critical"
+                          ? "bg-destructive/15 text-destructive"
+                          : item.priority === "High"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       {item.priority}
                     </span>
                   </td>
@@ -367,15 +406,21 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
                     </span>
                   </td>
                   <td className="p-3 font-mono font-bold text-purple-600 dark:text-purple-400">
-                    {item.childJobId || <span className="text-muted-foreground italic">Pending</span>}
+                    {item.childJobId || (
+                      <span className="text-muted-foreground italic">Pending</span>
+                    )}
                   </td>
-                  <td className="p-3 font-medium text-foreground">{item.assignedTech || 'Unassigned'}</td>
+                  <td className="p-3 font-medium text-foreground">
+                    {item.assignedTech || "Unassigned"}
+                  </td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      item.status === 'Generated'
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        item.status === "Generated"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       {item.status}
                     </span>
                   </td>

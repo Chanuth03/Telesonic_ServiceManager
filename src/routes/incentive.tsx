@@ -8,8 +8,22 @@ export const Route = createFileRoute("/incentive")({
       { title: "Incentive — Servio ITSM" },
       { name: "description", content: "Manage agent incentive schemes, targets and payouts." },
       { property: "og:title", content: "Incentive — Servio ITSM" },
-      { property: "og:description", content: "Manage agent incentive schemes, targets and payouts." },
+      {
+        property: "og:description",
+        content: "Manage agent incentive schemes, targets and payouts.",
+      },
     ],
   }),
-  component: () => <ModulePlaceholder title="Incentive" subtitle="Manage agent incentive schemes, targets and payouts." icon={Trophy} stats={[["Active schemes", "12"], ["Payouts this month", "LKR 1.2M"], ["Top performer", "Sarah Chen"]]} />,
+  component: () => (
+    <ModulePlaceholder
+      title="Incentive"
+      subtitle="Manage agent incentive schemes, targets and payouts."
+      icon={Trophy}
+      stats={[
+        ["Active schemes", "12"],
+        ["Payouts this month", "LKR 1.2M"],
+        ["Top performer", "Sarah Chen"],
+      ]}
+    />
+  ),
 });

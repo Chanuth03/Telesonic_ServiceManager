@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  PhoneCall, 
-  PhoneForwarded, 
-  Search, 
-  Clock, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Zap, 
-  Building2, 
-  Cpu, 
-  ArrowRight, 
-  ShieldCheck, 
-  User, 
+import React, { useState, useEffect } from "react";
+import {
+  PhoneCall,
+  PhoneForwarded,
+  Search,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Zap,
+  Building2,
+  Cpu,
+  ArrowRight,
+  ShieldCheck,
+  User,
   Plus,
   PhoneOff,
   Flame,
   Check,
-  RotateCcw
-} from 'lucide-react';
-import { SAMPLE_CALL_LOGS, InboundCallLog } from '@/data/serviceRequestsSpecData';
+  RotateCcw,
+} from "lucide-react";
+import { SAMPLE_CALL_LOGS, InboundCallLog } from "@/data/serviceRequestsSpecData";
 
 interface RapidInboundCallLoggerScreenProps {
   onConvertToUnifiedRequest?: (ticketData: any) => void;
@@ -27,48 +27,83 @@ interface RapidInboundCallLoggerScreenProps {
 
 const PRESET_CUSTOMERS = [
   {
-    phone: '0112894400',
-    name: 'Mr. Shantha Bandara',
-    company: 'Ceylon Agro Machinery PLC',
-    cardCode: 'C20014',
-    site: 'No. 45/A, Nawam Mawatha, Colombo 02',
+    phone: "0112894400",
+    name: "Mr. Shantha Bandara",
+    company: "Ceylon Agro Machinery PLC",
+    cardCode: "C20014",
+    site: "No. 45/A, Nawam Mawatha, Colombo 02",
     equipment: [
-      { serial: 'TEL-AC-VRV-90421', model: 'Daikin VRV IV-X 16HP', tag: 'Server Room AC 01', warranty: 'AMC Comprehensive' },
-      { serial: 'TEL-AC-CAS-11204', model: 'Daikin 4-Way Cassette 24k', tag: 'Boardroom Main', warranty: 'AMC Comprehensive' },
-      { serial: 'TEL-GEN-CAT-500K', model: 'CAT Diesel Generator 500kVA', tag: 'Powerhouse Substation', warranty: 'Expired / Billable' },
-    ]
+      {
+        serial: "TEL-AC-VRV-90421",
+        model: "Daikin VRV IV-X 16HP",
+        tag: "Server Room AC 01",
+        warranty: "AMC Comprehensive",
+      },
+      {
+        serial: "TEL-AC-CAS-11204",
+        model: "Daikin 4-Way Cassette 24k",
+        tag: "Boardroom Main",
+        warranty: "AMC Comprehensive",
+      },
+      {
+        serial: "TEL-GEN-CAT-500K",
+        model: "CAT Diesel Generator 500kVA",
+        tag: "Powerhouse Substation",
+        warranty: "Expired / Billable",
+      },
+    ],
   },
   {
-    phone: '0312239811',
-    name: 'Mr. Roshan De Silva',
-    company: 'Jayasuriya Garments Exports (Pvt) Ltd',
-    cardCode: 'C10452',
-    site: 'Phase 1, Zone B, BOI EPZ, Katunayake',
+    phone: "0312239811",
+    name: "Mr. Roshan De Silva",
+    company: "Jayasuriya Garments Exports (Pvt) Ltd",
+    cardCode: "C10452",
+    site: "Phase 1, Zone B, BOI EPZ, Katunayake",
     equipment: [
-      { serial: 'TEL-CHL-TRN-33102', model: 'Trane Series R 50-Ton Chiller', tag: 'Plant 2 Primary Chiller', warranty: 'Expired / Billable' },
-      { serial: 'TEL-AHU-CAR-041', model: 'Carrier Air Handling Unit 15k CFM', tag: 'Cleanroom AHU #1', warranty: 'Under Warranty' },
-    ]
+      {
+        serial: "TEL-CHL-TRN-33102",
+        model: "Trane Series R 50-Ton Chiller",
+        tag: "Plant 2 Primary Chiller",
+        warranty: "Expired / Billable",
+      },
+      {
+        serial: "TEL-AHU-CAR-041",
+        model: "Carrier Air Handling Unit 15k CFM",
+        tag: "Cleanroom AHU #1",
+        warranty: "Under Warranty",
+      },
+    ],
   },
   {
-    phone: '0112695431',
-    name: 'Mr. Dilshan Mendis',
-    company: 'Royal Colombo Golf Club',
-    cardCode: 'C10042',
-    site: 'Model Farm Road, Colombo 08',
+    phone: "0112695431",
+    name: "Mr. Dilshan Mendis",
+    company: "Royal Colombo Golf Club",
+    cardCode: "C10042",
+    site: "Model Farm Road, Colombo 08",
     equipment: [
-      { serial: 'TEL-SYS-VRF-RCGC', model: 'Daikin VRV Multi-System (6 Heads)', tag: 'Banquet Hall Central', warranty: 'AMC Comprehensive' },
-    ]
+      {
+        serial: "TEL-SYS-VRF-RCGC",
+        model: "Daikin VRV Multi-System (6 Heads)",
+        tag: "Banquet Hall Central",
+        warranty: "AMC Comprehensive",
+      },
+    ],
   },
   {
-    phone: '0112931150',
-    name: 'Mr. Anura Perera',
-    company: 'Lanka Cold Stores & Sea Food Logistics',
-    cardCode: 'C30089',
-    site: 'Fish Market Complex, Peliyagoda',
+    phone: "0112931150",
+    name: "Mr. Anura Perera",
+    company: "Lanka Cold Stores & Sea Food Logistics",
+    cardCode: "C30089",
+    site: "Fish Market Complex, Peliyagoda",
     equipment: [
-      { serial: 'TEL-REF-BIT-77810', model: 'Bitzer Semi-Hermetic Pack 30HP', tag: 'Freezer Room 3 Unit A', warranty: 'AMC Comprehensive' },
-    ]
-  }
+      {
+        serial: "TEL-REF-BIT-77810",
+        model: "Bitzer Semi-Hermetic Pack 30HP",
+        tag: "Freezer Room 3 Unit A",
+        warranty: "AMC Comprehensive",
+      },
+    ],
+  },
 ];
 
 export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreenProps> = ({
@@ -76,10 +111,12 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
   onNavigateToScreen,
 }) => {
   const [callLogs, setCallLogs] = useState<InboundCallLog[]>(SAMPLE_CALL_LOGS);
-  const [callerPhone, setCallerPhone] = useState('0112894400');
-  const [matchedCustomer, setMatchedCustomer] = useState<typeof PRESET_CUSTOMERS[0] | null>(PRESET_CUSTOMERS[0]);
+  const [callerPhone, setCallerPhone] = useState("0112894400");
+  const [matchedCustomer, setMatchedCustomer] = useState<(typeof PRESET_CUSTOMERS)[0] | null>(
+    PRESET_CUSTOMERS[0],
+  );
   const [selectedSerial, setSelectedSerial] = useState(PRESET_CUSTOMERS[0].equipment[0].serial);
-  const [selectedIssueChip, setSelectedIssueChip] = useState('No Cooling / Compressor Off');
+  const [selectedIssueChip, setSelectedIssueChip] = useState("No Cooling / Compressor Off");
   const [callDuration, setCallDuration] = useState(38);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
 
@@ -87,8 +124,10 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
   const [powerChecked, setPowerChecked] = useState(true);
   const [smokeHazard, setSmokeHazard] = useState(false);
   const [waterLeakChecked, setWaterLeakChecked] = useState(false);
-  const [errorCodeInput, setErrorCodeInput] = useState('E4');
-  const [notesInput, setNotesInput] = useState('Customer reports condenser fan started but compressor tripped after 2 mins with error E4.');
+  const [errorCodeInput, setErrorCodeInput] = useState("E4");
+  const [notesInput, setNotesInput] = useState(
+    "Customer reports condenser fan started but compressor tripped after 2 mins with error E4.",
+  );
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -105,21 +144,23 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
   const handlePhoneChange = (phone: string) => {
     setCallerPhone(phone);
-    const cleaned = phone.replace(/[^0-9]/g, '');
-    const found = PRESET_CUSTOMERS.find((c) => c.phone.includes(cleaned) || cleaned.includes(c.phone));
+    const cleaned = phone.replace(/[^0-9]/g, "");
+    const found = PRESET_CUSTOMERS.find(
+      (c) => c.phone.includes(cleaned) || cleaned.includes(c.phone),
+    );
     if (found) {
       setMatchedCustomer(found);
-      setSelectedSerial(found.equipment[0]?.serial || '');
+      setSelectedSerial(found.equipment[0]?.serial || "");
     } else {
       setMatchedCustomer(null);
-      setSelectedSerial('');
+      setSelectedSerial("");
     }
   };
 
-  const handleSimulateIncoming = (cust: typeof PRESET_CUSTOMERS[0]) => {
+  const handleSimulateIncoming = (cust: (typeof PRESET_CUSTOMERS)[0]) => {
     setCallerPhone(cust.phone);
     setMatchedCustomer(cust);
-    setSelectedSerial(cust.equipment[0]?.serial || '');
+    setSelectedSerial(cust.equipment[0]?.serial || "");
     setCallDuration(1);
     setIsTimerRunning(true);
     setToastMsg(`Simulated incoming call answered from ${cust.company} (${cust.phone})`);
@@ -133,24 +174,26 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
       id: `CALL-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleTimeString(),
       callerPhone,
-      callerName: matchedCustomer?.name || 'Unknown Caller',
-      companyName: matchedCustomer?.company || 'Walk-in / Direct Call',
+      callerName: matchedCustomer?.name || "Unknown Caller",
+      companyName: matchedCustomer?.company || "Walk-in / Direct Call",
       cardCode: matchedCustomer?.cardCode,
       matchedEquipmentCount: matchedCustomer?.equipment.length || 0,
       selectedSerial,
       quickIssue: selectedIssueChip,
       triagePassed: true,
       durationSeconds: callDuration,
-      status: 'Converted to Request',
+      status: "Converted to Request",
       createdTicketId: newTicketId,
     };
 
     setCallLogs([newLog, ...callLogs]);
-    setToastMsg(`Call converted successfully to Unified Service Request: ${newTicketId}! Routing to O1-SCR-TRX-01...`);
+    setToastMsg(
+      `Call converted successfully to Unified Service Request: ${newTicketId}! Routing to O1-SCR-TRX-01...`,
+    );
 
     setTimeout(() => {
       if (onNavigateToScreen) {
-        onNavigateToScreen('O1-SCR-TRX-01', newTicketId);
+        onNavigateToScreen("O1-SCR-TRX-01", newTicketId);
       }
     }, 1200);
   };
@@ -161,23 +204,23 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
       id: `CALL-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleTimeString(),
       callerPhone,
-      callerName: matchedCustomer?.name || 'Unknown Caller',
-      companyName: matchedCustomer?.company || 'Advisory Query',
+      callerName: matchedCustomer?.name || "Unknown Caller",
+      companyName: matchedCustomer?.company || "Advisory Query",
       cardCode: matchedCustomer?.cardCode,
       matchedEquipmentCount: 0,
       quickIssue: selectedIssueChip,
       triagePassed: true,
       durationSeconds: callDuration,
-      status: 'Advisory Only',
+      status: "Advisory Only",
     };
     setCallLogs([newLog, ...callLogs]);
-    setToastMsg('Call logged as Advisory Inquiry without creating dispatch ticket.');
+    setToastMsg("Call logged as Advisory Inquiry without creating dispatch ticket.");
     setTimeout(() => setToastMsg(null), 2500);
   };
 
   const minutes = Math.floor(callDuration / 60);
   const seconds = callDuration % 60;
-  const timeFormatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   return (
     <div className="space-y-4">
@@ -209,31 +252,41 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
               <span>Rapid Inbound Call Logger</span>
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              High-speed intake tool engineered for &lt; 45 second average call handling time with auto-suggest installed equipment.
+              High-speed intake tool engineered for &lt; 45 second average call handling time with
+              auto-suggest installed equipment.
             </p>
           </div>
 
           {/* Active Call HUD Timer */}
           <div className="flex items-center gap-3 bg-muted/60 p-2.5 rounded-xl border border-border">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${isTimerRunning ? 'bg-emerald-500 animate-ping' : 'bg-muted-foreground'}`} />
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${isTimerRunning ? "bg-emerald-500 animate-ping" : "bg-muted-foreground"}`}
+              />
               <div className="text-left">
-                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Active Handling Time</div>
-                <div className={`font-mono text-lg font-extrabold ${callDuration > 45 ? 'text-amber-500' : 'text-foreground'}`}>
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Active Handling Time
+                </div>
+                <div
+                  className={`font-mono text-lg font-extrabold ${callDuration > 45 ? "text-amber-500" : "text-foreground"}`}
+                >
                   {timeFormatted}
                 </div>
               </div>
             </div>
             <div className="text-[10px] text-muted-foreground pl-2 border-l border-border hidden sm:block">
-              Target: &lt; 00:45<br/>
-              Status: {isTimerRunning ? 'Live On Call' : 'Paused'}
+              Target: &lt; 00:45
+              <br />
+              Status: {isTimerRunning ? "Live On Call" : "Paused"}
             </div>
           </div>
         </div>
 
         {/* Quick Simulate Inbound Callers */}
         <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-muted-foreground">Simulate Inbound Caller:</span>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Simulate Inbound Caller:
+          </span>
           {PRESET_CUSTOMERS.map((cust) => (
             <button
               key={cust.phone}
@@ -241,7 +294,9 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
               className="text-xs px-2.5 py-1 rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <PhoneCall className="w-3 h-3 text-primary" />
-              <span>{cust.company.split(' ')[0]} ({cust.phone})</span>
+              <span>
+                {cust.company.split(" ")[0]} ({cust.phone})
+              </span>
             </button>
           ))}
         </div>
@@ -265,7 +320,9 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Incoming Phone Number / Caller ID *</label>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Incoming Phone Number / Caller ID *
+                </label>
                 <div className="relative mt-1">
                   <PhoneCall className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -292,17 +349,22 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
                   <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                     <div>
-                      <span className="font-medium text-foreground">Contact:</span> {matchedCustomer.name}
+                      <span className="font-medium text-foreground">Contact:</span>{" "}
+                      {matchedCustomer.name}
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">Location:</span> {matchedCustomer.site}
+                      <span className="font-medium text-foreground">Location:</span>{" "}
+                      {matchedCustomer.site}
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>No matching Business Partner in SAP B1. Caller will be registered as New Guest / Unregistered Client.</span>
+                  <span>
+                    No matching Business Partner in SAP B1. Caller will be registered as New Guest /
+                    Unregistered Client.
+                  </span>
                 </div>
               )}
             </div>
@@ -313,9 +375,13 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
             <div className="flex items-center justify-between border-b border-border pb-2.5 mb-3">
               <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-primary" />
-                <span>Installed Base Equipment at Site ({matchedCustomer?.equipment.length || 0} Units)</span>
+                <span>
+                  Installed Base Equipment at Site ({matchedCustomer?.equipment.length || 0} Units)
+                </span>
               </h3>
-              <span className="text-[10px] text-muted-foreground">Select equipment reporting fault</span>
+              <span className="text-[10px] text-muted-foreground">
+                Select equipment reporting fault
+              </span>
             </div>
 
             {matchedCustomer && matchedCustomer.equipment.length > 0 ? (
@@ -328,24 +394,29 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                       onClick={() => setSelectedSerial(eq.serial)}
                       className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
                         isSelected
-                          ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary'
-                          : 'border-border bg-background hover:bg-muted/50'
+                          ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary"
+                          : "border-border bg-background hover:bg-muted/50"
                       }`}
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-foreground text-xs">{eq.serial}</span>
+                          <span className="font-mono font-bold text-foreground text-xs">
+                            {eq.serial}
+                          </span>
                           <span className="font-semibold text-foreground">{eq.tag}</span>
                         </div>
                         <div className="text-muted-foreground text-[11px]">{eq.model}</div>
                       </div>
 
                       <div className="text-right">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          eq.warranty.includes('Comprehensive') || eq.warranty.includes('Warranty')
-                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                        }`}>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            eq.warranty.includes("Comprehensive") ||
+                            eq.warranty.includes("Warranty")
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                              : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                          }`}
+                        >
                           {eq.warranty}
                         </span>
                       </div>
@@ -371,16 +442,18 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
             {/* Quick Issue Chips */}
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">Reported Problem / Common Complaint *</label>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">
+                Reported Problem / Common Complaint *
+              </label>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  'No Cooling / Compressor Off',
-                  'Water Leakage / Drain Choke',
-                  'Power Trip / Circuit Breaker Spark',
-                  'Excessive Noise / Bearing Squeal',
-                  'Display Error Code (E4 / U4 / CH05)',
-                  'Gas Leak / Low Pressure',
-                  'Routine Periodic PM Due',
+                  "No Cooling / Compressor Off",
+                  "Water Leakage / Drain Choke",
+                  "Power Trip / Circuit Breaker Spark",
+                  "Excessive Noise / Bearing Squeal",
+                  "Display Error Code (E4 / U4 / CH05)",
+                  "Gas Leak / Low Pressure",
+                  "Routine Periodic PM Due",
                 ].map((chip) => {
                   const isSelected = selectedIssueChip === chip;
                   return (
@@ -389,8 +462,8 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                       onClick={() => setSelectedIssueChip(chip)}
                       className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer border ${
                         isSelected
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted/70 text-foreground border-border hover:bg-muted'
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted/70 text-foreground border-border hover:bg-muted"
                       }`}
                     >
                       {chip}
@@ -441,7 +514,9 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
               </label>
 
               <div className="pt-2 border-t border-border flex items-center gap-2">
-                <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Error Code on Remote:</span>
+                <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+                  Error Code on Remote:
+                </span>
                 <input
                   type="text"
                   value={errorCodeInput}
@@ -454,7 +529,9 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 
             {/* Quick Call Desk Notes */}
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Helpdesk Operator Intake Notes</label>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                Helpdesk Operator Intake Notes
+              </label>
               <textarea
                 rows={2}
                 value={notesInput}
@@ -482,7 +559,7 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                 </button>
                 {onNavigateToScreen && (
                   <button
-                    onClick={() => onNavigateToScreen('O1-SCR-TRX-03')}
+                    onClick={() => onNavigateToScreen("O1-SCR-TRX-03")}
                     className="py-2 px-3 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     Check Repeat Status
@@ -501,7 +578,9 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
             <Clock className="w-4 h-4 text-primary" />
             <span>Today's Inbound Call Queue & Intake Journal</span>
           </h3>
-          <span className="text-xs text-muted-foreground font-medium">Logged today: {callLogs.length} calls</span>
+          <span className="text-xs text-muted-foreground font-medium">
+            Logged today: {callLogs.length} calls
+          </span>
         </div>
 
         <div className="overflow-x-auto border border-border rounded-lg">
@@ -526,30 +605,44 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                   <td className="p-2.5 text-muted-foreground">{log.timestamp}</td>
                   <td className="p-2.5 font-medium text-foreground">{log.companyName}</td>
                   <td className="p-2.5 font-mono text-muted-foreground">{log.callerPhone}</td>
-                  <td className="p-2.5 font-mono font-semibold text-foreground">{log.selectedSerial || '—'}</td>
+                  <td className="p-2.5 font-mono font-semibold text-foreground">
+                    {log.selectedSerial || "—"}
+                  </td>
                   <td className="p-2.5 text-foreground">{log.quickIssue}</td>
                   <td className="p-2.5 text-center font-mono font-bold">
-                    <span className={log.durationSeconds > 45 ? 'text-amber-600' : 'text-emerald-600'}>
+                    <span
+                      className={log.durationSeconds > 45 ? "text-amber-600" : "text-emerald-600"}
+                    >
                       {log.durationSeconds}s
                     </span>
                   </td>
                   <td className="p-2.5">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      log.status === 'Converted to Request'
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                        : log.status === 'In Progress'
-                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        log.status === "Converted to Request"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                          : log.status === "In Progress"
+                            ? "bg-sky-500/15 text-sky-700 dark:text-sky-400"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       {log.status}
                     </span>
                   </td>
                   <td className="p-2.5 font-mono font-bold text-primary">
                     {log.createdTicketId ? (
-                      <span className="underline cursor-pointer" onClick={() => onNavigateToScreen && onNavigateToScreen('O1-SCR-TRX-01', log.createdTicketId)}>
+                      <span
+                        className="underline cursor-pointer"
+                        onClick={() =>
+                          onNavigateToScreen &&
+                          onNavigateToScreen("O1-SCR-TRX-01", log.createdTicketId)
+                        }
+                      >
                         {log.createdTicketId}
                       </span>
-                    ) : '—'}
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               ))}

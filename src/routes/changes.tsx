@@ -11,5 +11,16 @@ export const Route = createFileRoute("/changes")({
       { property: "og:description", content: "Plan, approve and schedule changes safely." },
     ],
   }),
-  component: () => <ModulePlaceholder title="Change Management" subtitle="Plan, approve and schedule changes safely." icon={GitPullRequestArrow} stats={[["Pending approval","6"],["Scheduled","14"],["Success rate","97%"]]} />,
+  component: () => (
+    <ModulePlaceholder
+      title="Change Management"
+      subtitle="Plan, approve and schedule changes safely."
+      icon={GitPullRequestArrow}
+      stats={[
+        ["Pending approval", "6"],
+        ["Scheduled", "14"],
+        ["Success rate", "97%"],
+      ]}
+    />
+  ),
 });

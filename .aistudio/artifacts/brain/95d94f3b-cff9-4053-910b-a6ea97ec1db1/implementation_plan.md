@@ -19,9 +19,9 @@ Implementation plan for introducing the **Masters Hub** on the main Workspace an
 
 - **What It Does**: Provides an enterprise-grade Master Data and Configuration subsystem for Telesonic Lanka Service Management (Option 01). Administrators, service coordinators, and engineering supervisors can view, edit, configure, and audit master records synchronized with SAP Business One.
 - **Target Audience / Personas**:
-  - *Service Coordinator / Manager*: Reviews Customer Business Partners, Sites/Locations, Installed Base Equipment, Multi-component systems, and Warranties.
-  - *Service Administrator*: Manages Checklist Templates, SLA rules, Hold Reasons, Repeat Reasons, and Notification Templates.
-  - *Finance & Operations*: Configures Project G/L Budgets, Labour Rates, Franchise Warehouses, and Deviation Thresholds.
+  - _Service Coordinator / Manager_: Reviews Customer Business Partners, Sites/Locations, Installed Base Equipment, Multi-component systems, and Warranties.
+  - _Service Administrator_: Manages Checklist Templates, SLA rules, Hold Reasons, Repeat Reasons, and Notification Templates.
+  - _Finance & Operations_: Configures Project G/L Budgets, Labour Rates, Franchise Warehouses, and Deviation Thresholds.
 - **Key Value**: Replaces disconnected spreadsheet trackers with a unified, audit-logged master repository featuring transparent SAP B1 integration indicators (`⇄B1`), preventing data duplication and enforcing strict business validation rules (e.g., O1-BCR rules).
 
 ---
@@ -48,12 +48,13 @@ Implementation plan for introducing the **Masters Hub** on the main Workspace an
      - Visual distinction between SAP B1 Synchronized fields (marked with `⇄B1` badge), calculated read-only fields (subtle neutral background), and editable service attribute fields.
      - Mandatory fields marked with red asterisk `*`.
    - **Tabbed Sub-Grids**:
-     - Contextual tabs (e.g. *Addresses / Sites*, *Contacts*, *Equipment*, *Service Calls*, *Contracts*, *Commercial*, *Attachments*, *History*).
+     - Contextual tabs (e.g. _Addresses / Sites_, _Contacts_, _Equipment_, _Service Calls_, _Contracts_, _Commercial_, _Attachments_, _History_).
      - High-density data tables with tabular figures, sorting, search, and export actions.
    - **History / Audit Drawer**:
      - Quick modal showing change timestamp, user, action, field, before/after values, and reasons.
 
 ### Visual Identity & Theme
+
 - **Theme**: Seamless integration with the existing Servio ITSM design system (neutral palette, clean borders, custom themes: Indigo, Emerald, Ocean, Sunset, Plum).
 - **Typography**: `Plus Jakarta Sans` for clean UI labels and typography hierarchy; `JetBrains Mono` for Code IDs, Serial numbers, and currency values (`tabular-nums`).
 - **Indicators**:
@@ -66,13 +67,13 @@ Implementation plan for introducing the **Masters Hub** on the main Workspace an
 ## 3. Key Product Decisions & Trade-Offs
 
 - **Hierarchical Layout vs Flattened View**:
-  - *Chosen*: A centralized **Masters Hub** with search, categorization, and quick-jump breadcrumbs, combined with modular full-screen forms for each master screen.
-  - *Why*: With 30 master screens, users need quick category scanning and direct search without cluttering the global top navigation.
+  - _Chosen_: A centralized **Masters Hub** with search, categorization, and quick-jump breadcrumbs, combined with modular full-screen forms for each master screen.
+  - _Why_: With 30 master screens, users need quick category scanning and direct search without cluttering the global top navigation.
 - **Client-Side State with Sample Data Preloading**:
-  - *Chosen*: Rich client-side reactive store preloaded with authentic Sri Lankan test cases (Air conditioning, industrial machines, refrigeration, commercial vehicles), storing local additions/updates in localStorage.
-  - *Why*: Allows immediate, zero-latency interactive testing, validation triggering, record editing, and export simulation without requiring an active backend or SAP server.
+  - _Chosen_: Rich client-side reactive store preloaded with authentic Sri Lankan test cases (Air conditioning, industrial machines, refrigeration, commercial vehicles), storing local additions/updates in localStorage.
+  - _Why_: Allows immediate, zero-latency interactive testing, validation triggering, record editing, and export simulation without requiring an active backend or SAP server.
 - **PDF / Excel Export Simulation**:
-  - *Chosen*: Generate actual formatted CSV/Excel downloads and browser print/PDF views matching the layout requirements from Section A1 and A9.
+  - _Chosen_: Generate actual formatted CSV/Excel downloads and browser print/PDF views matching the layout requirements from Section A1 and A9.
 
 ---
 

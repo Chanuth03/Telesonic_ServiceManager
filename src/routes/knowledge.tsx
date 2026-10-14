@@ -11,5 +11,16 @@ export const Route = createFileRoute("/knowledge")({
       { property: "og:description", content: "Self-help articles and agent runbooks." },
     ],
   }),
-  component: () => <ModulePlaceholder title="Knowledge Base" subtitle="Self-help articles and agent runbooks." icon={BookOpen} stats={[["Articles","512"],["Views this week","8.2k"],["Deflection rate","31%"]]} />,
+  component: () => (
+    <ModulePlaceholder
+      title="Knowledge Base"
+      subtitle="Self-help articles and agent runbooks."
+      icon={BookOpen}
+      stats={[
+        ["Articles", "512"],
+        ["Views this week", "8.2k"],
+        ["Deflection rate", "31%"],
+      ]}
+    />
+  ),
 });

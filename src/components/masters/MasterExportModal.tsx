@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
-import { X, FileText, FileSpreadsheet, Printer, Download, Check } from 'lucide-react';
-import { MasterScreenMeta, MasterTabDef } from '@/data/mastersSpecData';
+import React, { useRef } from "react";
+import { X, FileText, FileSpreadsheet, Printer, Download, Check } from "lucide-react";
+import { MasterScreenMeta, MasterTabDef } from "@/data/mastersSpecData";
 
 interface MasterExportModalProps {
   isOpen: boolean;
@@ -17,13 +17,13 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
   activeTab,
   formData,
 }) => {
-  const [activeFormat, setActiveFormat] = React.useState<'pdf' | 'excel'>('pdf');
+  const [activeFormat, setActiveFormat] = React.useState<"pdf" | "excel">("pdf");
   const [downloaded, setDownloaded] = React.useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
-  const currentDate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const currentDate = new Date().toISOString().replace("T", " ").slice(0, 19);
   const recordRef = formData[meta.fields[0]?.key] || meta.code;
 
   const handlePrintPdf = () => {
@@ -31,13 +31,13 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
     const printContent = printRef.current;
     if (!printContent) return;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow?.document;
@@ -87,7 +87,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
             <table>
               <thead>
                 <tr>
-                  ${activeTab.columns.map((c) => `<th class="${c.align === 'right' ? 'right' : ''}">${c.label}</th>`).join('')}
+                  ${activeTab.columns.map((c) => `<th class="${c.align === "right" ? "right" : ""}">${c.label}</th>`).join("")}
                 </tr>
               </thead>
               <tbody>
@@ -96,12 +96,15 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                     (row) => `
                   <tr>
                     ${activeTab.columns
-                      .map((c) => `<td class="${c.align === 'right' ? 'right' : ''}">${row[c.key] ?? '—'}</td>`)
-                      .join('')}
+                      .map(
+                        (c) =>
+                          `<td class="${c.align === "right" ? "right" : ""}">${row[c.key] ?? "—"}</td>`,
+                      )
+                      .join("")}
                   </tr>
-                `
+                `,
                   )
-                  .join('')}
+                  .join("")}
               </tbody>
             </table>
           </div>
@@ -155,10 +158,10 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
     </div>
     <table>
       <thead>
-        <tr>${activeTab.columns.map((c) => `<th class="${c.align === 'right' ? 'right' : ''}">${c.label}</th>`).join('')}</tr>
+        <tr>${activeTab.columns.map((c) => `<th class="${c.align === "right" ? "right" : ""}">${c.label}</th>`).join("")}</tr>
       </thead>
       <tbody>
-        ${activeTab.data.map((r) => `<tr>${activeTab.columns.map((c) => `<td class="${c.align === 'right' ? 'right' : ''}">${r[c.key] ?? '—'}</td>`).join('')}</tr>`).join('')}
+        ${activeTab.data.map((r) => `<tr>${activeTab.columns.map((c) => `<td class="${c.align === "right" ? "right" : ""}">${r[c.key] ?? "—"}</td>`).join("")}</tr>`).join("")}
       </tbody>
     </table>
     <div class="footer">
@@ -169,9 +172,9 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
   </body>
 </html>`;
 
-    const blob = new Blob([htmlString], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([htmlString], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `${meta.code.toLowerCase()}_${activeTab.id}_service_report.html`;
     document.body.appendChild(a);
@@ -186,31 +189,31 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
   const handleDownloadExcel = () => {
     const headers = activeTab.columns.map((c) => c.label);
     const rows = activeTab.data.map((row) =>
-      activeTab.columns.map((col) => `"${row[col.key] ?? ''}"`)
+      activeTab.columns.map((col) => `"${row[col.key] ?? ""}"`),
     );
 
     const reportCriteria = [
-      ['# REPORT CRITERIA SHEET — TELESONIC LANKA SERVICE MANAGEMENT (OPTION 01)'],
+      ["# REPORT CRITERIA SHEET — TELESONIC LANKA SERVICE MANAGEMENT (OPTION 01)"],
       [`Screen ID: ${meta.id}`, `Screen Name: ${meta.name}`],
       [`Active Record: ${recordRef}`, `Generated By: Kasun Perera (Service Coordinator)`],
       [`Timestamp: ${currentDate}`, `Confidentiality: Internal Telesonic Sri Lanka`],
       [`Tab Dataset: ${activeTab.label}`, `Total Records: ${activeTab.data.length}`],
-      ['----------------------------------------------------------------------'],
+      ["----------------------------------------------------------------------"],
       [],
     ];
 
     const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      reportCriteria.map((r) => r.join(',')).join('\n') +
-      '\n' +
-      headers.join(',') +
-      '\n' +
-      rows.map((r) => r.join(',')).join('\n');
+      "data:text/csv;charset=utf-8," +
+      reportCriteria.map((r) => r.join(",")).join("\n") +
+      "\n" +
+      headers.join(",") +
+      "\n" +
+      rows.map((r) => r.join(",")).join("\n");
 
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${meta.code.toLowerCase()}_${activeTab.id}_export.csv`);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${meta.code.toLowerCase()}_${activeTab.id}_export.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -242,22 +245,22 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
           <div className="flex items-center gap-2">
             <div className="flex p-0.5 bg-neutral-200 dark:bg-neutral-800 rounded-md text-xs font-medium">
               <button
-                onClick={() => setActiveFormat('pdf')}
+                onClick={() => setActiveFormat("pdf")}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-sm cursor-pointer transition-colors ${
-                  activeFormat === 'pdf'
-                    ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold'
-                    : 'text-neutral-600 dark:text-neutral-400'
+                  activeFormat === "pdf"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold"
+                    : "text-neutral-600 dark:text-neutral-400"
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>PDF Report</span>
               </button>
               <button
-                onClick={() => setActiveFormat('excel')}
+                onClick={() => setActiveFormat("excel")}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-sm cursor-pointer transition-colors ${
-                  activeFormat === 'excel'
-                    ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold'
-                    : 'text-neutral-600 dark:text-neutral-400'
+                  activeFormat === "excel"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold"
+                    : "text-neutral-600 dark:text-neutral-400"
                 }`}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -276,7 +279,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 flex-1 overflow-y-auto space-y-4">
-          {activeFormat === 'pdf' ? (
+          {activeFormat === "pdf" ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-neutral-500">
@@ -362,7 +365,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                           <th
                             key={c.key}
                             className={`p-2 border border-neutral-200 dark:border-neutral-700 font-semibold ${
-                              c.align === 'right' ? 'text-right' : 'text-left'
+                              c.align === "right" ? "text-right" : "text-left"
                             }`}
                           >
                             {c.label}
@@ -377,10 +380,10 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                             <td
                               key={c.key}
                               className={`p-2 border border-neutral-200 dark:border-neutral-700 ${
-                                c.align === 'right' ? 'text-right font-mono' : ''
+                                c.align === "right" ? "text-right font-mono" : ""
                               }`}
                             >
-                              {r[c.key] ?? '—'}
+                              {r[c.key] ?? "—"}
                             </td>
                           ))}
                         </tr>
@@ -419,7 +422,9 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                   <div className="p-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded">
                     <strong>1. Report Criteria Sheet:</strong>
                     <div>· Title: Telesonic Lanka Service Management (Option 01)</div>
-                    <div>· Screen ID: {meta.id} — {meta.name}</div>
+                    <div>
+                      · Screen ID: {meta.id} — {meta.name}
+                    </div>
                     <div>· Run User: Kasun Perera (Service Coordinator)</div>
                     <div>· Run Timestamp: {currentDate}</div>
                     <div>· Confidentiality Note: Internal Telesonic Lanka</div>
@@ -427,7 +432,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                   <div className="p-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded">
                     <strong>2. Data Register Sheet:</strong>
                     <div>· Active Tab: {activeTab.label}</div>
-                    <div>· Column Headers: {activeTab.columns.map((c) => c.label).join(' | ')}</div>
+                    <div>· Column Headers: {activeTab.columns.map((c) => c.label).join(" | ")}</div>
                     <div>· Row Count: {activeTab.data.length} records with native data types</div>
                   </div>
                 </div>

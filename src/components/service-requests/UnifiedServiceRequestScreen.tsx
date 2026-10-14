@@ -1,30 +1,30 @@
-import React, { useState } from 'react';
-import { 
-  Building2, 
-  MapPin, 
-  Cpu, 
-  AlertCircle, 
-  Clock, 
-  ShieldCheck, 
-  DollarSign, 
-  FileText, 
-  UserCheck, 
-  Layers, 
-  Printer, 
-  Download, 
-  RefreshCw, 
-  Save, 
-  CheckCircle2, 
-  PhoneCall, 
+import React, { useState } from "react";
+import {
+  Building2,
+  MapPin,
+  Cpu,
+  AlertCircle,
+  Clock,
+  ShieldCheck,
+  DollarSign,
+  FileText,
+  UserCheck,
+  Layers,
+  Printer,
+  Download,
+  RefreshCw,
+  Save,
+  CheckCircle2,
+  PhoneCall,
   AlertTriangle,
   History,
   ArrowRight,
   ExternalLink,
   ChevronDown,
   Wrench,
-  Search
-} from 'lucide-react';
-import { ServiceRequestRecord, SAMPLE_SERVICE_REQUESTS } from '@/data/serviceRequestsSpecData';
+  Search,
+} from "lucide-react";
+import { ServiceRequestRecord, SAMPLE_SERVICE_REQUESTS } from "@/data/serviceRequestsSpecData";
 
 interface UnifiedServiceRequestScreenProps {
   onNavigateToScreen?: (screenId: string, contextId?: string) => void;
@@ -35,10 +35,12 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
 }) => {
   const [requests, setRequests] = useState<ServiceRequestRecord[]>(SAMPLE_SERVICE_REQUESTS);
   const [selectedId, setSelectedId] = useState<string>(SAMPLE_SERVICE_REQUESTS[0].id);
-  const [activeTab, setActiveTab] = useState<'diagnostics' | 'commercial' | 'history' | 'parts' | 'audit'>('diagnostics');
+  const [activeTab, setActiveTab] = useState<
+    "diagnostics" | "commercial" | "history" | "parts" | "audit"
+  >("diagnostics");
   const [isSyncingB1, setIsSyncingB1] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [searchFilter, setSearchFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState("");
 
   const currentReq = requests.find((r) => r.id === selectedId) || requests[0];
 
@@ -51,7 +53,9 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
     setIsSyncingB1(true);
     setTimeout(() => {
       setIsSyncingB1(false);
-      showToast('⇄ Synced with SAP Business One DI Server API: CardCode, Credit Limit & Invoices updated.');
+      showToast(
+        "⇄ Synced with SAP Business One DI Server API: CardCode, Credit Limit & Invoices updated.",
+      );
     }, 800);
   };
 
@@ -66,9 +70,9 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
   const handleExportCsv = () => {
     const csvContent = `data:text/csv;charset=utf-8,Ticket ID,Customer,Phone,Equipment Serial,Model,Status,Priority,Credit Limit LKR,Overdue LKR\n"${currentReq.id}","${currentReq.customer.cardName}","${currentReq.customer.phone}","${currentReq.equipment.serialNo}","${currentReq.equipment.model}","${currentReq.status}","${currentReq.priority}","${currentReq.commercial.creditLimitLKR}","${currentReq.commercial.overdueAmountLKR}"`;
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${currentReq.id}_service_request.csv`);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${currentReq.id}_service_request.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -103,7 +107,8 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               <span>Unified Service Request with SAP Commercial Information Panel</span>
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Multi-panel service ticket creation and management interface with live SAP Business One customer financial health verification.
+              Multi-panel service ticket creation and management interface with live SAP Business
+              One customer financial health verification.
             </p>
           </div>
 
@@ -125,7 +130,12 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-background text-foreground cursor-pointer"
             >
               {requests
-                .filter(r => !searchFilter || r.id.toLowerCase().includes(searchFilter.toLowerCase()) || r.customer.cardName.toLowerCase().includes(searchFilter.toLowerCase()))
+                .filter(
+                  (r) =>
+                    !searchFilter ||
+                    r.id.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                    r.customer.cardName.toLowerCase().includes(searchFilter.toLowerCase()),
+                )
                 .map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.id}: {r.customer.cardName.slice(0, 24)} ({r.status})
@@ -151,13 +161,15 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               disabled={isSyncingB1}
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-colors cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingB1 ? 'animate-spin text-primary' : 'text-sky-500'}`} />
-              <span>{isSyncingB1 ? 'Querying SAP...' : 'Refresh SAP Commercial'}</span>
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isSyncingB1 ? "animate-spin text-primary" : "text-sky-500"}`}
+              />
+              <span>{isSyncingB1 ? "Querying SAP..." : "Refresh SAP Commercial"}</span>
             </button>
 
             {currentReq.repeatFlag?.isRepeat && onNavigateToScreen && (
               <button
-                onClick={() => onNavigateToScreen('O1-SCR-TRX-03', currentReq.id)}
+                onClick={() => onNavigateToScreen("O1-SCR-TRX-03", currentReq.id)}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors cursor-pointer animate-pulse"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
@@ -167,7 +179,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
 
             {currentReq.isMultiEquipment && onNavigateToScreen && (
               <button
-                onClick={() => onNavigateToScreen('O1-SCR-TRX-04', currentReq.id)}
+                onClick={() => onNavigateToScreen("O1-SCR-TRX-04", currentReq.id)}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-colors cursor-pointer"
               >
                 <Layers className="w-3.5 h-3.5 text-purple-500" />
@@ -177,7 +189,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
 
             {currentReq.commercial.billingHold && onNavigateToScreen && (
               <button
-                onClick={() => onNavigateToScreen('O1-SCR-TRX-03', currentReq.id)}
+                onClick={() => onNavigateToScreen("O1-SCR-TRX-03", currentReq.id)}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20 transition-colors cursor-pointer"
               >
                 <AlertCircle className="w-3.5 h-3.5" />
@@ -224,7 +236,9 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">BP CardCode & Name *</label>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  BP CardCode & Name *
+                </label>
                 <div className="font-semibold text-foreground mt-0.5 flex items-center justify-between">
                   <span>{currentReq.customer.cardName}</span>
                   <span className="font-mono text-[11px] px-1.5 py-0.5 bg-muted rounded font-bold text-primary">
@@ -234,32 +248,54 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Primary Contact Person</label>
-                <div className="text-foreground font-medium mt-0.5">{currentReq.customer.contactPerson}</div>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Primary Contact Person
+                </label>
+                <div className="text-foreground font-medium mt-0.5">
+                  {currentReq.customer.contactPerson}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-medium text-muted-foreground">Phone Number</label>
-                  <div className="text-foreground font-mono font-medium mt-0.5">{currentReq.customer.phone}</div>
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    Phone Number
+                  </label>
+                  <div className="text-foreground font-mono font-medium mt-0.5">
+                    {currentReq.customer.phone}
+                  </div>
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-muted-foreground">Email</label>
-                  <div className="text-foreground truncate font-medium mt-0.5">{currentReq.customer.email}</div>
+                  <div className="text-foreground truncate font-medium mt-0.5">
+                    {currentReq.customer.email}
+                  </div>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-border">
                 <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                   <MapPin className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-semibold text-foreground text-[11px]">Service Site Location</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">({currentReq.customer.siteId})</span>
+                  <span className="font-semibold text-foreground text-[11px]">
+                    Service Site Location
+                  </span>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    ({currentReq.customer.siteId})
+                  </span>
                 </div>
-                <div className="text-foreground font-medium text-[11px]">{currentReq.customer.siteName}</div>
-                <div className="text-muted-foreground text-[11px] mt-0.5">{currentReq.customer.address}</div>
+                <div className="text-foreground font-medium text-[11px]">
+                  {currentReq.customer.siteName}
+                </div>
+                <div className="text-muted-foreground text-[11px] mt-0.5">
+                  {currentReq.customer.address}
+                </div>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span className="px-1.5 py-0.5 bg-muted rounded font-medium">{currentReq.customer.district}</span>
-                  <span className="px-1.5 py-0.5 bg-muted rounded font-medium">{currentReq.customer.zone}</span>
+                  <span className="px-1.5 py-0.5 bg-muted rounded font-medium">
+                    {currentReq.customer.district}
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-muted rounded font-medium">
+                    {currentReq.customer.zone}
+                  </span>
                 </div>
               </div>
             </div>
@@ -280,8 +316,12 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-[11px] font-medium text-muted-foreground">Serial Number *</label>
-                  <div className="font-mono font-bold text-foreground text-xs">{currentReq.equipment.serialNo}</div>
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    Serial Number *
+                  </label>
+                  <div className="font-mono font-bold text-foreground text-xs">
+                    {currentReq.equipment.serialNo}
+                  </div>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
                   {currentReq.equipment.brand}
@@ -289,45 +329,68 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Model & Specification</label>
-                <div className="text-foreground font-medium mt-0.5">{currentReq.equipment.model}</div>
-                <div className="text-muted-foreground text-[11px]">{currentReq.equipment.category}</div>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Model & Specification
+                </label>
+                <div className="text-foreground font-medium mt-0.5">
+                  {currentReq.equipment.model}
+                </div>
+                <div className="text-muted-foreground text-[11px]">
+                  {currentReq.equipment.category}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-medium text-muted-foreground">Unit Tag / Room</label>
-                  <div className="text-foreground font-medium mt-0.5">{currentReq.equipment.equipmentTag}</div>
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    Unit Tag / Room
+                  </label>
+                  <div className="text-foreground font-medium mt-0.5">
+                    {currentReq.equipment.equipmentTag}
+                  </div>
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-muted-foreground">Operating Hours</label>
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    Operating Hours
+                  </label>
                   <div className="text-foreground font-mono font-medium mt-0.5">
-                    {currentReq.equipment.operatingHours ? `${currentReq.equipment.operatingHours.toLocaleString()} hrs` : 'N/A'}
+                    {currentReq.equipment.operatingHours
+                      ? `${currentReq.equipment.operatingHours.toLocaleString()} hrs`
+                      : "N/A"}
                   </div>
                 </div>
               </div>
 
               <div className="p-2.5 rounded-lg bg-muted/60 border border-border space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-muted-foreground">Warranty / Contract:</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    currentReq.equipment.warrantyStatus.includes('Comprehensive') || currentReq.equipment.warrantyStatus.includes('Warranty')
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-                  }`}>
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    Warranty / Contract:
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      currentReq.equipment.warrantyStatus.includes("Comprehensive") ||
+                      currentReq.equipment.warrantyStatus.includes("Warranty")
+                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                        : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                    }`}
+                  >
                     {currentReq.equipment.warrantyStatus}
                   </span>
                 </div>
                 {currentReq.equipment.contractNo && (
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Contract Ref:</span>
-                    <span className="font-mono font-semibold text-foreground">{currentReq.equipment.contractNo}</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {currentReq.equipment.contractNo}
+                    </span>
                   </div>
                 )}
                 {currentReq.equipment.contractExpiry && (
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Valid Until:</span>
-                    <span className="font-medium text-foreground">{currentReq.equipment.contractExpiry}</span>
+                    <span className="font-medium text-foreground">
+                      {currentReq.equipment.contractExpiry}
+                    </span>
                   </div>
                 )}
               </div>
@@ -344,11 +407,13 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <h3 className="text-sm font-bold text-foreground">Service Request & Triage</h3>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                  currentReq.priority.includes('P1') 
-                    ? 'bg-destructive/15 text-destructive border border-destructive/30' 
-                    : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                }`}>
+                <span
+                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    currentReq.priority.includes("P1")
+                      ? "bg-destructive/15 text-destructive border border-destructive/30"
+                      : "bg-amber-500/15 text-amber-600 border border-amber-500/30"
+                  }`}
+                >
                   {currentReq.priority}
                 </span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-muted text-foreground">
@@ -360,11 +425,15 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-medium text-muted-foreground">Call Type *</label>
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    Call Type *
+                  </label>
                   <select
                     value={currentReq.callType}
                     onChange={(e) => {
-                      const updated = requests.map(r => r.id === currentReq.id ? { ...r, callType: e.target.value as any } : r);
+                      const updated = requests.map((r) =>
+                        r.id === currentReq.id ? { ...r, callType: e.target.value as any } : r,
+                      );
                       setRequests(updated);
                     }}
                     className="w-full mt-1 px-2.5 py-1.5 text-xs rounded border border-border bg-background text-foreground font-medium"
@@ -386,12 +455,18 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Fault Category *</label>
-                <div className="text-foreground font-semibold mt-0.5">{currentReq.fault.category}</div>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Fault Category *
+                </label>
+                <div className="text-foreground font-semibold mt-0.5">
+                  {currentReq.fault.category}
+                </div>
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Reported Symptoms / Error Code</label>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Reported Symptoms / Error Code
+                </label>
                 <div className="mt-1 flex items-center gap-2">
                   {currentReq.fault.errorCode && (
                     <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-destructive/10 text-destructive border border-destructive/20">
@@ -403,12 +478,18 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Detailed Problem Description *</label>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Detailed Problem Description *
+                </label>
                 <textarea
                   rows={3}
                   value={currentReq.fault.description}
                   onChange={(e) => {
-                    const updated = requests.map(r => r.id === currentReq.id ? { ...r, fault: { ...r.fault, description: e.target.value } } : r);
+                    const updated = requests.map((r) =>
+                      r.id === currentReq.id
+                        ? { ...r, fault: { ...r.fault, description: e.target.value } }
+                        : r,
+                    );
                     setRequests(updated);
                   }}
                   className="w-full mt-1 p-2 text-xs rounded border border-border bg-background text-foreground font-normal focus:ring-1 focus:ring-primary focus:outline-none"
@@ -416,12 +497,18 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground">Preliminary Root Cause Hypothesis</label>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  Preliminary Root Cause Hypothesis
+                </label>
                 <input
                   type="text"
-                  value={currentReq.fault.preliminaryRootCause || ''}
+                  value={currentReq.fault.preliminaryRootCause || ""}
                   onChange={(e) => {
-                    const updated = requests.map(r => r.id === currentReq.id ? { ...r, fault: { ...r.fault, preliminaryRootCause: e.target.value } } : r);
+                    const updated = requests.map((r) =>
+                      r.id === currentReq.id
+                        ? { ...r, fault: { ...r.fault, preliminaryRootCause: e.target.value } }
+                        : r,
+                    );
                     setRequests(updated);
                   }}
                   className="w-full mt-1 px-2.5 py-1.5 text-xs rounded border border-border bg-background text-foreground"
@@ -435,16 +522,26 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                     <Clock className="w-3.5 h-3.5 text-primary" />
                     <span>SLA Targets (Option 01 Working Calendar)</span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground font-mono">Logged: {currentReq.createdAt}</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    Logged: {currentReq.createdAt}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2 rounded bg-background border border-border">
-                    <span className="text-[10px] text-muted-foreground block">Response Target:</span>
-                    <span className="font-bold text-foreground font-mono">{currentReq.slaResponseTarget}</span>
+                    <span className="text-[10px] text-muted-foreground block">
+                      Response Target:
+                    </span>
+                    <span className="font-bold text-foreground font-mono">
+                      {currentReq.slaResponseTarget}
+                    </span>
                   </div>
                   <div className="p-2 rounded bg-background border border-border">
-                    <span className="text-[10px] text-muted-foreground block">Resolution Target:</span>
-                    <span className="font-bold text-foreground font-mono">{currentReq.slaResolutionTarget}</span>
+                    <span className="text-[10px] text-muted-foreground block">
+                      Resolution Target:
+                    </span>
+                    <span className="font-bold text-foreground font-mono">
+                      {currentReq.slaResolutionTarget}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -454,7 +551,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <div>
                   <span className="text-[11px] text-muted-foreground">Primary Field Tech:</span>
                   <div className="font-semibold text-foreground text-xs mt-0.5">
-                    {currentReq.allocation.assignedTechName || 'Unassigned'}
+                    {currentReq.allocation.assignedTechName || "Unassigned"}
                   </div>
                 </div>
                 <div className="text-right">
@@ -485,17 +582,21 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             </div>
 
             {/* Credit Status Banner */}
-            <div className={`p-2.5 rounded-lg mb-3 flex items-center justify-between ${
-              currentReq.commercial.creditStatus === 'Normal'
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                : currentReq.commercial.creditStatus === 'Warning'
-                ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30'
-                : 'bg-destructive/15 text-destructive border border-destructive/30'
-            }`}>
+            <div
+              className={`p-2.5 rounded-lg mb-3 flex items-center justify-between ${
+                currentReq.commercial.creditStatus === "Normal"
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                  : currentReq.commercial.creditStatus === "Warning"
+                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                    : "bg-destructive/15 text-destructive border border-destructive/30"
+              }`}
+            >
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4" />
                 <div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider">Account Standing</div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider">
+                    Account Standing
+                  </div>
                   <div className="text-xs font-bold">{currentReq.commercial.creditStatus}</div>
                 </div>
               </div>
@@ -524,21 +625,30 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
 
               <div className="flex justify-between items-center py-1 border-b border-border/60">
                 <span className="text-muted-foreground text-[11px]">Overdue Invoices:</span>
-                <span className={`font-mono font-bold ${
-                  currentReq.commercial.overdueAmountLKR > 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
-                }`}>
+                <span
+                  className={`font-mono font-bold ${
+                    currentReq.commercial.overdueAmountLKR > 0
+                      ? "text-destructive"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
                   LKR {currentReq.commercial.overdueAmountLKR.toLocaleString()}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-1 border-b border-border/60">
                 <span className="text-muted-foreground text-[11px]">Payment Terms:</span>
-                <span className="font-medium text-foreground">{currentReq.commercial.paymentTerms}</span>
+                <span className="font-medium text-foreground">
+                  {currentReq.commercial.paymentTerms}
+                </span>
               </div>
 
               <div className="flex justify-between items-center py-1 border-b border-border/60">
                 <span className="text-muted-foreground text-[11px]">Price List:</span>
-                <span className="font-medium text-foreground text-[10px] truncate max-w-[140px]" title={currentReq.commercial.priceList}>
+                <span
+                  className="font-medium text-foreground text-[10px] truncate max-w-[140px]"
+                  title={currentReq.commercial.priceList}
+                >
                   {currentReq.commercial.priceList}
                 </span>
               </div>
@@ -546,7 +656,9 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
               <div className="flex justify-between items-center py-1">
                 <span className="text-muted-foreground text-[11px]">Contract Coverage:</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-[11px]">
-                  {currentReq.commercial.coveredUnderContract ? '✓ Covered (Free Labour)' : '✗ Billable Service'}
+                  {currentReq.commercial.coveredUnderContract
+                    ? "✓ Covered (Free Labour)"
+                    : "✗ Billable Service"}
                 </span>
               </div>
             </div>
@@ -570,11 +682,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
       <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
         <div className="flex border-b border-border bg-muted/40 overflow-x-auto">
           {[
-            { id: 'diagnostics', label: 'Technical Diagnostics & Root Cause', icon: Wrench },
-            { id: 'commercial', label: 'SAP B1 Open Invoices & AMC Terms', icon: DollarSign },
-            { id: 'history', label: 'Equipment Previous Calls (Audit)', icon: History },
-            { id: 'parts', label: 'Parts & Material Estimates', icon: Layers },
-            { id: 'audit', label: 'Transaction Audit Trail (COM-14)', icon: FileText },
+            { id: "diagnostics", label: "Technical Diagnostics & Root Cause", icon: Wrench },
+            { id: "commercial", label: "SAP B1 Open Invoices & AMC Terms", icon: DollarSign },
+            { id: "history", label: "Equipment Previous Calls (Audit)", icon: History },
+            { id: "parts", label: "Parts & Material Estimates", icon: Layers },
+            { id: "audit", label: "Transaction Audit Trail (COM-14)", icon: FileText },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -584,8 +696,8 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
                   isActive
-                    ? 'border-primary text-primary bg-background'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                    ? "border-primary text-primary bg-background"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -596,11 +708,13 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
         </div>
 
         <div className="p-4 text-xs">
-          {activeTab === 'diagnostics' && (
+          {activeTab === "diagnostics" && (
             <div className="space-y-3">
               <h4 className="font-bold text-foreground text-sm flex items-center gap-2">
                 <span>Field Symptom Verification & Diagnostic Checklist</span>
-                <span className="text-[10px] font-normal text-muted-foreground">(Master Template O1-SCR-MST-16)</span>
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  (Master Template O1-SCR-MST-16)
+                </span>
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="p-3 rounded-lg border border-border bg-background space-y-2">
@@ -654,11 +768,15 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             </div>
           )}
 
-          {activeTab === 'commercial' && (
+          {activeTab === "commercial" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-foreground text-sm">SAP Business One A/R Invoice Sub-Grid (OINV)</h4>
-                <span className="text-[11px] text-muted-foreground">Currency: Sri Lankan Rupee (LKR)</span>
+                <h4 className="font-bold text-foreground text-sm">
+                  SAP Business One A/R Invoice Sub-Grid (OINV)
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  Currency: Sri Lankan Rupee (LKR)
+                </span>
               </div>
               <div className="overflow-x-auto border border-border rounded-lg">
                 <table className="w-full text-left">
@@ -681,7 +799,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                       <td className="p-2.5 text-right">LKR 450,000</td>
                       <td className="p-2.5 text-right font-bold text-destructive">LKR 450,000</td>
                       <td className="p-2.5">45 Days</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-destructive/15 text-destructive font-sans font-bold text-[10px]">Overdue</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-destructive/15 text-destructive font-sans font-bold text-[10px]">
+                          Overdue
+                        </span>
+                      </td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-bold text-primary">INV-2026-9480</td>
@@ -690,7 +812,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                       <td className="p-2.5 text-right">LKR 1,200,000</td>
                       <td className="p-2.5 text-right">LKR 1,200,000</td>
                       <td className="p-2.5">Current</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-sans font-bold text-[10px]">Within Terms</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-sans font-bold text-[10px]">
+                          Within Terms
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -698,9 +824,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             </div>
           )}
 
-          {activeTab === 'history' && (
+          {activeTab === "history" && (
             <div className="space-y-3">
-              <h4 className="font-bold text-foreground text-sm">Previous Service Call Records on Serial #{currentReq.equipment.serialNo}</h4>
+              <h4 className="font-bold text-foreground text-sm">
+                Previous Service Call Records on Serial #{currentReq.equipment.serialNo}
+              </h4>
               <div className="overflow-x-auto border border-border rounded-lg">
                 <table className="w-full text-left">
                   <thead className="bg-muted text-[11px] text-muted-foreground uppercase font-bold border-b border-border">
@@ -720,18 +848,30 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                       <td className="p-2.5">2026-10-02 (11 days ago)</td>
                       <td className="p-2.5">Breakdown</td>
                       <td className="p-2.5 font-medium">Kamal Gunasekara</td>
-                      <td className="p-2.5 text-foreground">High-pressure switch reset and condenser fin dust wash</td>
+                      <td className="p-2.5 text-foreground">
+                        High-pressure switch reset and condenser fin dust wash
+                      </td>
                       <td className="p-2.5 text-muted-foreground">None (Cleaning only)</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">Resolved</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">
+                          Resolved
+                        </span>
+                      </td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-mono font-bold text-primary">SR-2026-0412</td>
                       <td className="p-2.5">2026-06-18</td>
                       <td className="p-2.5">Preventive PM</td>
                       <td className="p-2.5 font-medium">Sunil Jayatissa</td>
-                      <td className="p-2.5 text-foreground">Quarterly contract AMC service #2 completed</td>
+                      <td className="p-2.5 text-foreground">
+                        Quarterly contract AMC service #2 completed
+                      </td>
                       <td className="p-2.5 text-muted-foreground">Air Filters, Belts</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">Closed</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">
+                          Closed
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -739,10 +879,12 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             </div>
           )}
 
-          {activeTab === 'parts' && (
+          {activeTab === "parts" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-foreground text-sm">Preliminary Spare Parts Requisition Estimate</h4>
+                <h4 className="font-bold text-foreground text-sm">
+                  Preliminary Spare Parts Requisition Estimate
+                </h4>
                 <button className="text-xs px-2.5 py-1 rounded bg-primary text-primary-foreground font-semibold">
                   + Add Item from SAP Inventory
                 </button>
@@ -768,7 +910,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                       <td className="p-2.5 text-right font-mono">18,500.00</td>
                       <td className="p-2.5 text-right font-mono font-bold">18,500.00</td>
                       <td className="p-2.5">WH-CMB-MAIN</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">Free under AMC</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">
+                          Free under AMC
+                        </span>
+                      </td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-mono font-bold text-primary">SP-GAS-R410A</td>
@@ -777,7 +923,11 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                       <td className="p-2.5 text-right font-mono">32,000.00</td>
                       <td className="p-2.5 text-right font-mono font-bold">64,000.00</td>
                       <td className="p-2.5">WH-CMB-MAIN</td>
-                      <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">Free under AMC</span></td>
+                      <td className="p-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[10px]">
+                          Free under AMC
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -785,20 +935,31 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             </div>
           )}
 
-          {activeTab === 'audit' && (
+          {activeTab === "audit" && (
             <div className="space-y-2">
-              <h4 className="font-bold text-foreground text-sm">System Audit Trail & SAP B1 Synchronisation Log</h4>
+              <h4 className="font-bold text-foreground text-sm">
+                System Audit Trail & SAP B1 Synchronisation Log
+              </h4>
               <div className="space-y-1.5 font-mono text-[11px]">
                 <div className="p-2 rounded bg-muted/60 flex items-center justify-between">
-                  <span>[2026-10-13 08:30:14] Ticket created via Inbound Call Desk by Sanduni Dissanayake</span>
+                  <span>
+                    [2026-10-13 08:30:14] Ticket created via Inbound Call Desk by Sanduni
+                    Dissanayake
+                  </span>
                   <span className="text-muted-foreground">IP 192.168.1.42</span>
                 </div>
                 <div className="p-2 rounded bg-muted/60 flex items-center justify-between">
-                  <span>[2026-10-13 08:30:16] SAP B1iSN query executed for BP CardCode C20014 (Credit Limit & AMC active verified)</span>
+                  <span>
+                    [2026-10-13 08:30:16] SAP B1iSN query executed for BP CardCode C20014 (Credit
+                    Limit & AMC active verified)
+                  </span>
                   <span className="text-sky-600 font-bold">HTTP 200 OK</span>
                 </div>
                 <div className="p-2 rounded bg-muted/60 flex items-center justify-between">
-                  <span>[2026-10-13 08:31:02] Repeat Service Detection triggered: 94% match against SR-2026-0798 (Flagged)</span>
+                  <span>
+                    [2026-10-13 08:31:02] Repeat Service Detection triggered: 94% match against
+                    SR-2026-0798 (Flagged)
+                  </span>
                   <span className="text-amber-600 font-bold">TRX-03 Rule Triggered</span>
                 </div>
               </div>

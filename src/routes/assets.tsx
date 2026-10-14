@@ -11,5 +11,16 @@ export const Route = createFileRoute("/assets")({
       { property: "og:description", content: "Track hardware, software and configuration items." },
     ],
   }),
-  component: () => <ModulePlaceholder title="Asset Management" subtitle="Track hardware, software and configuration items." icon={HardDrive} stats={[["Total assets","2,481"],["In repair","23"],["Expiring warranties","41"]]} />,
+  component: () => (
+    <ModulePlaceholder
+      title="Asset Management"
+      subtitle="Track hardware, software and configuration items."
+      icon={HardDrive}
+      stats={[
+        ["Total assets", "2,481"],
+        ["In repair", "23"],
+        ["Expiring warranties", "41"],
+      ]}
+    />
+  ),
 });
