@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for adding the 'Masters' hub tile on the Workspace and implementing the full suite of Master Screens (O1-SCR-MST-01 to O1-SCR-MST-31) specified in Section A3 of the Telesonic Lanka Service Management specification with interactive UI, SAP B1 integration badges, field validations, status flows, and authentic sample data.",
+  "updatedAt": "2026-10-13T17:04:44.678663813Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

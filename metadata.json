@@ -1,0 +1,8 @@
+{
+  "name": "Klaro Project Engine",
+  "description": "Servio ITSM Service Desk Platform — Incidents, changes, service catalog, assets, and operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
