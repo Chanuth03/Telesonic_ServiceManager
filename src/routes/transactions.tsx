@@ -48,6 +48,7 @@ import {
   TransactionScreenMeta,
 } from "@/data/transactionsSpecData";
 import { TransactionScreenView } from "@/components/transactions/TransactionScreenView";
+import { PresentationGuideDownloadButton } from "@/components/common/PresentationGuideDownloadButton";
 
 export const Route = createFileRoute("/transactions")({
   head: () => ({
@@ -305,7 +306,8 @@ function TransactionsPage() {
             <span>All 35 Transaction Screens</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <PresentationGuideDownloadButton variant="compact" />
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Jump to Transaction Screen:
             </span>
@@ -349,24 +351,27 @@ function TransactionsPage() {
         </span>
       </div>
 
-      {/* Module Group Filter Pill Buttons */}
-      <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1">
-        {TRANSACTION_GROUPS.map((group) => {
-          const isActive = selectedGroup === group;
-          return (
-            <button
-              key={group}
-              onClick={() => setSelectedGroup(group)}
-              className={`px-3.5 py-1.5 text-xs rounded-full transition-colors cursor-pointer whitespace-nowrap font-medium ${
-                isActive
-                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                  : "bg-muted/70 text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {group}
-            </button>
-          );
-        })}
+      {/* Module Group Filter Pill Buttons & PDF Guide */}
+      <div className="flex flex-wrap items-center justify-between gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {TRANSACTION_GROUPS.map((group) => {
+            const isActive = selectedGroup === group;
+            return (
+              <button
+                key={group}
+                onClick={() => setSelectedGroup(group)}
+                className={`px-3.5 py-1.5 text-xs rounded-full transition-colors cursor-pointer whitespace-nowrap font-medium ${
+                  isActive
+                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    : "bg-muted/70 text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {group}
+              </button>
+            );
+          })}
+        </div>
+        <PresentationGuideDownloadButton variant="compact" />
       </div>
 
       {/* Screen Cards Grid: 4 columns like the screenshot */}

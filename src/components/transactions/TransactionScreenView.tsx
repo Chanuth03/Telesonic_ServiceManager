@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ArrowLeft,
   Download,
@@ -23,12 +23,24 @@ import {
   Layers,
   Send,
   FileSpreadsheet,
+  Plus,
+  Trash2,
+  Save,
+  RotateCcw,
+  Sparkles,
+  Package,
 } from "lucide-react";
 import { TransactionScreenMeta } from "@/data/transactionsSpecData";
 import { TransactionField } from "./TransactionField";
 import { TransactionAuditModal } from "./TransactionAuditModal";
 import { TransactionExportModal } from "./TransactionExportModal";
-import { Button } from "@/components/ui/button";
+import { AddPartModal } from "@/components/common/AddPartModal";
+import {
+  loadSavedFormData,
+  saveFormData,
+  loadSavedTabData,
+  saveTabData,
+} from "@/data/sparePartsCatalog";
 
 interface TransactionScreenViewProps {
   meta: TransactionScreenMeta;
@@ -41,13 +53,42 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   onBack,
   onNavigateToScreen,
 }) => {
-  const [formData, setFormData] = useState<Record<string, unknown>>(meta.sampleRecord);
+  const storageKey = `telesonic_trx_${meta.code}`;
+
+  // Persisted form data state
+  const [formData, setFormData] = useState<Record<string, unknown>>(() =>
+    loadSavedFormData(storageKey, meta.sampleRecord),
+  );
+
   const [activeTabId, setActiveTabId] = useState<string>(meta.tabs[0]?.id || "");
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isAddPartModalOpen, setIsAddPartModalOpen] = useState(false);
   const [showSpecDetails, setShowSpecDetails] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [b1Syncing, setB1Syncing] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`${storageKey}_last_saved`) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Tab datasets with persistent state
+  const [tabDatasets, setTabDatasets] = useState<Record<string, Array<Record<string, unknown>>>>(
+    () => {
+      const initial: Record<string, Array<Record<string, unknown>>> = {};
+      meta.tabs.forEach((tab) => {
+        initial[tab.id] = loadSavedTabData(
+          storageKey,
+          tab.id,
+          tab.data as Array<Record<string, unknown>>,
+        );
+      });
+      return initial;
+    },
+  );
 
   // Specialized interactive states
   const [blindCountActive, setBlindCountActive] = useState(
@@ -62,6 +103,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   );
 
   const activeTab = meta.tabs.find((t) => t.id === activeTabId) || meta.tabs[0];
+  const currentTabData = useMemo(() => {
+    return (activeTab ? tabDatasets[activeTab.id] : []) || [];
+  }, [activeTab, tabDatasets]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -69,7 +113,96 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   };
 
   const handleFieldChange = (key: string, val: unknown) => {
-    setFormData((prev) => ({ ...prev, [key]: val }));
+    setFormData((prev) => {
+      const next = { ...prev, [key]: val };
+      saveFormData(storageKey, next);
+      return next;
+    });
+  };
+
+  // Add Part / Row Line
+  const handleSavePart = (row: Record<string, unknown>) => {
+    if (!activeTab) return;
+    const tabId = activeTab.id;
+    const updated = [row, ...(tabDatasets[tabId] || [])];
+    setTabDatasets((prev) => ({ ...prev, [tabId]: updated }));
+    saveTabData(storageKey, tabId, updated);
+
+    // Save timestamp
+    const now = new Date().toLocaleTimeString();
+    setLastSavedTime(now);
+    try {
+      localStorage.setItem(`${storageKey}_last_saved`, now);
+    } catch {
+      // localStorage may be unavailable in private browsing
+    }
+
+    const partName = String(row.item || row.itemCode || row.description || "Part");
+    showToast(`Spare Part "${partName}" saved and added to ${activeTab.label}!`);
+  };
+
+  // Delete line item
+  const handleDeleteRow = (index: number) => {
+    if (!activeTab) return;
+    const tabId = activeTab.id;
+    const updated = (tabDatasets[tabId] || []).filter((_, i) => i !== index);
+    setTabDatasets((prev) => ({ ...prev, [tabId]: updated }));
+    saveTabData(storageKey, tabId, updated);
+    showToast("Line item removed from register.");
+  };
+
+  // Reset tab to default spec data
+  const handleResetTab = () => {
+    if (!activeTab) return;
+    const original = activeTab.data as Array<Record<string, unknown>>;
+    setTabDatasets((prev) => ({ ...prev, [activeTab.id]: original }));
+    saveTabData(storageKey, activeTab.id, original);
+    showToast(`Reset ${activeTab.label} to original specification dataset.`);
+  };
+
+  // Save full transaction
+  const handleSaveTransaction = () => {
+    saveFormData(storageKey, formData);
+    meta.tabs.forEach((tab) => {
+      if (tabDatasets[tab.id]) {
+        saveTabData(storageKey, tab.id, tabDatasets[tab.id]);
+      }
+    });
+    const now = new Date().toLocaleTimeString();
+    setLastSavedTime(now);
+    try {
+      localStorage.setItem(`${storageKey}_last_saved`, now);
+    } catch {
+      // localStorage may be unavailable in private browsing
+    }
+    showToast(
+      `Transaction ${currentRecordRef} saved successfully with ${currentTabData.length} line items.`,
+    );
+  };
+
+  // Create new blank record for demo
+  const handleCreateNewBlank = () => {
+    const blank: Record<string, unknown> = {};
+    meta.fields.forEach((f) => {
+      if (f.key === meta.fields[0]?.key) {
+        blank[f.key] = `${meta.code}-NEW-${Math.floor(1000 + Math.random() * 9000)}`;
+      } else if (f.key === "status") {
+        blank[f.key] = "Draft / Pending";
+      } else {
+        blank[f.key] = "";
+      }
+    });
+    setFormData(blank);
+    saveFormData(storageKey, blank);
+
+    // Clear active tab data
+    if (activeTab) {
+      setTabDatasets((prev) => ({ ...prev, [activeTab.id]: [] }));
+      saveTabData(storageKey, activeTab.id, []);
+    }
+    showToast(
+      `Initialized fresh blank record for ${meta.code}. You can now enter details and add parts!`,
+    );
   };
 
   const handleAction = (action: string) => {
@@ -97,24 +230,28 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       window.print();
       return;
     }
+    if (action.includes("Save") || action.includes("Update")) {
+      handleSaveTransaction();
+      return;
+    }
     if (action.includes("Hold")) {
-      setFormData((prev) => ({ ...prev, status: "On Hold" }));
+      handleFieldChange("status", "On Hold");
       showToast(`Call placed On Hold. SLA timer suspended pending customer confirmation.`);
       return;
     }
     if (action.includes("Resume")) {
-      setFormData((prev) => ({ ...prev, status: "In Progress" }));
+      handleFieldChange("status", "In Progress");
       showToast(`Call resumed into active triage. SLA clock reactivated.`);
       return;
     }
     if (action.includes("Approve")) {
-      setFormData((prev) => ({ ...prev, status: "Approved" }));
+      handleFieldChange("status", "Approved");
       showToast(`Transaction approved under compliance authority matrix.`);
       return;
     }
     if (action.includes("Submit")) {
-      setFormData((prev) => ({ ...prev, status: "Submitted" }));
-      showToast(`Transaction ${meta.code} submitted successfully.`);
+      handleFieldChange("status", "Submitted");
+      showToast(`Transaction ${meta.code} submitted successfully with parts register.`);
       return;
     }
     if (action.includes("Generate Meet Link")) {
@@ -130,6 +267,31 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
   const firstFieldKey = meta.fields[0]?.key;
   const currentRecordRef = firstFieldKey ? String(formData[firstFieldKey] ?? meta.code) : meta.code;
+
+  // Calculate live tab metrics
+  const tabMetrics = useMemo(() => {
+    let totalQty = 0;
+    let totalLkr = 0;
+
+    currentTabData.forEach((row) => {
+      // Qty calculation
+      const q = parseFloat(String(row.qty || row.quantity || row.reqQty || 0));
+      if (!isNaN(q)) totalQty += q;
+
+      // Price calculation
+      const amtStr = String(
+        row.total || row.amount || row.totalAmount || row.cost || row.price || "0",
+      ).replace(/[^0-9.]/g, "");
+      const amt = parseFloat(amtStr);
+      if (!isNaN(amt)) totalLkr += amt;
+    });
+
+    return {
+      count: currentTabData.length,
+      totalQty,
+      totalLkr,
+    };
+  }, [currentTabData]);
 
   return (
     <div className="space-y-4">
@@ -153,7 +315,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                   {meta.id}
                 </span>
@@ -165,6 +327,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                 <span className="text-xs px-2 py-0.5 rounded font-medium bg-muted text-foreground">
                   {meta.type}
                 </span>
+                {lastSavedTime && (
+                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
+                    Saved at {lastSavedTime}
+                  </span>
+                )}
               </div>
               <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground mt-0.5">
                 {meta.name}
@@ -174,6 +341,24 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
           {/* Action Buttons Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleSaveTransaction}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs cursor-pointer transition-colors"
+              title="Save all changes and parts into local register"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Record</span>
+            </button>
+
+            <button
+              onClick={handleCreateNewBlank}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
+              title="Create a new blank transaction to demonstrate saving from scratch"
+            >
+              <Plus className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden sm:inline">New Transaction</span>
+            </button>
+
             <button
               onClick={() => setShowSpecDetails(!showSpecDetails)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
@@ -191,7 +376,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export PDF / Excel</span>
+              <span>Export</span>
             </button>
 
             <button
@@ -199,7 +384,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
             >
               <History className="w-3.5 h-3.5" />
-              <span>History / Audit</span>
+              <span>Audit</span>
             </button>
 
             {b1Syncing && (
@@ -503,6 +688,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           <div className="flex border-b border-border bg-muted/40 overflow-x-auto">
             {meta.tabs.map((tab) => {
               const isActive = (activeTab?.id || meta.tabs[0]?.id) === tab.id;
+              const count = (tabDatasets[tab.id] || []).length;
               return (
                 <button
                   key={tab.id}
@@ -516,7 +702,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                   <Layers className="w-3.5 h-3.5" />
                   <span>{tab.label}</span>
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground">
-                    {tab.data.length}
+                    {count}
                   </span>
                 </button>
               );
@@ -526,24 +712,75 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           {/* Active Tab Dataset Table */}
           {activeTab && (
             <div className="p-4 sm:p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-foreground">{activeTab.label} Register</h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    Tab dataset synced with transactional audit trail
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-foreground">
+                      {activeTab.label} Register
+                    </h3>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                      {tabMetrics.count} recorded
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Live line items table. Add spare parts, inspect saved records, or export data.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* Primary Action to Add Parts / Line Items */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setIsAddPartModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Spare Part / Line Item</span>
+                  </button>
+
+                  <button
+                    onClick={handleResetTab}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                    title="Reset to default sample data"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span className="hidden sm:inline">Reset</span>
+                  </button>
+
                   <button
                     onClick={() => setIsExportOpen(true)}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-border bg-card text-foreground hover:bg-muted cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
                   >
-                    <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-                    <span>Export Sheet</span>
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Export</span>
                   </button>
                 </div>
               </div>
 
+              {/* Dynamic Summary Strip if parts/amounts are present */}
+              {tabMetrics.totalLkr > 0 && (
+                <div className="px-4 py-2.5 rounded-lg bg-muted/40 border border-border/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground">
+                      Total Line Items:{" "}
+                      <strong className="text-foreground">{tabMetrics.count}</strong>
+                    </span>
+                    {tabMetrics.totalQty > 0 && (
+                      <span className="text-muted-foreground">
+                        Total Quantity:{" "}
+                        <strong className="text-foreground">{tabMetrics.totalQty} Units</strong>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Calculated Subtotal:</span>
+                    <span className="text-sm font-extrabold text-primary">
+                      LKR {tabMetrics.totalLkr.toLocaleString("en-US")}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Responsive Table */}
               <div className="overflow-x-auto border border-border rounded-lg">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -569,37 +806,63 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                           </div>
                         </th>
                       ))}
+                      <th className="p-3 text-right font-semibold text-foreground w-16">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {activeTab.data.length === 0 ? (
+                    {currentTabData.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={activeTab.columns.length}
+                          colSpan={activeTab.columns.length + 1}
                           className="p-8 text-center text-muted-foreground"
                         >
-                          No records recorded in this register yet.
+                          <Package className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                          <p className="font-semibold text-foreground">
+                            No parts or line items in this register yet.
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Click{" "}
+                            <strong className="text-primary font-bold">
+                              "Add Spare Part / Line Item"
+                            </strong>{" "}
+                            above to register parts from the Telesonic Spares catalog.
+                          </p>
                         </td>
                       </tr>
                     ) : (
-                      activeTab.data.map((row, idx) => (
+                      currentTabData.map((row, idx) => (
                         <tr
-                          key={idx}
-                          className="hover:bg-muted/40 transition-colors group cursor-pointer"
-                          onClick={() => {
-                            showToast(`Row ${idx + 1} inspected.`);
-                          }}
+                          key={String(row._id || idx)}
+                          className={`hover:bg-muted/40 transition-colors group ${
+                            row._isNew ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
+                          }`}
                         >
-                          {activeTab.columns.map((col) => (
+                          {activeTab.columns.map((col, cIdx) => (
                             <td
                               key={col.key}
                               className={`p-3 text-foreground whitespace-nowrap ${
                                 col.align === "right" ? "text-right font-mono tabular-nums" : ""
                               }`}
                             >
-                              {row[col.key] != null ? String(row[col.key]) : "—"}
+                              <div className="flex items-center gap-1.5">
+                                {cIdx === 0 && row._isNew && (
+                                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 shrink-0">
+                                    Saved
+                                  </span>
+                                )}
+                                <span>{row[col.key] != null ? String(row[col.key]) : "—"}</span>
+                              </div>
                             </td>
                           ))}
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => handleDeleteRow(idx)}
+                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              title="Delete line item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -611,17 +874,30 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         </div>
       )}
 
-      {/* Modals */}
+      {/* Add Part / Line Item Modal */}
+      {activeTab && (
+        <AddPartModal
+          isOpen={isAddPartModalOpen}
+          onClose={() => setIsAddPartModalOpen(false)}
+          onSavePart={handleSavePart}
+          tabColumns={activeTab.columns}
+          tabLabel={activeTab.label}
+          screenCode={meta.code}
+        />
+      )}
+
+      {/* Export Modal */}
       {activeTab && (
         <TransactionExportModal
           isOpen={isExportOpen}
           onClose={() => setIsExportOpen(false)}
           meta={meta}
-          activeTab={activeTab}
+          activeTab={{ ...activeTab, data: currentTabData }}
           formData={formData}
         />
       )}
 
+      {/* Audit Modal */}
       <TransactionAuditModal
         isOpen={isAuditOpen}
         onClose={() => setIsAuditOpen(false)}

@@ -95,18 +95,44 @@ const modules = [
   { to: "/incentive", label: "Incentive", icon: Trophy, tone: "bg-success-soft text-success" },
 ] as const;
 
+import { PresentationGuideDownloadButton } from "@/components/common/PresentationGuideDownloadButton";
+
 function Workspace() {
   return (
-    <div className="py-4 sm:py-8">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-6">
+    <div className="py-4 sm:py-8 space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">Welcome back, Nimal</p>
           <h1 className="text-3xl font-bold">Your workspace</h1>
         </div>
-        <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-success" />
-          Service desk online
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <PresentationGuideDownloadButton variant="primary" />
+          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-success" />
+            Service desk online
+          </span>
+        </div>
+      </div>
+
+      {/* Presentation Fast-Track Callout */}
+      <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary text-primary-foreground uppercase tracking-wide">
+              Presentation Ready
+            </span>
+            <span className="text-xs font-bold text-foreground">
+              Core Demonstration Tiles: Masters, Transactions & Dashboard
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Verified working frontend with localStorage persistence, spare parts catalog, live
+            pricing, and 7-screen single-page dashboard.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <PresentationGuideDownloadButton variant="outline" showModalOnInfo={true} />
+        </div>
       </div>
       <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {modules.map(({ to, label, icon: Icon, tone }) => (

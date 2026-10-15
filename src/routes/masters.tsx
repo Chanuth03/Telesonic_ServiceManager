@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { MASTER_SCREENS_LIST, MASTER_CATEGORIES } from "@/data/mastersSpecData";
 import { MasterScreenView } from "@/components/masters/MasterScreenView";
+import { PresentationGuideDownloadButton } from "@/components/common/PresentationGuideDownloadButton";
 
 export const Route = createFileRoute("/masters")({
   head: () => ({
@@ -274,7 +275,8 @@ function MastersPage() {
             <span>All 31 Master Screens</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <PresentationGuideDownloadButton variant="compact" />
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Jump to Master Screen:
             </span>
@@ -314,24 +316,27 @@ function MastersPage() {
         </span>
       </div>
 
-      {/* Category Filter Pill Buttons */}
-      <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1">
-        {MASTER_CATEGORIES.map((cat) => {
-          const isActive = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 text-xs rounded-full transition-colors cursor-pointer whitespace-nowrap font-medium ${
-                isActive
-                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                  : "bg-muted/70 text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {cat}
-            </button>
-          );
-        })}
+      {/* Category Filter Pill Buttons & PDF Guide */}
+      <div className="flex flex-wrap items-center justify-between gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {MASTER_CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 text-xs rounded-full transition-colors cursor-pointer whitespace-nowrap font-medium ${
+                  isActive
+                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    : "bg-muted/70 text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+        <PresentationGuideDownloadButton variant="compact" />
       </div>
 
       {/* Screen Cards Grid: 4 columns matching the reference screenshot */}

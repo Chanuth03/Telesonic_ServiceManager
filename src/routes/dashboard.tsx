@@ -26,6 +26,7 @@ import { ManagementKpiScreen } from "@/components/dashboard/ManagementKpiScreen"
 import { ReportViewerScreen } from "@/components/dashboard/ReportViewerScreen";
 import { IntegrationQueueScreen } from "@/components/dashboard/IntegrationQueueScreen";
 import { ExportLogScreen } from "@/components/dashboard/ExportLogScreen";
+import { PresentationGuideDownloadButton } from "@/components/common/PresentationGuideDownloadButton";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -127,11 +128,9 @@ function DashboardPage() {
             </p>
           </div>
 
-          {/* Quick jump to screen dropdown */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-medium text-muted-foreground hidden lg:inline">
-              Jump to Screen:
-            </span>
+          {/* Quick jump to screen dropdown & PDF Guide */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <PresentationGuideDownloadButton variant="primary" showModalOnInfo={true} />
             <select
               onChange={(e) => {
                 if (e.target.value) scrollToScreen(e.target.value);
