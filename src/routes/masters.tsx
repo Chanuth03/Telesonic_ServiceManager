@@ -40,7 +40,6 @@ import {
 } from "lucide-react";
 import { MASTER_SCREENS_LIST, MASTER_CATEGORIES } from "@/data/mastersSpecData";
 import { MasterScreenView } from "@/components/masters/MasterScreenView";
-import { PresentationGuideDownloadButton } from "@/components/common/PresentationGuideDownloadButton";
 
 export const Route = createFileRoute("/masters")({
   head: () => ({
@@ -276,7 +275,6 @@ function MastersPage() {
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
-            <PresentationGuideDownloadButton variant="compact" />
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Jump to Master Screen:
             </span>
@@ -311,9 +309,7 @@ function MastersPage() {
           placeholder={`Search ${MASTER_SCREENS_LIST.length} screen modules by name, description or number...`}
           className="w-full pl-10 pr-36 py-2.5 text-xs rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary shadow-xs"
         />
-        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium hidden sm:inline">
-          Showing {filteredScreens.length} of {MASTER_SCREENS_LIST.length} Screens
-        </span>
+        
       </div>
 
       {/* Category Filter Pill Buttons & PDF Guide */}
@@ -336,7 +332,6 @@ function MastersPage() {
             );
           })}
         </div>
-        <PresentationGuideDownloadButton variant="compact" />
       </div>
 
       {/* Screen Cards Grid: 4 columns matching the reference screenshot */}

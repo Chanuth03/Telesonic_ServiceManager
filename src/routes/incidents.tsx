@@ -144,9 +144,6 @@ function Incidents() {
             </tbody>
           </table>
         </div>
-        <div className="border-t px-4 py-3 text-xs text-muted-foreground">
-          Showing {filtered.length} of {rows.length}
-        </div>
       </div>
 
       {open && (
