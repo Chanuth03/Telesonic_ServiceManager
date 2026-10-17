@@ -309,7 +309,6 @@ function MastersPage() {
           placeholder={`Search ${MASTER_SCREENS_LIST.length} screen modules by name, description or number...`}
           className="w-full pl-10 pr-36 py-2.5 text-xs rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary shadow-xs"
         />
-        
       </div>
 
       {/* Category Filter Pill Buttons & PDF Guide */}

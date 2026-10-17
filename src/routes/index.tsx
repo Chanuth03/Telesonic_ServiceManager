@@ -95,7 +95,6 @@ const modules = [
   { to: "/incentive", label: "Incentive", icon: Trophy, tone: "bg-success-soft text-success" },
 ] as const;
 
-
 function Workspace() {
   return (
     <div className="py-4 sm:py-8 space-y-6">
@@ -106,7 +105,6 @@ function Workspace() {
         </div>
       </div>
 
-      
       <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {modules.map(({ to, label, icon: Icon, tone }) => (
           <Button
