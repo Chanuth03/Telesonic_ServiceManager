@@ -6,7 +6,7 @@ interface MasterFieldProps {
   field: MasterFieldDef;
   value: unknown;
   onChange: (val: unknown) => void;
-  error?: string;
+  error?: string | undefined;
 }
 
 export const MasterField: React.FC<MasterFieldProps> = ({ field, value, onChange, error }) => {

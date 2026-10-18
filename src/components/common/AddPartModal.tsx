@@ -176,7 +176,7 @@ export const AddPartModal: React.FC<AddPartModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="font-bold text-foreground flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
-                <span>Quick Select from Telesonic Spares Catalog:</span>
+                <span>Quick Select from Spare Parts Catalog:</span>
               </label>
               <span className="text-[10px] font-mono text-primary font-semibold">
                 {TELESONIC_SPARE_PARTS_CATALOG.length} Items Available

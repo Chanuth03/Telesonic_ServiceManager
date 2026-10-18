@@ -34,7 +34,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
   onNavigateToScreen,
 }) => {
   const [requests, setRequests] = useState<ServiceRequestRecord[]>(SAMPLE_SERVICE_REQUESTS);
-  const [selectedId, setSelectedId] = useState<string>(SAMPLE_SERVICE_REQUESTS[0].id);
+  const [selectedId, setSelectedId] = useState<string>(SAMPLE_SERVICE_REQUESTS[0]!.id);
   const [activeTab, setActiveTab] = useState<
     "diagnostics" | "commercial" | "history" | "parts" | "audit"
   >("diagnostics");
@@ -42,7 +42,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
 
-  const currentReq = requests.find((r) => r.id === selectedId) || requests[0];
+  const currentReq = requests.find((r) => r.id === selectedId) ?? requests[0]!;
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -92,24 +92,10 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                O1-SCR-TRX-01
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Priority P1 · SM Browser
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center gap-1">
-                ⇄B1 Live Two-Way (BP + Equip + AR Invoice)
-              </span>
-            </div>
+            <div className="flex flex-wrap items-center gap-2 mb-1"></div>
             <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <span>Unified Service Request with SAP Commercial Information Panel</span>
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Multi-panel service ticket creation and management interface with live SAP Business
-              One customer financial health verification.
-            </p>
           </div>
 
           {/* Quick Ticket Switcher & New Button */}
@@ -229,9 +215,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <Building2 className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-bold text-foreground">Customer & Business Partner</h3>
               </div>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                ⇄B1 OCRD
-              </span>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -279,9 +262,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                   <span className="font-semibold text-foreground text-[11px]">
                     Service Site Location
                   </span>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    ({currentReq.customer.siteId})
-                  </span>
                 </div>
                 <div className="text-foreground font-medium text-[11px]">
                   {currentReq.customer.siteName}
@@ -308,9 +288,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <Cpu className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-bold text-foreground">Installed Base Equipment</h3>
               </div>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                ⇄B1 OINS
-              </span>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -406,20 +383,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <AlertCircle className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-bold text-foreground">Service Request & Triage</h3>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                    currentReq.priority.includes("P1")
-                      ? "bg-destructive/15 text-destructive border border-destructive/30"
-                      : "bg-amber-500/15 text-amber-600 border border-amber-500/30"
-                  }`}
-                >
-                  {currentReq.priority}
-                </span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-muted text-foreground">
-                  {currentReq.status}
-                </span>
-              </div>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -462,20 +425,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 </label>
                 <div className="text-foreground font-semibold mt-0.5">
                   {currentReq.fault.category}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground">
-                  Reported Symptoms / Error Code
-                </label>
-                <div className="mt-1 flex items-center gap-2">
-                  {currentReq.fault.errorCode && (
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-destructive/10 text-destructive border border-destructive/20">
-                      Error: {currentReq.fault.errorCode}
-                    </span>
-                  )}
-                  <span className="text-foreground font-medium">{currentReq.fault.symptom}</span>
                 </div>
               </div>
 
@@ -578,9 +527,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <DollarSign className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-bold text-foreground">SAP Commercial Panel</h3>
               </div>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                ⇄B1 Real-Time
-              </span>
             </div>
 
             {/* Credit Status Banner */}
@@ -718,9 +664,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
             <div className="space-y-3">
               <h4 className="font-bold text-foreground text-sm flex items-center gap-2">
                 <span>Field Symptom Verification & Diagnostic Checklist</span>
-                <span className="text-[10px] font-normal text-muted-foreground">
-                  (Master Template O1-SCR-MST-16)
-                </span>
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="p-3 rounded-lg border border-border bg-background space-y-2">
@@ -780,9 +723,6 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
                 <h4 className="font-bold text-foreground text-sm">
                   SAP Business One A/R Invoice Sub-Grid (OINV)
                 </h4>
-                <span className="text-[11px] text-muted-foreground">
-                  Currency: Sri Lankan Rupee (LKR)
-                </span>
               </div>
               <div className="overflow-x-auto border border-border rounded-lg">
                 <table className="w-full text-left">

@@ -66,7 +66,6 @@ export const IntegrationQueueScreen: React.FC = () => {
         meta={meta}
         icon={Cpu}
         tone="bg-indigo-50 text-indigo-600 dark:bg-indigo-950/70 dark:text-indigo-400"
-        badgeExtra="DI Server Monitor"
       />
 
       {toastMessage && (

@@ -112,10 +112,11 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
 }) => {
   const [callLogs, setCallLogs] = useState<InboundCallLog[]>(SAMPLE_CALL_LOGS);
   const [callerPhone, setCallerPhone] = useState("0112894400");
+  const defaultCustomer = PRESET_CUSTOMERS[0]!;
   const [matchedCustomer, setMatchedCustomer] = useState<(typeof PRESET_CUSTOMERS)[0] | null>(
-    PRESET_CUSTOMERS[0],
+    defaultCustomer,
   );
-  const [selectedSerial, setSelectedSerial] = useState(PRESET_CUSTOMERS[0].equipment[0].serial);
+  const [selectedSerial, setSelectedSerial] = useState(defaultCustomer.equipment[0]?.serial ?? "");
   const [selectedIssueChip, setSelectedIssueChip] = useState("No Cooling / Compressor Off");
   const [callDuration, setCallDuration] = useState(38);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -236,25 +237,10 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                O1-SCR-TRX-02
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Priority P1 · SM Browser Call Center HUD
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                ⇄B1 Real-Time BP & Serial Lookup
-              </span>
-            </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <PhoneCall className="w-5 h-5 text-primary animate-pulse" />
               <span>Rapid Inbound Call Logger</span>
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              High-speed intake tool engineered for &lt; 45 second average call handling time with
-              auto-suggest installed equipment.
-            </p>
           </div>
 
           {/* Active Call HUD Timer */}
@@ -313,9 +299,6 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                 <Search className="w-4 h-4 text-primary" />
                 <span>Caller Identification & SAP BP Auto-Match</span>
               </h3>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                OCR-01 Instant Lookup
-              </span>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -379,9 +362,6 @@ export const RapidInboundCallLoggerScreen: React.FC<RapidInboundCallLoggerScreen
                   Installed Base Equipment at Site ({matchedCustomer?.equipment.length || 0} Units)
                 </span>
               </h3>
-              <span className="text-[10px] text-muted-foreground">
-                Select equipment reporting fault
-              </span>
             </div>
 
             {matchedCustomer && matchedCustomer.equipment.length > 0 ? (

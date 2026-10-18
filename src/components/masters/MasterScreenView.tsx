@@ -87,6 +87,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       }, 3800);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [sidePopup.show]);
 
   const handleFieldChange = (key: string, val: unknown) => {
@@ -201,7 +202,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       show: true,
       title: "Record Loaded",
       message: `Loaded record into form for editing.`,
-      recordId: String(rec[meta.fields[0]?.key] || ""),
+      recordId: String((meta.fields[0] && rec[meta.fields[0].key]) || ""),
     });
   };
 
@@ -342,42 +343,9 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
           <button
             onClick={() => setShowSpecDetails(!showSpecDetails)}
             className="flex items-center gap-1 text-primary hover:underline text-xs cursor-pointer font-medium"
-          >
-            <Info className="w-3.5 h-3.5" />
-            <span>{showSpecDetails ? "Hide Spec Details" : "Specification Details"}</span>
-          </button>
+          ></button>
         </div>
       </div>
-
-      {/* Specification Reference Sheet (collapsible) */}
-      {showSpecDetails && (
-        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl text-xs space-y-2 text-foreground animate-in fade-in">
-          <div className="flex items-center justify-between font-bold text-primary">
-            <span>Section A3 Specification Sheet: {meta.id}</span>
-            <span className="font-mono text-[11px]">Classification: {meta.classification}</span>
-          </div>
-          <p className="leading-relaxed">
-            <span className="font-semibold">Purpose:</span> {meta.purpose}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-[11px] pt-1">
-            <div>
-              <span className="text-muted-foreground font-semibold">Authorized Roles:</span>{" "}
-              {meta.roles}
-            </div>
-            <div>
-              <span className="text-muted-foreground font-semibold">Status Flow:</span>{" "}
-              {meta.statusFlow}
-            </div>
-            <div>
-              <span className="text-muted-foreground font-semibold">Priority:</span> {meta.priority}
-            </div>
-            <div>
-              <span className="text-muted-foreground font-semibold">Linked Navigation:</span>{" "}
-              {meta.linkedNavigation.join(", ")}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MAIN MASTER SCREEN FORM CARD */}
       <div className="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
@@ -394,9 +362,6 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                   ({meta.id})
                 </span>
               </h1>
-              <p className="text-xs text-muted-foreground">
-                Enter details below with real-time validation and save to the local registry.
-              </p>
             </div>
           </div>
 
@@ -545,10 +510,6 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                     ({filteredSavedRecords.length} of {savedRecords.length} records)
                   </span>
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Saved records for this master screen. Search or click "Load" to edit in the form
-                  above.
-                </p>
               </div>
 
               {/* Search Bar for Saved Records */}
@@ -726,12 +687,12 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       <MasterAuditModal
         isOpen={isAuditOpen}
         onClose={() => setIsAuditOpen(false)}
-        recordId={String(formData[meta.fields[0]?.key] || meta.code)}
+        recordId={String((meta.fields[0] && formData[meta.fields[0].key]) || meta.code)}
         screenTitle={meta.name}
       />
 
       {/* Export Modal */}
-      {meta.tabs.length > 0 && (
+      {meta.tabs[0] && (
         <MasterExportModal
           isOpen={isExportOpen}
           onClose={() => setIsExportOpen(false)}

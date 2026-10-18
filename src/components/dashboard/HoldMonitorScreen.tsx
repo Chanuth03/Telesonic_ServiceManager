@@ -67,7 +67,6 @@ export const HoldMonitorScreen: React.FC = () => {
         meta={meta}
         icon={PauseCircle}
         tone="bg-amber-50 text-amber-600 dark:bg-amber-950/70 dark:text-amber-400"
-        badgeExtra="BCR-04 Enforced"
       />
 
       {/* Action toast */}

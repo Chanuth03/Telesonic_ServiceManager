@@ -58,21 +58,7 @@ export const ExportLogScreen: React.FC = () => {
         meta={meta}
         icon={ShieldCheck}
         tone="bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400"
-        badgeExtra="Rule O1-BCR-08"
       />
-
-      {/* Compliance Protocol Notice */}
-      <div className="mb-5 p-3.5 sm:p-4 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/30 text-teal-900 dark:text-teal-200 text-xs flex items-start gap-3 shadow-2xs">
-        <Lock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <span className="font-bold">
-            Rule O1-BCR-08 Immutable Data Governance & ISO 27001 Protocol:
-          </span>{" "}
-          Every operational export generated via the Report Viewer (DSH-06) or Master grids is
-          immutably timestamped with user credentials, parameters, and row count. Logs cannot be
-          purged or altered by non-root administrators.
-        </div>
-      </div>
 
       {downloadSuccessNotice && (
         <div className="mb-4 p-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-2xs">

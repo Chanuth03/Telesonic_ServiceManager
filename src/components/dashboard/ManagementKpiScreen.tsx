@@ -53,16 +53,11 @@ export const ManagementKpiScreen: React.FC = () => {
         meta={meta}
         icon={BarChart3}
         tone="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400"
-        badgeExtra="Executive Summary"
       />
 
       {/* Period Filter Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5 p-3 rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Calendar className="w-4 h-4 text-primary" />
-          <span>Financial Accounting Cycle:</span>
-          <span className="text-foreground font-bold">FY2026 Telesonic Sri Lanka</span>
-        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"></div>
 
         <div className="flex items-center bg-muted/70 p-1 rounded-lg text-xs font-medium">
           <button

@@ -384,7 +384,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
                                 c.align === "right" ? "text-right font-mono" : ""
                               }`}
                             >
-                              {r[c.key] ?? "—"}
+                              {r[c.key] != null ? String(r[c.key]) : "—"}
                             </td>
                           ))}
                         </tr>

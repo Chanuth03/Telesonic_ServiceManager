@@ -714,9 +714,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                       {tabMetrics.count} recorded
                     </span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Live line items table. Add spare parts, inspect saved records, or export data.
-                  </p>
                 </div>
 
                 {/* Primary Action to Add Parts / Line Items */}

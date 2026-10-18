@@ -363,11 +363,6 @@ function MastersPage() {
                 <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug mb-1 line-clamp-2">
                   {screen.name}
                 </h3>
-
-                {/* Description */}
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                  {screen.purpose}
-                </p>
               </div>
 
               {/* Footer Row: Category on Left, Open -> on Right */}

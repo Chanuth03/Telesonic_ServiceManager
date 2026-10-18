@@ -40,18 +40,18 @@ export interface ServiceRequestRecord {
       | "Under AMC Labour-Only"
       | "Expired / Out of Scope"
       | "Other Brand Billable";
-    contractNo?: string;
-    contractExpiry?: string;
-    operatingHours?: number;
+    contractNo?: string | undefined;
+    contractExpiry?: string | undefined;
+    operatingHours?: number | undefined;
   };
 
   // Fault & Symptoms
   fault: {
     category: string;
     symptom: string;
-    errorCode?: string;
+    errorCode?: string | undefined;
     description: string;
-    preliminaryRootCause?: string;
+    preliminaryRootCause?: string | undefined;
     safetyHazard: boolean;
   };
 
@@ -64,7 +64,7 @@ export interface ServiceRequestRecord {
     priceList: string;
     creditStatus: "Normal" | "Warning" | "Credit Hold";
     billingHold: boolean;
-    billingHoldReason?: string;
+    billingHoldReason?: string | undefined;
     coveredUnderContract: boolean;
     estimatedCostLKR: number;
   };
@@ -74,9 +74,9 @@ export interface ServiceRequestRecord {
     branchCode: string;
     branchName: string;
     warehouseCode: string;
-    assignedTechId?: string;
-    assignedTechName?: string;
-    scheduledSlot?: string;
+    assignedTechId?: string | undefined;
+    assignedTechName?: string | undefined;
+    scheduledSlot?: string | undefined;
   };
 
   // Repeat & Hold Details
@@ -84,28 +84,32 @@ export interface ServiceRequestRecord {
     isRepeat: boolean;
     repeatScore: number;
     detectionWindowDays: number;
-    previousTicketId?: string;
-    previousTicketDate?: string;
-    previousTechName?: string;
-    previousResolution?: string;
+    previousTicketId?: string | undefined;
+    previousTicketDate?: string | undefined;
+    previousTechName?: string | undefined;
+    previousResolution?: string | undefined;
     reworkWarrantyApplicable: boolean;
-  };
+  } | undefined;
 
   holdDetails?: {
     isOnHold: boolean;
     holdReasonCode:
-      "CREDIT_HOLD" | "PARTS_AWAITING" | "SITE_ACCESS" | "WARRANTY_VERIFY" | "CUSTOMER_APPROVAL";
+      | "CREDIT_HOLD"
+      | "PARTS_AWAITING"
+      | "SITE_ACCESS"
+      | "WARRANTY_VERIFY"
+      | "CUSTOMER_APPROVAL";
     holdReasonLabel: string;
     holdPlacedDate: string;
     placedBy: string;
     supervisorOverrideAllowed: boolean;
-    overrideBy?: string;
-    overrideJustification?: string;
-  };
+    overrideBy?: string | undefined;
+    overrideJustification?: string | undefined;
+  } | undefined;
 
   // Multi-equipment child count if parent
-  isMultiEquipment?: boolean;
-  multiEquipmentCount?: number;
+  isMultiEquipment?: boolean | undefined;
+  multiEquipmentCount?: number | undefined;
 }
 
 export interface InboundCallLog {
@@ -114,14 +118,14 @@ export interface InboundCallLog {
   callerPhone: string;
   callerName: string;
   companyName: string;
-  cardCode?: string;
+  cardCode?: string | undefined;
   matchedEquipmentCount: number;
-  selectedSerial?: string;
+  selectedSerial?: string | undefined;
   quickIssue: string;
   triagePassed: boolean;
   durationSeconds: number;
   status: "In Progress" | "Converted to Request" | "Dispatched" | "Advisory Only";
-  createdTicketId?: string;
+  createdTicketId?: string | undefined;
 }
 
 export interface MultiEquipmentItem {

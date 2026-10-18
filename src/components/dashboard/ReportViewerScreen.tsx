@@ -24,7 +24,7 @@ export const ReportViewerScreen: React.FC = () => {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const currentReport =
-    REPORT_VIEWER_OPTIONS.find((r) => r.id === selectedReportId) || REPORT_VIEWER_OPTIONS[0];
+    REPORT_VIEWER_OPTIONS.find((r) => r.id === selectedReportId) ?? REPORT_VIEWER_OPTIONS[0]!;
 
   const handleGenerate = () => {
     setIsGenerating(true);
@@ -75,7 +75,6 @@ export const ReportViewerScreen: React.FC = () => {
         meta={meta}
         icon={FileSpreadsheet}
         tone="bg-cyan-50 text-cyan-600 dark:bg-cyan-950/70 dark:text-cyan-400"
-        badgeExtra="Ad-Hoc Generator"
       />
 
       {exportNotice && (

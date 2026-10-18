@@ -33,19 +33,7 @@ export const RepeatJobAnalysisScreen: React.FC = () => {
         meta={meta}
         icon={RotateCcw}
         tone="bg-purple-50 text-purple-600 dark:bg-purple-950/70 dark:text-purple-400"
-        badgeExtra="Rule O1-BCR-02"
       />
-
-      {/* BCR-02 Policy Banner */}
-      <div className="mb-5 p-3.5 sm:p-4 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-3 shadow-2xs">
-        <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <span className="font-bold">O1-BCR-02 Automated Repeat Detection Rule:</span> Service
-          calls logged on the same Customer Equipment within a 30-day window are classified as
-          Repeat Calls. Technicians with &gt; 10% repeat rate trigger a quality audit and rework
-          cost allocation against incentive scores.
-        </div>
-      </div>
 
       {/* Rework Summary Statistics Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5">

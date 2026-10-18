@@ -31,28 +31,6 @@ export const DashboardScreenHeader: React.FC<DashboardScreenHeaderProps> = ({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-muted/80 text-foreground border border-border/60">
-                #{meta.code}
-              </span>
-              <span className="font-mono text-[11px] text-muted-foreground">{meta.id}</span>
-              <span
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                  meta.priority === "P1"
-                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60"
-                    : "bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60"
-                }`}
-              >
-                {meta.priority} Priority
-              </span>
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-                {meta.type}
-              </span>
-              {liveBadge && (
-                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  LIVE STREAM
-                </span>
-              )}
               {badgeExtra && (
                 <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                   {badgeExtra}
@@ -72,18 +50,6 @@ export const DashboardScreenHeader: React.FC<DashboardScreenHeaderProps> = ({
 
         {/* Right: Roles & Actions */}
         <div className="flex sm:flex-col items-end justify-between sm:justify-center gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/60">
-          <div className="text-right hidden sm:block">
-            <span className="text-[11px] text-muted-foreground block font-medium">
-              Target Roles
-            </span>
-            <span
-              className="text-xs font-semibold text-foreground max-w-[200px] truncate block"
-              title={meta.roles}
-            >
-              {meta.roles}
-            </span>
-          </div>
-
           <div className="flex items-center gap-2">
             {onRefresh && (
               <button
@@ -98,10 +64,6 @@ export const DashboardScreenHeader: React.FC<DashboardScreenHeaderProps> = ({
                 <span>{isRefreshing ? "Updating..." : "Refresh"}</span>
               </button>
             )}
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground px-2 py-1 rounded bg-muted/60">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>O1-Spec Validated</span>
-            </span>
           </div>
         </div>
       </div>

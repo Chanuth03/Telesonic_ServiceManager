@@ -106,18 +106,9 @@ function ServiceRequestsPage() {
       <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-primary mb-1 uppercase tracking-wider">
-              <Headphones className="w-4 h-4" />
-              <span>Telesonic Lanka Service Management (Option 01)</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
               Service Request Module
             </h1>
-            <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
-              Complete transactional suite (Screen Register O1-SCR-TRX-01 through TRX-04) featuring
-              real-time SAP Business One BP financial health checks, sub-45s rapid call logging,
-              automated 30-day repeat detection, and multi-unit breakdown.
-            </p>
           </div>
 
           {/* Module Metric Badges */}
@@ -171,15 +162,12 @@ function ServiceRequestsPage() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono font-bold text-primary text-[11px]">{s.id}</span>
+                  {/* <span className="font-mono font-bold text-primary text-[11px]">{s.id}</span>
                   <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
                     {s.badge}
-                  </span>
+                  </span> */}
                 </div>
                 <div className="font-bold text-foreground line-clamp-1">{s.name}</div>
-                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
-                  {s.purpose}
-                </p>
               </div>
             );
           })}

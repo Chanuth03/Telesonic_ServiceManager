@@ -84,7 +84,6 @@ export const HeartbeatPulseScreen: React.FC = () => {
         icon={Activity}
         tone="bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400"
         liveBadge={true}
-        badgeExtra="Auto-Refresh 30s"
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
       />

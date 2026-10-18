@@ -22,8 +22,8 @@ import {
 import { ServiceRequestRecord, SAMPLE_SERVICE_REQUESTS } from "@/data/serviceRequestsSpecData";
 
 interface RepeatDetectorHoldScreenProps {
-  initialTicketId?: string;
-  onNavigateToScreen?: (screenId: string, contextId?: string) => void;
+  initialTicketId?: string | undefined;
+  onNavigateToScreen?: ((screenId: string, contextId?: string) => void) | undefined;
 }
 
 export const RepeatDetectorHoldScreen: React.FC<RepeatDetectorHoldScreenProps> = ({
@@ -36,7 +36,7 @@ export const RepeatDetectorHoldScreen: React.FC<RepeatDetectorHoldScreenProps> =
   const [selectedTicketId, setSelectedTicketId] = useState<string>(
     initialTicketId ||
       SAMPLE_SERVICE_REQUESTS.find((r) => r.repeatFlag?.isRepeat)?.id ||
-      SAMPLE_SERVICE_REQUESTS[0].id,
+      SAMPLE_SERVICE_REQUESTS[0]!.id,
   );
 
   // Supervisor override modal state
@@ -57,7 +57,7 @@ export const RepeatDetectorHoldScreen: React.FC<RepeatDetectorHoldScreenProps> =
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const currentReq = requests.find((r) => r.id === selectedTicketId) || requests[0];
+  const currentReq = requests.find((r) => r.id === selectedTicketId) ?? requests[0]!;
 
   const handleResolveHoldWithB1 = () => {
     setIsVerifyingB1(true);
@@ -139,25 +139,10 @@ export const RepeatDetectorHoldScreen: React.FC<RepeatDetectorHoldScreenProps> =
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                O1-SCR-TRX-03
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Priority P1 · SM Browser Quality & Governance
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                ⇄B1 History & Commercial Hold Synchronization
-              </span>
-            </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <RotateCcw className="w-5 h-5 text-amber-500" />
               <span>Repeat Service Detector and Hold Resolution Screen</span>
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Automated detection of repeat failures within 30/60/90 days window, technician
-              callback audits, and supervisor hold release workflow.
-            </p>
           </div>
 
           {/* Toggle between Repeat Detection vs Hold Resolution */}
@@ -243,17 +228,6 @@ export const RepeatDetectorHoldScreen: React.FC<RepeatDetectorHoldScreenProps> =
                       Automated Repeat Match Evaluation on {currentReq.id}
                     </h3>
                   </div>
-                  <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                      currentReq.repeatFlag?.isRepeat
-                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse"
-                        : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                    }`}
-                  >
-                    {currentReq.repeatFlag?.isRepeat
-                      ? `Repeat Identified (${currentReq.repeatFlag.repeatScore}% Match)`
-                      : "No Repeat Detected"}
-                  </span>
                 </div>
 
                 {currentReq.repeatFlag?.isRepeat ? (

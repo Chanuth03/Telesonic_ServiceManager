@@ -21,8 +21,8 @@ import {
 } from "@/data/serviceRequestsSpecData";
 
 interface MultiEquipmentBreakdownScreenProps {
-  initialTicketId?: string;
-  onNavigateToScreen?: (screenId: string, contextId?: string) => void;
+  initialTicketId?: string | undefined;
+  onNavigateToScreen?: ((screenId: string, contextId?: string) => void) | undefined;
 }
 
 export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScreenProps> = ({
@@ -30,7 +30,9 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
   onNavigateToScreen,
 }) => {
   const parentRequest =
-    SAMPLE_SERVICE_REQUESTS.find((r) => r.id === initialTicketId) || SAMPLE_SERVICE_REQUESTS[4];
+    SAMPLE_SERVICE_REQUESTS.find((r) => r.id === initialTicketId) ??
+    SAMPLE_SERVICE_REQUESTS[4] ??
+    SAMPLE_SERVICE_REQUESTS[0]!;
   const [items, setItems] = useState<MultiEquipmentItem[]>(
     SAMPLE_MULTI_EQUIPMENT_ITEMS[initialTicketId] ||
       SAMPLE_MULTI_EQUIPMENT_ITEMS["SR-2026-0845"] ||
@@ -157,25 +159,10 @@ export const MultiEquipmentBreakdownScreen: React.FC<MultiEquipmentBreakdownScre
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                O1-SCR-TRX-04
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                Priority P2 · Commercial Site Facility Management
-              </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                SM Local Breakdown
-              </span>
-            </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <Layers className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <span>Multi-Equipment Service Request Breakdown Screen</span>
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Splits master commercial facility requests into independent equipment work orders with
-              individual faults, technician routing, and tracking.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">

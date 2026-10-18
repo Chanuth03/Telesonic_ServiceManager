@@ -154,7 +154,7 @@ export const TransactionExportModal: React.FC<TransactionExportModalProps> = ({
       "\n" +
       headers.join(",") +
       "\n" +
-      rows.map((r) => r.join(",")).join("\n");
+      rows.join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
