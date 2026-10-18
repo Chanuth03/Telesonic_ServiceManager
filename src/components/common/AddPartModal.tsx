@@ -159,10 +159,6 @@ export const AddPartModal: React.FC<AddPartModalProps> = ({
               <h2 className="text-sm sm:text-base font-bold text-foreground">
                 Add Spare Part / Line Item
               </h2>
-              <p className="text-[11px] text-muted-foreground">
-                Registering part into{" "}
-                <span className="font-semibold text-foreground">{tabLabel}</span> ({screenCode})
-              </p>
             </div>
           </div>
           <button

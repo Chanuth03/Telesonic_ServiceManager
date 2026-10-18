@@ -137,7 +137,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       // localStorage may be unavailable in private browsing
     }
 
-    const partName = String(row.item || row.itemCode || row.description || "Part");
+    const partName = String(row["item"] || row["itemCode"] || row["description"] || "Part");
     showToast(`Spare Part "${partName}" saved and added to ${activeTab.label}!`);
   };
 
@@ -164,8 +164,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   const handleSaveTransaction = () => {
     saveFormData(storageKey, formData);
     meta.tabs.forEach((tab) => {
-      if (tabDatasets[tab.id]) {
-        saveTabData(storageKey, tab.id, tabDatasets[tab.id]);
+      const data = tabDatasets[tab.id];
+      if (data) {
+        saveTabData(storageKey, tab.id, data);
       }
     });
     const now = new Date().toLocaleTimeString();
@@ -275,12 +276,12 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
     currentTabData.forEach((row) => {
       // Qty calculation
-      const q = parseFloat(String(row.qty || row.quantity || row.reqQty || 0));
+      const q = parseFloat(String(row["qty"] || row["quantity"] || row["reqQty"] || 0));
       if (!isNaN(q)) totalQty += q;
 
       // Price calculation
       const amtStr = String(
-        row.total || row.amount || row.totalAmount || row.cost || row.price || "0",
+        row["total"] || row["amount"] || row["totalAmount"] || row["cost"] || row["price"] || "0",
       ).replace(/[^0-9.]/g, "");
       const amt = parseFloat(amtStr);
       if (!isNaN(amt)) totalLkr += amt;
@@ -316,17 +317,14 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
             </button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                  {meta.id}
+                <span className="text-xs px-2 py-0.5 rounded font-medium bg-muted text-foreground">
+                  {meta.type}
                 </span>
                 <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   {meta.module}
                 </span>
-                <span className="text-xs text-muted-foreground">·</span>
-                <span className="text-xs px-2 py-0.5 rounded font-medium bg-muted text-foreground">
-                  {meta.type}
-                </span>
+
                 {lastSavedTime && (
                   <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
                     Saved at {lastSavedTime}
@@ -495,13 +493,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         <div className="flex items-center justify-between border-b pb-3 border-border">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <span>Transaction Header Information</span>
-            <span className="text-xs font-mono font-normal text-muted-foreground">
-              (Live Interactive Spec Inputs)
-            </span>
           </h2>
-          <span className="text-xs text-muted-foreground font-mono">
-            Active: <strong className="text-foreground">{currentRecordRef}</strong>
-          </span>
         </div>
 
         {/* Dynamic Form Header Fields Grid */}
@@ -832,9 +824,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                     ) : (
                       currentTabData.map((row, idx) => (
                         <tr
-                          key={String(row._id || idx)}
+                          key={String(row["_id"] || idx)}
                           className={`hover:bg-muted/40 transition-colors group ${
-                            row._isNew ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
+                            Boolean(row["_isNew"]) ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
                           }`}
                         >
                           {activeTab.columns.map((col, cIdx) => (
@@ -845,7 +837,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                               }`}
                             >
                               <div className="flex items-center gap-1.5">
-                                {cIdx === 0 && row._isNew && (
+                                {cIdx === 0 && Boolean(row["_isNew"]) && (
                                   <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 shrink-0">
                                     Saved
                                   </span>

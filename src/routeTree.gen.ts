@@ -20,7 +20,10 @@ import { Route as IncidentsRouteImport } from './routes/incidents'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MastersRouteImport } from './routes/masters'
 import { Route as ProblemsRouteImport } from './routes/problems'
+import { Route as ServiceRequestsRouteImport } from './routes/service-requests'
+import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as TicketsIdRouteImport } from './routes/tickets.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -78,9 +81,24 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MastersRoute = MastersRouteImport.update({
+  id: '/masters',
+  path: '/masters',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProblemsRoute = ProblemsRouteImport.update({
   id: '/problems',
   path: '/problems',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceRequestsRoute = ServiceRequestsRouteImport.update({
+  id: '/service-requests',
+  path: '/service-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TicketsIdRoute = TicketsIdRouteImport.update({
@@ -101,7 +119,10 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/masters': typeof MastersRoute
   '/problems': typeof ProblemsRoute
+  '/service-requests': typeof ServiceRequestsRoute
+  '/transactions': typeof TransactionsRoute
   '/tickets/$id': typeof TicketsIdRoute
 }
 export interface FileRoutesByTo {
@@ -116,7 +137,10 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/masters': typeof MastersRoute
   '/problems': typeof ProblemsRoute
+  '/service-requests': typeof ServiceRequestsRoute
+  '/transactions': typeof TransactionsRoute
   '/tickets/$id': typeof TicketsIdRoute
 }
 export interface FileRoutesById {
@@ -132,7 +156,10 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/masters': typeof MastersRoute
   '/problems': typeof ProblemsRoute
+  '/service-requests': typeof ServiceRequestsRoute
+  '/transactions': typeof TransactionsRoute
   '/tickets/$id': typeof TicketsIdRoute
 }
 export interface FileRouteTypes {
@@ -149,7 +176,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/masters'
     | '/problems'
+    | '/service-requests'
+    | '/transactions'
     | '/tickets/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -164,7 +194,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/masters'
     | '/problems'
+    | '/service-requests'
+    | '/transactions'
     | '/tickets/$id'
   id:
     | '__root__'
@@ -179,7 +212,10 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/masters'
     | '/problems'
+    | '/service-requests'
+    | '/transactions'
     | '/tickets/$id'
   fileRoutesById: FileRoutesById
 }
@@ -195,7 +231,10 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
+  MastersRoute: typeof MastersRoute
   ProblemsRoute: typeof ProblemsRoute
+  ServiceRequestsRoute: typeof ServiceRequestsRoute
+  TransactionsRoute: typeof TransactionsRoute
   TicketsIdRoute: typeof TicketsIdRoute
 }
 
@@ -278,11 +317,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/masters': {
+      id: '/masters'
+      path: '/masters'
+      fullPath: '/masters'
+      preLoaderRoute: typeof MastersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/problems': {
       id: '/problems'
       path: '/problems'
       fullPath: '/problems'
       preLoaderRoute: typeof ProblemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service-requests': {
+      id: '/service-requests'
+      path: '/service-requests'
+      fullPath: '/service-requests'
+      preLoaderRoute: typeof ServiceRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tickets/$id': {
@@ -307,7 +367,10 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
+  MastersRoute: MastersRoute,
   ProblemsRoute: ProblemsRoute,
+  ServiceRequestsRoute: ServiceRequestsRoute,
+  TransactionsRoute: TransactionsRoute,
   TicketsIdRoute: TicketsIdRoute,
 }
 export const routeTree = rootRouteImport
