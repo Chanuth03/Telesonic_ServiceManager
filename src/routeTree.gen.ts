@@ -21,10 +21,25 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MastersRouteImport } from './routes/masters'
+import { Route as MobileRouteImport } from './routes/mobile'
+import { Route as MobileApkDownloadRouteImport } from './routes/mobile-apk-download'
 import { Route as ProblemsRouteImport } from './routes/problems'
 import { Route as ServiceRequestsRouteImport } from './routes/service-requests'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as MobileIndexRouteImport } from './routes/mobile.index'
+import { Route as MobileJobsRouteImport } from './routes/mobile.jobs'
+import { Route as MobileLoginRouteImport } from './routes/mobile.login'
+import { Route as MobileNotificationsRouteImport } from './routes/mobile.notifications'
+import { Route as MobileStockCountRouteImport } from './routes/mobile.stock-count'
 import { Route as TicketsIdRouteImport } from './routes/tickets.$id'
+import { Route as MobileJobsJobIdRouteImport } from './routes/mobile.jobs.$jobId'
+import { Route as MobileJobsJobIdCompletionRouteImport } from './routes/mobile.jobs.$jobId.completion'
+import { Route as MobileJobsJobIdHoldRouteImport } from './routes/mobile.jobs.$jobId.hold'
+import { Route as MobileJobsJobIdInspectionRouteImport } from './routes/mobile.jobs.$jobId.inspection'
+import { Route as MobileJobsJobIdLabourRouteImport } from './routes/mobile.jobs.$jobId.labour'
+import { Route as MobileJobsJobIdPartsRouteImport } from './routes/mobile.jobs.$jobId.parts'
+import { Route as MobileJobsJobIdPhotosRouteImport } from './routes/mobile.jobs.$jobId.photos'
+import { Route as MobileJobsJobIdTravelRouteImport } from './routes/mobile.jobs.$jobId.travel'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -86,6 +101,16 @@ const MastersRoute = MastersRouteImport.update({
   path: '/masters',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MobileRoute = MobileRouteImport.update({
+  id: '/mobile',
+  path: '/mobile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MobileApkDownloadRoute = MobileApkDownloadRouteImport.update({
+  id: '/mobile-apk-download',
+  path: '/mobile-apk-download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProblemsRoute = ProblemsRouteImport.update({
   id: '/problems',
   path: '/problems',
@@ -101,10 +126,77 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MobileIndexRoute = MobileIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MobileRoute,
+} as any)
+const MobileJobsRoute = MobileJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => MobileRoute,
+} as any)
+const MobileLoginRoute = MobileLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => MobileRoute,
+} as any)
+const MobileNotificationsRoute = MobileNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => MobileRoute,
+} as any)
+const MobileStockCountRoute = MobileStockCountRouteImport.update({
+  id: '/stock-count',
+  path: '/stock-count',
+  getParentRoute: () => MobileRoute,
+} as any)
 const TicketsIdRoute = TicketsIdRouteImport.update({
   id: '/tickets/$id',
   path: '/tickets/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MobileJobsJobIdRoute = MobileJobsJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => MobileJobsRoute,
+} as any)
+const MobileJobsJobIdCompletionRoute =
+  MobileJobsJobIdCompletionRouteImport.update({
+    id: '/completion',
+    path: '/completion',
+    getParentRoute: () => MobileJobsJobIdRoute,
+  } as any)
+const MobileJobsJobIdHoldRoute = MobileJobsJobIdHoldRouteImport.update({
+  id: '/hold',
+  path: '/hold',
+  getParentRoute: () => MobileJobsJobIdRoute,
+} as any)
+const MobileJobsJobIdInspectionRoute =
+  MobileJobsJobIdInspectionRouteImport.update({
+    id: '/inspection',
+    path: '/inspection',
+    getParentRoute: () => MobileJobsJobIdRoute,
+  } as any)
+const MobileJobsJobIdLabourRoute = MobileJobsJobIdLabourRouteImport.update({
+  id: '/labour',
+  path: '/labour',
+  getParentRoute: () => MobileJobsJobIdRoute,
+} as any)
+const MobileJobsJobIdPartsRoute = MobileJobsJobIdPartsRouteImport.update({
+  id: '/parts',
+  path: '/parts',
+  getParentRoute: () => MobileJobsJobIdRoute,
+} as any)
+const MobileJobsJobIdPhotosRoute = MobileJobsJobIdPhotosRouteImport.update({
+  id: '/photos',
+  path: '/photos',
+  getParentRoute: () => MobileJobsJobIdRoute,
+} as any)
+const MobileJobsJobIdTravelRoute = MobileJobsJobIdTravelRouteImport.update({
+  id: '/travel',
+  path: '/travel',
+  getParentRoute: () => MobileJobsJobIdRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -120,10 +212,25 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/masters': typeof MastersRoute
+  '/mobile': typeof MobileRouteWithChildren
+  '/mobile-apk-download': typeof MobileApkDownloadRoute
   '/problems': typeof ProblemsRoute
   '/service-requests': typeof ServiceRequestsRoute
   '/transactions': typeof TransactionsRoute
+  '/mobile/jobs': typeof MobileJobsRouteWithChildren
+  '/mobile/login': typeof MobileLoginRoute
+  '/mobile/notifications': typeof MobileNotificationsRoute
+  '/mobile/stock-count': typeof MobileStockCountRoute
   '/tickets/$id': typeof TicketsIdRoute
+  '/mobile/': typeof MobileIndexRoute
+  '/mobile/jobs/$jobId': typeof MobileJobsJobIdRouteWithChildren
+  '/mobile/jobs/$jobId/completion': typeof MobileJobsJobIdCompletionRoute
+  '/mobile/jobs/$jobId/hold': typeof MobileJobsJobIdHoldRoute
+  '/mobile/jobs/$jobId/inspection': typeof MobileJobsJobIdInspectionRoute
+  '/mobile/jobs/$jobId/labour': typeof MobileJobsJobIdLabourRoute
+  '/mobile/jobs/$jobId/parts': typeof MobileJobsJobIdPartsRoute
+  '/mobile/jobs/$jobId/photos': typeof MobileJobsJobIdPhotosRoute
+  '/mobile/jobs/$jobId/travel': typeof MobileJobsJobIdTravelRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -138,10 +245,24 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/masters': typeof MastersRoute
+  '/mobile-apk-download': typeof MobileApkDownloadRoute
   '/problems': typeof ProblemsRoute
   '/service-requests': typeof ServiceRequestsRoute
   '/transactions': typeof TransactionsRoute
+  '/mobile/jobs': typeof MobileJobsRouteWithChildren
+  '/mobile/login': typeof MobileLoginRoute
+  '/mobile/notifications': typeof MobileNotificationsRoute
+  '/mobile/stock-count': typeof MobileStockCountRoute
   '/tickets/$id': typeof TicketsIdRoute
+  '/mobile': typeof MobileIndexRoute
+  '/mobile/jobs/$jobId': typeof MobileJobsJobIdRouteWithChildren
+  '/mobile/jobs/$jobId/completion': typeof MobileJobsJobIdCompletionRoute
+  '/mobile/jobs/$jobId/hold': typeof MobileJobsJobIdHoldRoute
+  '/mobile/jobs/$jobId/inspection': typeof MobileJobsJobIdInspectionRoute
+  '/mobile/jobs/$jobId/labour': typeof MobileJobsJobIdLabourRoute
+  '/mobile/jobs/$jobId/parts': typeof MobileJobsJobIdPartsRoute
+  '/mobile/jobs/$jobId/photos': typeof MobileJobsJobIdPhotosRoute
+  '/mobile/jobs/$jobId/travel': typeof MobileJobsJobIdTravelRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -157,10 +278,25 @@ export interface FileRoutesById {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/masters': typeof MastersRoute
+  '/mobile': typeof MobileRouteWithChildren
+  '/mobile-apk-download': typeof MobileApkDownloadRoute
   '/problems': typeof ProblemsRoute
   '/service-requests': typeof ServiceRequestsRoute
   '/transactions': typeof TransactionsRoute
+  '/mobile/jobs': typeof MobileJobsRouteWithChildren
+  '/mobile/login': typeof MobileLoginRoute
+  '/mobile/notifications': typeof MobileNotificationsRoute
+  '/mobile/stock-count': typeof MobileStockCountRoute
   '/tickets/$id': typeof TicketsIdRoute
+  '/mobile/': typeof MobileIndexRoute
+  '/mobile/jobs/$jobId': typeof MobileJobsJobIdRouteWithChildren
+  '/mobile/jobs/$jobId/completion': typeof MobileJobsJobIdCompletionRoute
+  '/mobile/jobs/$jobId/hold': typeof MobileJobsJobIdHoldRoute
+  '/mobile/jobs/$jobId/inspection': typeof MobileJobsJobIdInspectionRoute
+  '/mobile/jobs/$jobId/labour': typeof MobileJobsJobIdLabourRoute
+  '/mobile/jobs/$jobId/parts': typeof MobileJobsJobIdPartsRoute
+  '/mobile/jobs/$jobId/photos': typeof MobileJobsJobIdPhotosRoute
+  '/mobile/jobs/$jobId/travel': typeof MobileJobsJobIdTravelRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,10 +313,25 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/masters'
+    | '/mobile'
+    | '/mobile-apk-download'
     | '/problems'
     | '/service-requests'
     | '/transactions'
+    | '/mobile/jobs'
+    | '/mobile/login'
+    | '/mobile/notifications'
+    | '/mobile/stock-count'
     | '/tickets/$id'
+    | '/mobile/'
+    | '/mobile/jobs/$jobId'
+    | '/mobile/jobs/$jobId/completion'
+    | '/mobile/jobs/$jobId/hold'
+    | '/mobile/jobs/$jobId/inspection'
+    | '/mobile/jobs/$jobId/labour'
+    | '/mobile/jobs/$jobId/parts'
+    | '/mobile/jobs/$jobId/photos'
+    | '/mobile/jobs/$jobId/travel'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -195,10 +346,24 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/masters'
+    | '/mobile-apk-download'
     | '/problems'
     | '/service-requests'
     | '/transactions'
+    | '/mobile/jobs'
+    | '/mobile/login'
+    | '/mobile/notifications'
+    | '/mobile/stock-count'
     | '/tickets/$id'
+    | '/mobile'
+    | '/mobile/jobs/$jobId'
+    | '/mobile/jobs/$jobId/completion'
+    | '/mobile/jobs/$jobId/hold'
+    | '/mobile/jobs/$jobId/inspection'
+    | '/mobile/jobs/$jobId/labour'
+    | '/mobile/jobs/$jobId/parts'
+    | '/mobile/jobs/$jobId/photos'
+    | '/mobile/jobs/$jobId/travel'
   id:
     | '__root__'
     | '/'
@@ -213,10 +378,25 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/masters'
+    | '/mobile'
+    | '/mobile-apk-download'
     | '/problems'
     | '/service-requests'
     | '/transactions'
+    | '/mobile/jobs'
+    | '/mobile/login'
+    | '/mobile/notifications'
+    | '/mobile/stock-count'
     | '/tickets/$id'
+    | '/mobile/'
+    | '/mobile/jobs/$jobId'
+    | '/mobile/jobs/$jobId/completion'
+    | '/mobile/jobs/$jobId/hold'
+    | '/mobile/jobs/$jobId/inspection'
+    | '/mobile/jobs/$jobId/labour'
+    | '/mobile/jobs/$jobId/parts'
+    | '/mobile/jobs/$jobId/photos'
+    | '/mobile/jobs/$jobId/travel'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -232,6 +412,8 @@ export interface RootRouteChildren {
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
   MastersRoute: typeof MastersRoute
+  MobileRoute: typeof MobileRouteWithChildren
+  MobileApkDownloadRoute: typeof MobileApkDownloadRoute
   ProblemsRoute: typeof ProblemsRoute
   ServiceRequestsRoute: typeof ServiceRequestsRoute
   TransactionsRoute: typeof TransactionsRoute
@@ -324,6 +506,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MastersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mobile': {
+      id: '/mobile'
+      path: '/mobile'
+      fullPath: '/mobile'
+      preLoaderRoute: typeof MobileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mobile-apk-download': {
+      id: '/mobile-apk-download'
+      path: '/mobile-apk-download'
+      fullPath: '/mobile-apk-download'
+      preLoaderRoute: typeof MobileApkDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/problems': {
       id: '/problems'
       path: '/problems'
@@ -345,6 +541,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mobile/': {
+      id: '/mobile/'
+      path: '/'
+      fullPath: '/mobile/'
+      preLoaderRoute: typeof MobileIndexRouteImport
+      parentRoute: typeof MobileRoute
+    }
+    '/mobile/jobs': {
+      id: '/mobile/jobs'
+      path: '/jobs'
+      fullPath: '/mobile/jobs'
+      preLoaderRoute: typeof MobileJobsRouteImport
+      parentRoute: typeof MobileRoute
+    }
+    '/mobile/login': {
+      id: '/mobile/login'
+      path: '/login'
+      fullPath: '/mobile/login'
+      preLoaderRoute: typeof MobileLoginRouteImport
+      parentRoute: typeof MobileRoute
+    }
+    '/mobile/notifications': {
+      id: '/mobile/notifications'
+      path: '/notifications'
+      fullPath: '/mobile/notifications'
+      preLoaderRoute: typeof MobileNotificationsRouteImport
+      parentRoute: typeof MobileRoute
+    }
+    '/mobile/stock-count': {
+      id: '/mobile/stock-count'
+      path: '/stock-count'
+      fullPath: '/mobile/stock-count'
+      preLoaderRoute: typeof MobileStockCountRouteImport
+      parentRoute: typeof MobileRoute
+    }
     '/tickets/$id': {
       id: '/tickets/$id'
       path: '/tickets/$id'
@@ -352,8 +583,119 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TicketsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mobile/jobs/$jobId': {
+      id: '/mobile/jobs/$jobId'
+      path: '/$jobId'
+      fullPath: '/mobile/jobs/$jobId'
+      preLoaderRoute: typeof MobileJobsJobIdRouteImport
+      parentRoute: typeof MobileJobsRoute
+    }
+    '/mobile/jobs/$jobId/completion': {
+      id: '/mobile/jobs/$jobId/completion'
+      path: '/completion'
+      fullPath: '/mobile/jobs/$jobId/completion'
+      preLoaderRoute: typeof MobileJobsJobIdCompletionRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/hold': {
+      id: '/mobile/jobs/$jobId/hold'
+      path: '/hold'
+      fullPath: '/mobile/jobs/$jobId/hold'
+      preLoaderRoute: typeof MobileJobsJobIdHoldRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/inspection': {
+      id: '/mobile/jobs/$jobId/inspection'
+      path: '/inspection'
+      fullPath: '/mobile/jobs/$jobId/inspection'
+      preLoaderRoute: typeof MobileJobsJobIdInspectionRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/labour': {
+      id: '/mobile/jobs/$jobId/labour'
+      path: '/labour'
+      fullPath: '/mobile/jobs/$jobId/labour'
+      preLoaderRoute: typeof MobileJobsJobIdLabourRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/parts': {
+      id: '/mobile/jobs/$jobId/parts'
+      path: '/parts'
+      fullPath: '/mobile/jobs/$jobId/parts'
+      preLoaderRoute: typeof MobileJobsJobIdPartsRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/photos': {
+      id: '/mobile/jobs/$jobId/photos'
+      path: '/photos'
+      fullPath: '/mobile/jobs/$jobId/photos'
+      preLoaderRoute: typeof MobileJobsJobIdPhotosRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
+    '/mobile/jobs/$jobId/travel': {
+      id: '/mobile/jobs/$jobId/travel'
+      path: '/travel'
+      fullPath: '/mobile/jobs/$jobId/travel'
+      preLoaderRoute: typeof MobileJobsJobIdTravelRouteImport
+      parentRoute: typeof MobileJobsJobIdRoute
+    }
   }
 }
+
+interface MobileJobsJobIdRouteChildren {
+  MobileJobsJobIdCompletionRoute: typeof MobileJobsJobIdCompletionRoute
+  MobileJobsJobIdHoldRoute: typeof MobileJobsJobIdHoldRoute
+  MobileJobsJobIdInspectionRoute: typeof MobileJobsJobIdInspectionRoute
+  MobileJobsJobIdLabourRoute: typeof MobileJobsJobIdLabourRoute
+  MobileJobsJobIdPartsRoute: typeof MobileJobsJobIdPartsRoute
+  MobileJobsJobIdPhotosRoute: typeof MobileJobsJobIdPhotosRoute
+  MobileJobsJobIdTravelRoute: typeof MobileJobsJobIdTravelRoute
+}
+
+const MobileJobsJobIdRouteChildren: MobileJobsJobIdRouteChildren = {
+  MobileJobsJobIdCompletionRoute: MobileJobsJobIdCompletionRoute,
+  MobileJobsJobIdHoldRoute: MobileJobsJobIdHoldRoute,
+  MobileJobsJobIdInspectionRoute: MobileJobsJobIdInspectionRoute,
+  MobileJobsJobIdLabourRoute: MobileJobsJobIdLabourRoute,
+  MobileJobsJobIdPartsRoute: MobileJobsJobIdPartsRoute,
+  MobileJobsJobIdPhotosRoute: MobileJobsJobIdPhotosRoute,
+  MobileJobsJobIdTravelRoute: MobileJobsJobIdTravelRoute,
+}
+
+const MobileJobsJobIdRouteWithChildren = MobileJobsJobIdRoute._addFileChildren(
+  MobileJobsJobIdRouteChildren,
+)
+
+interface MobileJobsRouteChildren {
+  MobileJobsJobIdRoute: typeof MobileJobsJobIdRouteWithChildren
+}
+
+const MobileJobsRouteChildren: MobileJobsRouteChildren = {
+  MobileJobsJobIdRoute: MobileJobsJobIdRouteWithChildren,
+}
+
+const MobileJobsRouteWithChildren = MobileJobsRoute._addFileChildren(
+  MobileJobsRouteChildren,
+)
+
+interface MobileRouteChildren {
+  MobileJobsRoute: typeof MobileJobsRouteWithChildren
+  MobileLoginRoute: typeof MobileLoginRoute
+  MobileNotificationsRoute: typeof MobileNotificationsRoute
+  MobileStockCountRoute: typeof MobileStockCountRoute
+  MobileIndexRoute: typeof MobileIndexRoute
+}
+
+const MobileRouteChildren: MobileRouteChildren = {
+  MobileJobsRoute: MobileJobsRouteWithChildren,
+  MobileLoginRoute: MobileLoginRoute,
+  MobileNotificationsRoute: MobileNotificationsRoute,
+  MobileStockCountRoute: MobileStockCountRoute,
+  MobileIndexRoute: MobileIndexRoute,
+}
+
+const MobileRouteWithChildren =
+  MobileRoute._addFileChildren(MobileRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -368,6 +710,8 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
   MastersRoute: MastersRoute,
+  MobileRoute: MobileRouteWithChildren,
+  MobileApkDownloadRoute: MobileApkDownloadRoute,
   ProblemsRoute: ProblemsRoute,
   ServiceRequestsRoute: ServiceRequestsRoute,
   TransactionsRoute: TransactionsRoute,
