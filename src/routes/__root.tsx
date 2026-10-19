@@ -14,6 +14,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
+import { MobileShell } from "@/components/mobile/MobileShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 
 function NotFoundComponent() {
@@ -107,11 +108,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
-      <body suppressHydrationWarning>
+      <body>
         {children}
         <Scripts />
       </body>
@@ -123,6 +124,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const bare = pathname === "/login";
+  const isMobileRoute = pathname.startsWith("/mobile");
   useEffect(() => {
     applyTheme(getSavedTheme());
   }, []);
@@ -130,6 +132,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {bare ? (
         <Outlet />
+      ) : isMobileRoute ? (
+        <MobileShell>
+          <Outlet />
+        </MobileShell>
       ) : (
         <AppShell>
           <Outlet />

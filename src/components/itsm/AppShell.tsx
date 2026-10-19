@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Search,
   Bell,
@@ -11,6 +11,7 @@ import {
   Grid2X2,
   Palette,
   Check,
+  Smartphone,
 } from "lucide-react";
 import { Avatar } from "./Badges";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState(false);
   const [notif, setNotif] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
-  const [theme, setTheme] = useState("indigo");
-
-  useEffect(() => {
-    setTheme(getSavedTheme());
-  }, []);
+  const [theme, setTheme] = useState(getSavedTheme);
 
   return (
     <div className="min-h-screen">
@@ -47,6 +44,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Grid2X2 size={18} />
             </Link>
           </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden sm:flex items-center gap-1.5 border-primary/30 text-xs font-semibold text-primary hover:bg-primary/10"
+          >
+            <Link to="/mobile">
+              <Smartphone size={15} />
+              Mobile App
+            </Link>
+          </Button>
           <div className="relative min-w-0 flex-1 max-w-xl">
             <Search
               size={16}
@@ -61,6 +69,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             </kbd>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="flex sm:hidden items-center gap-1 text-xs font-semibold text-primary border-primary/30"
+            >
+              <Link to="/mobile">
+                <Smartphone size={14} />
+                Mobile
+              </Link>
+            </Button>
             <div className="relative">
               <Button
                 variant="ghost"
@@ -150,12 +169,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
               {profile && (
                 <div className="card-surface rise absolute right-0 mt-2 w-48 p-1.5 text-sm">
-                  {(
-                    [
-                      [User, "My profile"],
-                      [Settings, "Settings"],
-                    ] as const
-                  ).map(([I, l]) => (
+                  {[
+                    [User, "My profile"],
+                    [Settings, "Settings"],
+                  ].map(([I, l]: [React.ComponentType<{ className?: string }>, string]) => (
                     <Button
                       variant="ghost"
                       key={l}

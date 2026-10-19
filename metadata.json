@@ -1,6 +1,6 @@
 {
-  "name": "Klaro Project Engine",
-  "description": "Servio ITSM Service Desk Platform — Incidents, changes, service catalog, assets, and operations.",
+  "name": "Pixel Perfect Replica - Enterprise Service Operations",
+  "description": "Enterprise IT Service Management, Assets, Equipment, Incidents, Problems, and Change Management Console.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

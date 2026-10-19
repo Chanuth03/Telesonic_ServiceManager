@@ -10,10 +10,8 @@ import {
   ClipboardList,
   MonitorCog,
   Trophy,
+  Smartphone,
   ArrowUpRight,
-  Database,
-  Headphones,
-  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -40,19 +38,6 @@ export const Route = createFileRoute("/")({
 });
 
 const modules = [
-  {
-    to: "/transactions",
-    label: "Transactions",
-    icon: ArrowRightLeft,
-    tone: "bg-primary-soft text-primary",
-  },
-  { to: "/masters", label: "Masters", icon: Database, tone: "bg-primary-soft text-primary" },
-  {
-    to: "/service-requests",
-    label: "Service Requests",
-    icon: Headphones,
-    tone: "bg-info-soft text-info",
-  },
   {
     to: "/dashboard",
     label: "Dashboard",
@@ -97,14 +82,17 @@ const modules = [
 
 function Workspace() {
   return (
-    <div className="py-4 sm:py-8 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
+    <div className="py-4 sm:py-8">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-6">
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">Welcome back, Nimal</p>
           <h1 className="text-3xl font-bold">Your workspace</h1>
         </div>
+        <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span className="h-2 w-2 rounded-full bg-success" />
+          Service desk online
+        </span>
       </div>
-
       <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {modules.map(({ to, label, icon: Icon, tone }) => (
           <Button

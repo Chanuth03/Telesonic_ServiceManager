@@ -1,222 +1,279 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  Activity,
-  PauseCircle,
-  RotateCcw,
-  BarChart3,
-  FileSpreadsheet,
-  Cpu,
-  ShieldCheck,
-  ArrowLeft,
-  ArrowUpRight,
-  Layers,
-  Radio,
-  Sparkles,
-  ChevronRight,
-  Clock,
-  Database,
-  Building,
+  AlertTriangle,
+  Inbox,
+  TimerOff,
+  UserX,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  MessageSquare,
+  CheckCircle2,
+  UserPlus,
+  GitPullRequestArrow,
 } from "lucide-react";
-import { DASHBOARD_GROUPS, DASHBOARD_SCREENS_LIST } from "@/data/dashboardSpecData";
-import { HeartbeatPulseScreen } from "@/components/dashboard/HeartbeatPulseScreen";
-import { HoldMonitorScreen } from "@/components/dashboard/HoldMonitorScreen";
-import { RepeatJobAnalysisScreen } from "@/components/dashboard/RepeatJobAnalysisScreen";
-import { ManagementKpiScreen } from "@/components/dashboard/ManagementKpiScreen";
-import { ReportViewerScreen } from "@/components/dashboard/ReportViewerScreen";
-import { IntegrationQueueScreen } from "@/components/dashboard/IntegrationQueueScreen";
-import { ExportLogScreen } from "@/components/dashboard/ExportLogScreen";
+import { tickets } from "@/lib/itsm-data";
+import { PageHeader, PriorityBadge, Avatar } from "@/components/itsm/Badges";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Service Operations & Executive Dashboard (A6) — Telesonic Lanka" },
-      {
-        name: "description",
-        content:
-          "Telesonic Lanka Option 01 Service Management Dashboard suite: Live Pulse (DSH-01), Hold Monitor (DSH-02), Repeat Job Analysis (DSH-03), Management KPIs (DSH-04), Integration Queue (DSH-05), Report Viewer (DSH-06), and Export Audit (DSH-07).",
-      },
-      {
-        property: "og:title",
-        content: "Service Operations & Executive Dashboard (A6) — Telesonic Lanka",
-      },
-      {
-        property: "og:description",
-        content:
-          "Telesonic Lanka Option 01 Service Management Dashboard suite: Live Pulse (DSH-01), Hold Monitor (DSH-02), Repeat Job Analysis (DSH-03), Management KPIs (DSH-04), Integration Queue (DSH-05), Report Viewer (DSH-06), and Export Audit (DSH-07).",
-      },
+      { title: "Dashboard — Servio ITSM" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      {
+        name: "description",
+        content: "Service manager overview: KPIs, ticket trends, urgent work and recent activity.",
+      },
+      { property: "og:title", content: "Dashboard — Servio ITSM" },
+      {
+        property: "og:description",
+        content: "Service manager overview: KPIs, ticket trends, urgent work and recent activity.",
+      },
     ],
   }),
-  component: DashboardPage,
+  component: Dashboard,
 });
 
-function DashboardPage() {
-  const [activeGroup, setActiveGroup] = useState<string>("live-monitoring");
+const kpis = [
+  {
+    label: "Active Incidents",
+    value: 128,
+    delta: "+12%",
+    up: true,
+    icon: AlertTriangle,
+    tone: "bg-primary-soft text-primary",
+  },
+  {
+    label: "Pending Requests",
+    value: 46,
+    delta: "-4%",
+    up: false,
+    icon: Inbox,
+    tone: "bg-info-soft text-info",
+  },
+  {
+    label: "SLA Breached",
+    value: 7,
+    delta: "+2",
+    up: true,
+    icon: TimerOff,
+    tone: "bg-destructive-soft text-destructive",
+    live: true,
+  },
+  {
+    label: "Unassigned Tickets",
+    value: 19,
+    delta: "-8%",
+    up: false,
+    icon: UserX,
+    tone: "bg-warning-soft text-warning",
+  },
+];
 
-  const scrollToSection = (id: string) => {
-    setActiveGroup(id);
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+const series = {
+  "7d": {
+    labels: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"],
+    open: [42, 51, 28, 22, 63, 58, 47],
+    resolved: [38, 49, 31, 25, 55, 61, 52],
+  },
+  "30d": {
+    labels: ["W1", "W2", "W3", "W4"],
+    open: [240, 286, 251, 302],
+    resolved: [228, 270, 262, 295],
+  },
+};
 
-  const scrollToScreen = (screenId: string) => {
-    const code = screenId.replace("O1-SCR-", "").toLowerCase();
-    const element = document.getElementById(`screen-${code}`);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+const activity = [
+  { icon: MessageSquare, who: "Sarah Chen", what: "commented on", ref: "INC-10482", t: "4m ago" },
+  { icon: CheckCircle2, who: "Lena Fischer", what: "resolved", ref: "INC-10477", t: "22m ago" },
+  { icon: UserPlus, who: "Arjun Mehta", what: "was assigned", ref: "INC-10475", t: "1h ago" },
+  {
+    icon: GitPullRequestArrow,
+    who: "Tom Okafor",
+    what: "submitted change",
+    ref: "CHG-2201",
+    t: "2h ago",
+  },
+  { icon: AlertTriangle, who: "System", what: "escalated", ref: "INC-10481", t: "3h ago" },
+];
+
+function Dashboard() {
+  const [range, setRange] = useState<"7d" | "30d">("7d");
+  const [hover, setHover] = useState<number | null>(null);
+  const d = series[range];
+  const max = Math.max(...d.open, ...d.resolved);
+  const urgent = tickets.filter(
+    (t) => (t.priority === "Critical" || t.priority === "High") && t.status !== "Resolved",
+  );
 
   return (
-    <div className="py-4 sm:py-6 space-y-8 max-w-7xl mx-auto">
-      {/* Top Header & Breadcrumbs */}
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+    <>
+      <PageHeader
+        title="Good morning, Nimal"
+        subtitle="Here's what's happening across the service desk today."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((k, i) => (
+          <div
+            key={k.label}
+            className="card-interactive rise p-5"
+            style={{ animationDelay: `${i * 60}ms` }}
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-border">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-              Service Operations & Management Dashboard
-            </h1>
-          </div>
-
-          {/* Quick jump to screen dropdown & PDF Guide */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <select
-              onChange={(e) => {
-                if (e.target.value) scrollToScreen(e.target.value);
-              }}
-              defaultValue=""
-              className="p-2 text-xs rounded-lg border border-border bg-card text-foreground font-semibold shadow-xs"
-            >
-              <option value="" disabled>
-                Select Screen...
-              </option>
-              {DASHBOARD_SCREENS_LIST.map((s) => (
-                <option key={s.id} value={s.id}>
-                  #{s.code} — {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Sticky Group Navigation Anchor Bar */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md pt-2 pb-3 border-b border-border">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
-          {DASHBOARD_GROUPS.map((grp) => {
-            const isActive = activeGroup === grp.id;
-            return (
-              <button
-                key={grp.id}
-                onClick={() => scrollToSection(grp.id)}
-                className={`px-4 py-2 text-xs rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-card text-muted-foreground hover:text-foreground border border-border/80 hover:bg-muted"
-                }`}
-              >
-                <span>{grp.title}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    isActive
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {grp.screenIds.length} Screens
+            <div className="flex items-start justify-between">
+              <span className={`grid h-10 w-10 place-items-center rounded-lg ${k.tone}`}>
+                <k.icon size={19} />
+              </span>
+              {k.live && (
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive">
+                  <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-destructive" />
+                  LIVE
                 </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* GROUP 1: Live Monitoring & Operational Pulse */}
-      <div id="live-monitoring" className="space-y-10 scroll-mt-24 pt-2">
-        <div className="border-b border-border/80 pb-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <h2 className="text-xl font-extrabold text-foreground tracking-tight">
-              Live Monitoring & Operational Pulse
-            </h2>
+              )}
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">{k.label}</p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight">{k.value}</span>
+              <span
+                className={`flex items-center gap-0.5 text-xs font-semibold ${k.up ? "text-destructive" : "text-success"}`}
+              >
+                {k.up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                {k.delta}
+              </span>
+            </div>
           </div>
-        </div>
-
-        {/* Screen 1: O1-SCR-DSH-01 */}
-        <HeartbeatPulseScreen />
-
-        {/* Screen 2: O1-SCR-DSH-02 */}
-        <HoldMonitorScreen />
-
-        {/* Screen 3: O1-SCR-DSH-03 */}
-        <RepeatJobAnalysisScreen />
+        ))}
       </div>
 
-      {/* GROUP 2: Executive Management & Financial Performance */}
-      <div id="executive-management" className="space-y-10 scroll-mt-24 pt-6">
-        <div className="border-b border-border/80 pb-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <h2 className="text-xl font-extrabold text-foreground tracking-tight">
-              Executive Management & Financial Performance
-            </h2>
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <section className="card-surface p-5 xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Open vs. Resolved</h2>
+              <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-sm bg-primary" />
+                  Opened
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-sm bg-success" />
+                  Resolved
+                </span>
+              </div>
+            </div>
+            <div className="flex rounded-lg bg-muted p-0.5 text-xs font-medium">
+              {(["7d", "30d"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={`rounded-md px-3 py-1.5 ${range === r ? "bg-card shadow-sm" : "text-muted-foreground"}`}
+                >
+                  {r === "7d" ? "7 days" : "30 days"}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Screen 4: O1-SCR-DSH-04 */}
-        <ManagementKpiScreen />
-
-        {/* Screen 5: O1-SCR-DSH-06 */}
-        <ReportViewerScreen />
-      </div>
-
-      {/* GROUP 3: System Integration & Data Governance */}
-      <div id="integration-governance" className="space-y-10 scroll-mt-24 pt-6">
-        <div className="border-b border-border/80 pb-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-            <h2 className="text-xl font-extrabold text-foreground tracking-tight">
-              System Integration & Data Governance
-            </h2>
+          <div className="mt-6 flex h-60 items-end gap-2 sm:gap-4">
+            {d.labels.map((l, i) => (
+              <div
+                key={l}
+                className="relative flex h-full flex-1 flex-col items-center justify-end"
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+              >
+                {hover === i && (
+                  <div className="absolute -top-2 z-10 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] text-background">
+                    {d.open[i]} open · {d.resolved[i]} resolved
+                  </div>
+                )}
+                <div className="flex h-full w-full items-end justify-center gap-1">
+                  <div
+                    className="w-full max-w-5 rounded-t-md bg-primary transition-all duration-500"
+                    style={{
+                      height: `${((d.open[i] ?? 0) / max) * 85}%`,
+                      opacity: hover === null || hover === i ? 1 : 0.4,
+                    }}
+                  />
+                  <div
+                    className="w-full max-w-5 rounded-t-md bg-success transition-all duration-500"
+                    style={{
+                      height: `${((d.resolved[i] ?? 0) / max) * 85}%`,
+                      opacity: hover === null || hover === i ? 1 : 0.4,
+                    }}
+                  />
+                </div>
+                <span className="mt-2 text-xs text-muted-foreground">{l}</span>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
 
-        {/* Screen 6: O1-SCR-DSH-05 */}
-        <IntegrationQueueScreen />
-
-        {/* Screen 7: O1-SCR-DSH-07 */}
-        <ExportLogScreen />
+        <section className="card-surface p-5">
+          <h2 className="font-semibold">Recent Activity</h2>
+          <ol className="mt-4 space-y-4">
+            {activity.map((a) => (
+              <li key={a.ref + a.t} className="flex gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                  <a.icon size={14} />
+                </span>
+                <div className="min-w-0 text-sm">
+                  <p>
+                    <span className="font-semibold">{a.who}</span> {a.what}{" "}
+                    <span className="font-mono text-xs text-primary">{a.ref}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{a.t}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
       </div>
 
-      {/* Footer Navigation Bar */}
-      <div className="pt-8 pb-12 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-3">
-          <Link to="/masters" className="text-primary hover:underline font-semibold">
-            Masters
-          </Link>
-          <span>•</span>
-          <Link to="/transactions" className="text-primary hover:underline font-semibold">
-            Transactions
-          </Link>
-          <span>•</span>
-          <Link to="/" className="text-primary hover:underline font-semibold">
-            Return to Workspace
+      <section className="card-surface mt-6">
+        <div className="flex items-center justify-between border-b p-5">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <span className="pulse-dot h-2 w-2 rounded-full bg-destructive" />
+            Urgent Tickets
+          </h2>
+          <Link
+            to="/incidents"
+            className="flex items-center gap-1 text-sm font-medium text-primary"
+          >
+            View all <ArrowRight size={14} />
           </Link>
         </div>
-      </div>
-    </div>
+        <ul className="divide-y">
+          {urgent.map((t) => (
+            <li key={t.id}>
+              <Link
+                to="/tickets/$id"
+                params={{ id: t.id }}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-3.5 hover:bg-muted/60 sm:grid-cols-[110px_minmax(0,1fr)_140px_90px]"
+              >
+                <span className="hidden font-mono text-xs text-muted-foreground sm:block">
+                  {t.id}
+                </span>
+                <span className="truncate text-sm font-medium">{t.subject}</span>
+                <span className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+                  {t.assignee ? (
+                    <>
+                      <Avatar name={t.assignee} />
+                      {t.assignee.split(" ")[0]}
+                    </>
+                  ) : (
+                    <em>Unassigned</em>
+                  )}
+                </span>
+                <span className="justify-self-end">
+                  <PriorityBadge p={t.priority} />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

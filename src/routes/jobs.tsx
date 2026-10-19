@@ -1,6 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CalendarClock, KanbanSquare, Plus, Table2, Wrench, X } from "lucide-react";
+import {
+  CalendarClock,
+  KanbanSquare,
+  Plus,
+  Table2,
+  Wrench,
+  X,
+  Smartphone,
+  ExternalLink,
+} from "lucide-react";
 import {
   initialJobs,
   jobColumns,
@@ -110,6 +119,29 @@ function JobsPage() {
 
   return (
     <>
+      {/* Field Technician Mobile View Banner */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-sm">
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+            <Smartphone size={18} />
+          </span>
+          <div>
+            <h3 className="font-semibold text-foreground">Field Technician Mobile View</h3>
+            <p className="text-xs text-muted-foreground">
+              Access Telesonic Option 01 Mobile App (Mobile Jobs, Travel & Check-in, Parts, Photos,
+              Signature).
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/mobile/jobs"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
+        >
+          Open Mobile Jobs App
+          <ExternalLink size={14} />
+        </Link>
+      </div>
+
       <PageHeader
         title="Job Management"
         subtitle="Work orders and field tasks across your teams."

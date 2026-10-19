@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight, Smartphone } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -21,12 +21,13 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Enter your email and password to continue.");
       return;
     }
+    sessionStorage.setItem("servio_login_mode", "normal");
     navigate({ to: "/" });
   };
 
@@ -78,7 +79,7 @@ function LoginPage() {
             Sign in to your service desk account.
           </p>
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
+          <form onSubmit={(e) => handleLogin(e)} className="mt-8 space-y-4">
             <div>
               <label className="mb-1 block text-xs font-semibold">Work email</label>
               <div className="relative">
@@ -139,12 +140,21 @@ function LoginPage() {
               <input type="checkbox" className="h-4 w-4 rounded border accent-primary" /> Keep me
               signed in
             </label>
-            <button
-              type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
-              Sign in <ArrowRight size={15} />
-            </button>
+            <div className="space-y-2.5">
+              <button
+                type="submit"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              >
+                Sign in <ArrowRight size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/mobile-apk-download" })}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-card py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                <Smartphone size={15} /> Mobile Login
+              </button>
+            </div>
           </form>
 
           <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">

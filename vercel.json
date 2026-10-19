@@ -1,6 +1,0 @@
-{
-  "buildCommand": "vite build",
-  "env": {
-    "NITRO_PRESET": "vercel"
-  }
-}
