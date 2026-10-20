@@ -35,17 +35,21 @@ export const Route = createFileRoute("/mobile/login")({
   component: MobileLoginPage,
 });
 
+import { useRole } from "@/context/RoleContext";
+import { apiFetch } from "@/lib/api-client";
+
 function MobileLoginPage() {
   const navigate = useNavigate();
+  const { setRole } = useRole();
   const [serverUrl, setServerUrl] = useState("https://telesonic.service-manager.com");
-  const [techId, setTechId] = useState("TECH-0092");
-  const [pinPassword, setPinPassword] = useState("123456");
+  const [techId, setTechId] = useState("tech@telesonic.lk");
+  const [pinPassword, setPinPassword] = useState("tech123");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleMobileSignIn = (e: React.FormEvent) => {
+  const handleMobileSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -54,31 +58,53 @@ function MobileLoginPage() {
       return;
     }
     if (!techId.trim()) {
-      setError("Please enter your Technician ID or Username.");
+      setError("Please enter your Technician ID or Email.");
       return;
     }
     if (!pinPassword.trim()) {
-      setError("Please enter your Password or Security PIN.");
+      setError("Please enter your Password.");
       return;
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      // Store temporary demo authentication state
-      sessionStorage.setItem("mobile_authenticated", "true");
-      sessionStorage.setItem("mobile_tech_id", techId.trim());
-      sessionStorage.setItem("mobile_server_url", serverUrl.trim());
+    try {
+      const email = techId.includes("@") ? techId.trim() : "tech@telesonic.lk";
+      const response = await apiFetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pinPassword.trim() }),
+      });
 
-      // Navigate to authenticated technician mobile view
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setError(data.error || "Invalid Email or Password");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("auth_user", JSON.stringify(data.user));
+      }
+
+      setRole("TECHNICIAN");
+      sessionStorage.setItem("mobile_authenticated", "true");
+      sessionStorage.setItem("mobile_tech_id", data.user?.name || techId.trim());
+
       navigate({ to: "/mobile" });
-    }, 450);
+    } catch {
+      setError("Authentication failed. Please check network connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFillDemo = () => {
     setServerUrl("https://telesonic.service-manager.com");
-    setTechId("TECH-0092");
-    setPinPassword("992810");
+    setTechId("tech@telesonic.lk");
+    setPinPassword("tech123");
     setError("");
   };
 

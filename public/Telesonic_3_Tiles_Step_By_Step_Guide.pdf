@@ -1,5 +1,5 @@
 %PDF-1.3
-%ºß¬à
+%ï¿½ß¬ï¿½
 3 0 obj
 <</Type /Page
 /Parent 1 0 R
@@ -47,7 +47,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 822.0474803149605805 Td
-(TELESONIC HVAC/R ITSM — PRESENTATION & OPERATIONAL MANUAL) Tj
+(TELESONIC HVAC/R ITSM ï¿½ PRESENTATION & OPERATIONAL MANUAL) Tj
 ET
 BT
 /F1 8 Tf
@@ -64,7 +64,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 22.6771653543306684 Td
-(Confidential & Proprietary — Telesonic Engineering \(Pvt\) Ltd) Tj
+(Confidential & Proprietary ï¿½ Telesonic Engineering \(Pvt\) Ltd) Tj
 ET
 BT
 /F1 8 Tf
@@ -138,35 +138,35 @@ BT
 10.3499999999999996 TL
 0.2 0.255 0.333 rg
 62.3622047244094517 561.2600787401574962 Td
-(•  Section 1: Workspace Launcher & Navigation Architecture \(Route: /\)) Tj
+(ï¿½  Section 1: Workspace Launcher & Navigation Architecture \(Route: /\)) Tj
 ET
 BT
 /F1 9 Tf
 10.3499999999999996 TL
 0.2 0.255 0.333 rg
 62.3622047244094517 545.6695275590550409 Td
-(•  Section 2: Tile 1 — Masters Management \(Route: /masters\) — Detailed Step-by-Step) Tj
+(ï¿½  Section 2: Tile 1 ï¿½ Masters Management \(Route: /masters\) ï¿½ Detailed Step-by-Step) Tj
 ET
 BT
 /F1 9 Tf
 10.3499999999999996 TL
 0.2 0.255 0.333 rg
 62.3622047244094517 530.0789763779526993 Td
-(•  Section 3: Tile 2 — Transaction Processing \(Route: /transactions\) — Parts Saving & Work Orders) Tj
+(ï¿½  Section 3: Tile 2 ï¿½ Transaction Processing \(Route: /transactions\) ï¿½ Parts Saving & Work Orders) Tj
 ET
 BT
 /F1 9 Tf
 10.3499999999999996 TL
 0.2 0.255 0.333 rg
 62.3622047244094517 514.4884251968503577 Td
-(•  Section 4: Tile 3 — Unified Service Operations Dashboard \(Route: /dashboard\) — Single Page View) Tj
+(ï¿½  Section 4: Tile 3 ï¿½ Unified Service Operations Dashboard \(Route: /dashboard\) ï¿½ Single Page View) Tj
 ET
 BT
 /F1 9 Tf
 10.3499999999999996 TL
 0.2 0.255 0.333 rg
 62.3622047244094517 498.8978740157479592 Td
-(•  Section 5: 5-Minute Live Presentation Script \(Exact talking points & clicks\)) Tj
+(ï¿½  Section 5: 5-Minute Live Presentation Script \(Exact talking points & clicks\)) Tj
 ET
 0.12 0.16 0.23 rg
 45.354330708661422 456.378188976377885 504.5713385826770718 -19.8425196850393704 re
@@ -305,7 +305,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 822.0474803149605805 Td
-(TELESONIC HVAC/R ITSM — PRESENTATION & OPERATIONAL MANUAL) Tj
+(TELESONIC HVAC/R ITSM ï¿½ PRESENTATION & OPERATIONAL MANUAL) Tj
 ET
 BT
 /F1 8 Tf
@@ -322,7 +322,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 22.6771653543306684 Td
-(Confidential & Proprietary — Telesonic Engineering \(Pvt\) Ltd) Tj
+(Confidential & Proprietary ï¿½ Telesonic Engineering \(Pvt\) Ltd) Tj
 ET
 BT
 /F1 8 Tf
@@ -339,7 +339,7 @@ BT
 12.6499999999999986 TL
 1. g
 56.6929133858267775 780.9451181102361943 Td
-(SECTION 2: TILE 1 — MASTERS MANAGEMENT \(/masters\)) Tj
+(SECTION 2: TILE 1 ï¿½ MASTERS MANAGEMENT \(/masters\)) Tj
 ET
 BT
 /F2 9.5 Tf
@@ -381,7 +381,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 677.480551181102328 Td
-(• MST-05 - Item / Spare Parts Master:) Tj
+(ï¿½ MST-05 - Item / Spare Parts Master:) Tj
 ET
 BT
 /F1 9 Tf
@@ -395,7 +395,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 661.8899999999999864 Td
-(• MST-08 - Multi-Component Equipment Master:) Tj
+(ï¿½ MST-08 - Multi-Component Equipment Master:) Tj
 ET
 BT
 /F1 9 Tf
@@ -409,7 +409,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 646.2994488188976447 Td
-(• MST-25 - Price List & Discount Master:) Tj
+(ï¿½ MST-25 - Price List & Discount Master:) Tj
 ET
 BT
 /F1 9 Tf
@@ -423,7 +423,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 630.7088976377951894 Td
-(• MST-06 - Technician Skills & Certification:) Tj
+(ï¿½ MST-06 - Technician Skills & Certification:) Tj
 ET
 BT
 /F1 9 Tf
@@ -437,7 +437,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 615.1183464566928478 Td
-(• MST-01 - Branch & Service Center Master:) Tj
+(ï¿½ MST-01 - Branch & Service Center Master:) Tj
 ET
 BT
 /F1 9 Tf
@@ -682,7 +682,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 822.0474803149605805 Td
-(TELESONIC HVAC/R ITSM — PRESENTATION & OPERATIONAL MANUAL) Tj
+(TELESONIC HVAC/R ITSM ï¿½ PRESENTATION & OPERATIONAL MANUAL) Tj
 ET
 BT
 /F1 8 Tf
@@ -699,7 +699,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 22.6771653543306684 Td
-(Confidential & Proprietary — Telesonic Engineering \(Pvt\) Ltd) Tj
+(Confidential & Proprietary ï¿½ Telesonic Engineering \(Pvt\) Ltd) Tj
 ET
 BT
 /F1 8 Tf
@@ -716,7 +716,7 @@ BT
 12.6499999999999986 TL
 1. g
 56.6929133858267775 780.9451181102361943 Td
-(SECTION 3: TILE 2 — TRANSACTION PROCESSING \(/transactions\)) Tj
+(SECTION 3: TILE 2 ï¿½ TRANSACTION PROCESSING \(/transactions\)) Tj
 ET
 BT
 /F2 9.5 Tf
@@ -758,7 +758,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 677.480551181102328 Td
-(• TRX-17 - Parts Issue & Return Request:) Tj
+(ï¿½ TRX-17 - Parts Issue & Return Request:) Tj
 ET
 BT
 /F1 9 Tf
@@ -772,7 +772,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 661.8899999999999864 Td
-(• TRX-35 - Service Quotation & Estimation:) Tj
+(ï¿½ TRX-35 - Service Quotation & Estimation:) Tj
 ET
 BT
 /F1 9 Tf
@@ -786,7 +786,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 646.2994488188976447 Td
-(• TRX-02 - Job Card Execution / Field Service:) Tj
+(ï¿½ TRX-02 - Job Card Execution / Field Service:) Tj
 ET
 BT
 /F1 9 Tf
@@ -800,7 +800,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 630.7088976377951894 Td
-(• TRX-26 - Equipment Commissioning Certificate:) Tj
+(ï¿½ TRX-26 - Equipment Commissioning Certificate:) Tj
 ET
 BT
 /F1 9 Tf
@@ -814,7 +814,7 @@ BT
 10.3499999999999996 TL
 0.059 0.09 0.165 rg
 51.0236220472441033 615.1183464566928478 Td
-(• TRX-31 - Annual Maintenance Contract \(AMC\):) Tj
+(ï¿½ TRX-31 - Annual Maintenance Contract \(AMC\):) Tj
 ET
 BT
 /F1 9 Tf
@@ -1093,7 +1093,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 822.0474803149605805 Td
-(TELESONIC HVAC/R ITSM — PRESENTATION & OPERATIONAL MANUAL) Tj
+(TELESONIC HVAC/R ITSM ï¿½ PRESENTATION & OPERATIONAL MANUAL) Tj
 ET
 BT
 /F1 8 Tf
@@ -1110,7 +1110,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 22.6771653543306684 Td
-(Confidential & Proprietary — Telesonic Engineering \(Pvt\) Ltd) Tj
+(Confidential & Proprietary ï¿½ Telesonic Engineering \(Pvt\) Ltd) Tj
 ET
 BT
 /F1 8 Tf
@@ -1127,7 +1127,7 @@ BT
 12.6499999999999986 TL
 1. g
 56.6929133858267775 780.9451181102361943 Td
-(SECTION 4: TILE 3 — UNIFIED SERVICE DASHBOARD \(/dashboard\)) Tj
+(SECTION 4: TILE 3 ï¿½ UNIFIED SERVICE DASHBOARD \(/dashboard\)) Tj
 ET
 BT
 /F2 9.5 Tf
@@ -1188,21 +1188,21 @@ BT
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 656.2207086614173477 Td
-(• O1-SCR-DSH-01: Heartbeat Pulse — Live SLA gauges, active technicians, and unresolved emergency tickets.) Tj
+(ï¿½ O1-SCR-DSH-01: Heartbeat Pulse ï¿½ Live SLA gauges, active technicians, and unresolved emergency tickets.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 643.4648031496062686 Td
-(• O1-SCR-DSH-02: Hold Monitor — Interactive resolution for Credit Limit, Spare Parts, and Warranty Approvals.) Tj
+(ï¿½ O1-SCR-DSH-02: Hold Monitor ï¿½ Interactive resolution for Credit Limit, Spare Parts, and Warranty Approvals.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 630.7088976377951894 Td
-(• O1-SCR-DSH-03: Repeat Job Analysis — 30-day recall rates, faulty part correlations, and technician coaching.) Tj
+(ï¿½ O1-SCR-DSH-03: Repeat Job Analysis ï¿½ 30-day recall rates, faulty part correlations, and technician coaching.) Tj
 ET
 0.95 0.96 0.96 rg
 48.1889763779527627 612.2837007874014716 m
@@ -1228,14 +1228,14 @@ BT
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 591.0238582677164914 Td
-(• O1-SCR-DSH-04: Management KPI Dashboard — Revenue \(LKR 28.4M\), First-Time-Fix Rate \(89.2%\), CSAT score.) Tj
+(ï¿½ O1-SCR-DSH-04: Management KPI Dashboard ï¿½ Revenue \(LKR 28.4M\), First-Time-Fix Rate \(89.2%\), CSAT score.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 578.2679527559055259 Td
-(• O1-SCR-DSH-06: Report Viewer & Downloader — Filter reports by branch and export genuine CSV spreadsheets.) Tj
+(ï¿½ O1-SCR-DSH-06: Report Viewer & Downloader ï¿½ Filter reports by branch and export genuine CSV spreadsheets.) Tj
 ET
 0.95 0.96 0.96 rg
 48.1889763779527627 559.8427559055118081 m
@@ -1261,14 +1261,14 @@ BT
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 538.5829133858267141 Td
-(• O1-SCR-DSH-05: Integration Queue — Live status of SAP B1 DI Server, Dialog SMS, with interactive RETRY action.) Tj
+(ï¿½ O1-SCR-DSH-05: Integration Queue ï¿½ Live status of SAP B1 DI Server, Dialog SMS, with interactive RETRY action.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.278 0.333 0.412 rg
 53.8582677165354369 525.827007874015635 Td
-(• O1-SCR-DSH-07: Export Audit Log — ISO 27001-compliant immutable log with cryptographic SHA-256 validation.) Tj
+(ï¿½ O1-SCR-DSH-07: Export Audit Log ï¿½ ISO 27001-compliant immutable log with cryptographic SHA-256 validation.) Tj
 ET
 BT
 /F2 10 Tf
@@ -1472,7 +1472,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 822.0474803149605805 Td
-(TELESONIC HVAC/R ITSM — PRESENTATION & OPERATIONAL MANUAL) Tj
+(TELESONIC HVAC/R ITSM ï¿½ PRESENTATION & OPERATIONAL MANUAL) Tj
 ET
 BT
 /F1 8 Tf
@@ -1489,7 +1489,7 @@ BT
 9.1999999999999993 TL
 0.42 0.447 0.502 rg
 45.354330708661422 22.6771653543306684 Td
-(Confidential & Proprietary — Telesonic Engineering \(Pvt\) Ltd) Tj
+(Confidential & Proprietary ï¿½ Telesonic Engineering \(Pvt\) Ltd) Tj
 ET
 BT
 /F1 8 Tf
@@ -1583,7 +1583,7 @@ BT
 9.7749999999999986 TL
 0.059 0.09 0.165 rg
 116.2204724409448886 647.7167716535432191 Td
-(Tile 1 Demonstration — Masters \(/masters\)) Tj
+(Tile 1 Demonstration ï¿½ Masters \(/masters\)) Tj
 ET
 BT
 /F3 8 Tf
@@ -1627,7 +1627,7 @@ BT
 9.7749999999999986 TL
 0.059 0.09 0.165 rg
 116.2204724409448886 568.346692913385823 Td
-(Tile 2 Demonstration — Transactions \(/transactions\)) Tj
+(Tile 2 Demonstration ï¿½ Transactions \(/transactions\)) Tj
 ET
 BT
 /F3 8 Tf
@@ -1671,7 +1671,7 @@ BT
 9.7749999999999986 TL
 0.059 0.09 0.165 rg
 116.2204724409448886 488.9766141732283131 Td
-(Tile 3 Demonstration — Unified Dashboard \(/dashboard\)) Tj
+(Tile 3 Demonstration ï¿½ Unified Dashboard \(/dashboard\)) Tj
 ET
 BT
 /F3 8 Tf

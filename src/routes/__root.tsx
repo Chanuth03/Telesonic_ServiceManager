@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
+import { RoleProvider } from "@/context/RoleContext";
 
 function NotFoundComponent() {
   return (
@@ -127,14 +128,16 @@ function RootComponent() {
     applyTheme(getSavedTheme());
   }, []);
   return (
-    <QueryClientProvider client={queryClient}>
-      {bare ? (
-        <Outlet />
-      ) : (
-        <AppShell>
+    <RoleProvider>
+      <QueryClientProvider client={queryClient}>
+        {bare ? (
           <Outlet />
-        </AppShell>
-      )}
-    </QueryClientProvider>
+        ) : (
+          <AppShell>
+            <Outlet />
+          </AppShell>
+        )}
+      </QueryClientProvider>
+    </RoleProvider>
   );
 }

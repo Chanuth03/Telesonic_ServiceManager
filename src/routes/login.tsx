@@ -14,20 +14,74 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+import { useRole } from "@/context/RoleContext";
+import { apiFetch } from "@/lib/api-client";
+
 function LoginPage() {
   const navigate = useNavigate();
+  const { setRole } = useRole();
   const [showPw, setShowPw] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@telesonic.lk");
+  const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Enter your email and password to continue.");
       return;
     }
-    navigate({ to: "/" });
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiFetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setError(data.error || "Invalid Email or Password");
+        setLoading(false);
+        return;
+      }
+
+      // Store JWT Token in localStorage
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("auth_user", JSON.stringify(data.user));
+      }
+
+      // Update Active Role in Context
+      if (data.user?.role) {
+        setRole(data.user.role);
+      }
+
+      navigate({ to: "/" });
+    } catch {
+      setError("Something went wrong on the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setDemoCredentials = (roleType: "ADMIN" | "TECHNICIAN") => {
+    if (roleType === "ADMIN") {
+      setEmail("admin@telesonic.lk");
+      setPassword("admin123");
+    } else {
+      setEmail("tech@telesonic.lk");
+      setPassword("tech123");
+    }
+    setError("");
   };
 
   return (
@@ -141,11 +195,41 @@ function LoginPage() {
             </label>
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 cursor-pointer"
             >
-              Sign in <ArrowRight size={15} />
+              {loading ? (
+                <span>Authenticating with Bcrypt & JWT...</span>
+              ) : (
+                <>
+                  Sign in <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </form>
+
+          {/* Quick Demo Credentials */}
+          <div className="mt-4 p-3 rounded-lg bg-muted/60 border border-border text-xs space-y-2">
+            <span className="font-semibold text-muted-foreground block text-[11px] uppercase tracking-wider">
+              Quick Test Credentials (Bcrypt Hashed)
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDemoCredentials("ADMIN")}
+                className="flex-1 py-1.5 px-2 rounded bg-card border border-border text-foreground font-semibold hover:border-primary transition-colors cursor-pointer text-center text-xs"
+              >
+                ADMIN (admin123)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDemoCredentials("TECHNICIAN")}
+                className="flex-1 py-1.5 px-2 rounded bg-card border border-border text-foreground font-semibold hover:border-primary transition-colors cursor-pointer text-center text-xs"
+              >
+                TECH (tech123)
+              </button>
+            </div>
+          </div>
 
           <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />

@@ -15,19 +15,36 @@ import {
 import { Avatar } from "./Badges";
 import { Button } from "@/components/ui/button";
 import { themes, applyTheme, getSavedTheme } from "@/lib/theme";
+import { RoleSwitcherBar, useRole } from "@/context/RoleContext";
+import { useRouterState } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState(false);
   const [notif, setNotif] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [theme, setTheme] = useState("indigo");
+  const { role } = useRole();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     setTheme(getSavedTheme());
   }, []);
 
+  const isTechnicianMobileView =
+    role === "TECHNICIAN" && (pathname === "/" || pathname.startsWith("/mobile"));
+
+  if (isTechnicianMobileView) {
+    return (
+      <div className="min-h-screen bg-muted/20">
+        <RoleSwitcherBar />
+        <div>{children}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
+      <RoleSwitcherBar />
       <div>
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-3 border-b bg-card/85 px-4 py-3 backdrop-blur sm:px-6">
           <Link

@@ -80,32 +80,36 @@ export interface ServiceRequestRecord {
   };
 
   // Repeat & Hold Details
-  repeatFlag?: {
-    isRepeat: boolean;
-    repeatScore: number;
-    detectionWindowDays: number;
-    previousTicketId?: string | undefined;
-    previousTicketDate?: string | undefined;
-    previousTechName?: string | undefined;
-    previousResolution?: string | undefined;
-    reworkWarrantyApplicable: boolean;
-  } | undefined;
+  repeatFlag?:
+    | {
+        isRepeat: boolean;
+        repeatScore: number;
+        detectionWindowDays: number;
+        previousTicketId?: string | undefined;
+        previousTicketDate?: string | undefined;
+        previousTechName?: string | undefined;
+        previousResolution?: string | undefined;
+        reworkWarrantyApplicable: boolean;
+      }
+    | undefined;
 
-  holdDetails?: {
-    isOnHold: boolean;
-    holdReasonCode:
-      | "CREDIT_HOLD"
-      | "PARTS_AWAITING"
-      | "SITE_ACCESS"
-      | "WARRANTY_VERIFY"
-      | "CUSTOMER_APPROVAL";
-    holdReasonLabel: string;
-    holdPlacedDate: string;
-    placedBy: string;
-    supervisorOverrideAllowed: boolean;
-    overrideBy?: string | undefined;
-    overrideJustification?: string | undefined;
-  } | undefined;
+  holdDetails?:
+    | {
+        isOnHold: boolean;
+        holdReasonCode:
+          | "CREDIT_HOLD"
+          | "PARTS_AWAITING"
+          | "SITE_ACCESS"
+          | "WARRANTY_VERIFY"
+          | "CUSTOMER_APPROVAL";
+        holdReasonLabel: string;
+        holdPlacedDate: string;
+        placedBy: string;
+        supervisorOverrideAllowed: boolean;
+        overrideBy?: string | undefined;
+        overrideJustification?: string | undefined;
+      }
+    | undefined;
 
   // Multi-equipment child count if parent
   isMultiEquipment?: boolean | undefined;

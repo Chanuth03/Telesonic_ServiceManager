@@ -1,0 +1,132 @@
+// Prisma Schema for Telesonic Service Manager
+// Configured with PostgreSQL datasource reading DATABASE_URL from .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id              String        @id
+  customerName    String
+  customerContact String?
+  town            String
+  window          String
+  priority        String        // "Critical" | "High" | "Normal" | "Low"
+  role            String
+  status          String        // "Assigned" | "Accepted" | "In Progress" | "On Hold" | "Completed" | "Declined"
+  category        String
+  siteName        String?
+  siteAddress     String
+  technicianName  String
+  scheduledDate   String
+  syncStatus      String        @default("synced") // "synced" | "pending"
+  syncedAt        DateTime?
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  labourLogs      LabourLog[]
+  partsUsed       PartUsed[]
+  inspections     Inspection[]
+  holdRequests    HoldRequest[]
+
+  @@map("jobs")
+}
+
+model ServiceRequest {
+  id              String        @id
+  title           String
+  callType        String
+  customerName    String
+  status          String
+  priority        String
+  assignedTo      String?
+  scheduledDate   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("service_requests")
+}
+
+model SyncLog {
+  id          String    @id @default(cuid())
+  batchId     String
+  role        String
+  deviceId    String
+  itemCount   Int
+  status      String    // "SUCCESS" | "PARTIAL" | "FAILED"
+  details     String?
+  syncedAt    DateTime  @default(now())
+
+  @@map("sync_logs")
+}
+
+model LabourLog {
+  id                  String   @id @default(cuid())
+  jobId               String
+  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  technicianName      String
+  date                String
+  hours               Float
+  rateType            String   // "Regular" | "Overtime" | "Weekend/Holiday"
+  activityDescription String
+  createdAt           DateTime @default(now())
+
+  @@map("labour_logs")
+}
+
+model PartUsed {
+  id             String   @id @default(cuid())
+  jobId          String
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  partCode       String
+  name           String
+  qtyUsed        Int
+  unitPrice      Float
+  createdAt      DateTime @default(now())
+
+  @@map("parts_used")
+}
+
+model Inspection {
+  id             String   @id @default(cuid())
+  jobId          String
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspectedAt    DateTime @default(now())
+  technicianName String
+  overallStatus  String   // "Pass" | "Fail" | "Conditional Pass"
+  generalNotes   String?
+
+  @@map("inspections")
+}
+
+model HoldRequest {
+  id                  String   @id @default(cuid())
+  jobId               String
+  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reason              String
+  notes               String
+  estimatedDelayHours Float
+  requestedAt         DateTime @default(now())
+  status              String   // "Submitted" | "Approved" | "Pending Review"
+
+  @@map("hold_requests")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // Bcrypt hashed password
+  role      String   // "ADMIN" | "TECHNICIAN"
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}

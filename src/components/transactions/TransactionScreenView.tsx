@@ -823,7 +823,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                         <tr
                           key={String(row["_id"] || idx)}
                           className={`hover:bg-muted/40 transition-colors group ${
-                            Boolean(row["_isNew"]) ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
+                            row["_isNew"] ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
                           }`}
                         >
                           {activeTab.columns.map((col, cIdx) => (

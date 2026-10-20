@@ -95,36 +95,8 @@ const modules = [
   { to: "/incentive", label: "Incentive", icon: Trophy, tone: "bg-success-soft text-success" },
 ] as const;
 
-function Workspace() {
-  return (
-    <div className="py-4 sm:py-8 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
-        <div>
-          <p className="mb-2 text-sm font-medium text-muted-foreground">Welcome back, Nimal</p>
-          <h1 className="text-3xl font-bold">Your workspace</h1>
-        </div>
-      </div>
+import { RoleLayoutSwitcher } from "@/components/layout/RoleLayoutSwitcher";
 
-      <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {modules.map(({ to, label, icon: Icon, tone }) => (
-          <Button
-            key={to}
-            asChild
-            variant="ghost"
-            className="group h-auto min-h-40 flex-col items-start justify-between gap-6 whitespace-normal rounded-lg border bg-card p-5 text-card-foreground shadow-sm transition-all hover:-translate-y-1 hover:border-primary/40 hover:bg-card hover:shadow-md motion-reduce:transform-none sm:min-h-48 sm:p-6"
-          >
-            <Link to={to}>
-              <span className="flex w-full items-start justify-between gap-2">
-                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-lg ${tone}`}>
-                  <Icon className="size-6" />
-                </span>
-                <ArrowUpRight className="text-muted-foreground transition-colors group-hover:text-primary" />
-              </span>
-              <span className="text-base font-semibold sm:text-lg">{label}</span>
-            </Link>
-          </Button>
-        ))}
-      </nav>
-    </div>
-  );
+function Workspace() {
+  return <RoleLayoutSwitcher />;
 }
