@@ -10,7 +10,7 @@
 
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt from "./jwt";
 
 const JWT_SECRET =
   (typeof process !== "undefined" && process.env?.JWT_SECRET) ||
