@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api-client";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { setRole } = useRole();
+  const { setRole, setUser } = useRole();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("admin@telesonic.lk");
   const [password, setPassword] = useState("admin123");
@@ -57,11 +57,12 @@ function LoginPage() {
       // Store JWT Token in localStorage
       if (data.token) {
         localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("auth_user", JSON.stringify(data.user));
       }
 
-      // Update Active Role in Context
-      if (data.user?.role) {
+      // Update Active User & Role in Context and localStorage
+      if (data.user) {
+        setUser(data.user);
+      } else if (data.user?.role) {
         setRole(data.user.role);
       }
 

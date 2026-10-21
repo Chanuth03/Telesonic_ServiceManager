@@ -301,42 +301,69 @@ export async function handleApiRequest(request: Request): Promise<Response> {
           return new Response(JSON.stringify({ error: "Name and Email are required" }), { status: 400, headers });
         }
 
-        // Check if existing user
-        const existing = await prisma.user.findUnique({ where: { email } });
+        // Check if user has an existing ID (from loading a record) or originalEmail
+        const userId = body.id ? Number(body.id) : undefined;
+        let existing = null;
+
+        if (userId && !isNaN(userId)) {
+          existing = await prisma.user.findUnique({ where: { id: userId } });
+        }
+        if (!existing) {
+          existing = await prisma.user.findUnique({ where: { email } });
+        }
 
         let passwordHash = existing ? existing.password : bcrypt.hashSync("User@123", 10);
         if (rawPassword) {
           passwordHash = bcrypt.hashSync(rawPassword, 10);
         }
 
-        const savedUser = await prisma.user.upsert({
-          where: { email },
-          update: {
-            name,
-            role,
-            phone,
-            status,
-            password: passwordHash,
-          },
-          create: {
-            email,
-            name,
-            role,
-            phone,
-            status,
-            password: passwordHash,
-          },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            phone: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        });
+        let savedUser;
+        if (existing) {
+          // Update the existing user record!
+          savedUser = await prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              email,
+              name,
+              role,
+              phone,
+              status,
+              password: passwordHash,
+            },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              phone: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+        } else {
+          // Create brand new user
+          savedUser = await prisma.user.create({
+            data: {
+              email,
+              name,
+              role,
+              phone,
+              status,
+              password: passwordHash,
+            },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              phone: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+        }
 
         return new Response(JSON.stringify({ success: true, user: savedUser }), { status: 201, headers });
       }

@@ -232,6 +232,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
               result.user,
               ...prev.filter(
                 (u) =>
+                  u["id"] !== result.user["id"] &&
                   String(u["email"]).toLowerCase() !== String(result.user["email"]).toLowerCase(),
               ),
             ]);
@@ -294,7 +295,9 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
 
   // Load saved record into form for viewing/editing
   const handleLoadRecord = (rec: Record<string, unknown>) => {
-    setFormData(rec);
+    // Keep record id and details, clear password input
+    const cleanRec = { ...rec, password: "" };
+    setFormData(cleanRec);
     setValidationErrors({});
     window.scrollTo({ top: 150, behavior: "smooth" });
     setSidePopup({

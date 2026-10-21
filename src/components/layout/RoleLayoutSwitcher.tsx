@@ -191,7 +191,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary text-primary-foreground flex items-center gap-1">
               <Shield className="w-3 h-3" />
-              <span>ROLE: ADMIN</span>
+              <span>ROLE: {user.role || "ADMIN"}</span>
             </span>
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Database className="w-3 h-3 text-emerald-500" />
