@@ -42,7 +42,72 @@ export const MasterField: React.FC<MasterFieldProps> = ({ field, value, onChange
         )}
       </div>
 
-      {field.type === "select" ? (
+            {(field.type as string) === "multiselect" ? (
+        (() => {
+          const currentSelected: string[] = Array.isArray(value)
+            ? (value as string[])
+            : typeof value === "string" && value.trim()
+              ? value.startsWith("[")
+                ? (() => { try { return JSON.parse(value); } catch { return value.split(",").map(s => s.trim()); } })()
+                : value.split(",").map((s) => s.trim()).filter(Boolean)
+              : [];
+
+          const toggleOption = (opt: string) => {
+            let updated: string[];
+            if (opt === "ALL") {
+              if (currentSelected.includes("ALL")) {
+                updated = [];
+              } else {
+                updated = ["ALL"];
+              }
+            } else {
+              const withoutAll = currentSelected.filter((x) => x !== "ALL");
+              if (withoutAll.includes(opt)) {
+                updated = withoutAll.filter((x) => x !== opt);
+              } else {
+                updated = [...withoutAll, opt];
+              }
+            }
+            onChange(updated.join(","));
+          };
+
+          return (
+            <div className="space-y-2 p-2.5 rounded-lg border border-border bg-muted/20">
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                {field.options?.map((opt) => {
+                  const isSelected =
+                    currentSelected.includes("ALL") || currentSelected.includes(opt);
+                  const isStrictAll = opt === "ALL" && currentSelected.includes("ALL");
+
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => toggleOption(opt)}
+                      className={`px-2.5 py-1 text-[11px] font-mono rounded-md border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isStrictAll
+                          ? "bg-primary text-primary-foreground border-primary font-bold shadow-xs"
+                          : isSelected
+                            ? "bg-primary/15 text-primary border-primary/40 font-semibold"
+                            : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                      <span>{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[10px] text-muted-foreground font-mono flex items-center justify-between">
+                <span>Selected: {currentSelected.length === 0 ? "None" : currentSelected.join(", ")}</span>
+                <span className="text-[10px] text-primary underline cursor-pointer" onClick={() => onChange("ALL")}>
+                  Select All
+                </span>
+              </div>
+            </div>
+          );
+        })()
+      ) : field.type === "select" ? (
         <select
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}

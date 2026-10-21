@@ -119,14 +119,29 @@ model HoldRequest {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
   password  String   // Bcrypt hashed password
-  role      String   // "ADMIN" | "TECHNICIAN"
+  role      String   // System Role Code (e.g. ADMIN, TECHNICIAN, COORDINATOR)
   phone     String?
+  status    String   @default("Active") // "Active" | "Inactive"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+
+model SystemRole {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?
+  permissions String?  // comma separated or JSON string
+  status      String   @default("Active") // "Active" | "Inactive"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_roles")
 }

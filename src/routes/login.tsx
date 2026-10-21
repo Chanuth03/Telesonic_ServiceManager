@@ -208,42 +208,6 @@ function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Credentials */}
-          <div className="mt-4 p-3 rounded-lg bg-muted/60 border border-border text-xs space-y-2">
-            <span className="font-semibold text-muted-foreground block text-[11px] uppercase tracking-wider">
-              Quick Test Credentials (Bcrypt Hashed)
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("ADMIN")}
-                className="flex-1 py-1.5 px-2 rounded bg-card border border-border text-foreground font-semibold hover:border-primary transition-colors cursor-pointer text-center text-xs"
-              >
-                ADMIN (admin123)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("TECHNICIAN")}
-                className="flex-1 py-1.5 px-2 rounded bg-card border border-border text-foreground font-semibold hover:border-primary transition-colors cursor-pointer text-center text-xs"
-              >
-                TECH (tech123)
-              </button>
-            </div>
-          </div>
-
-          <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            or continue with
-            <span className="h-px flex-1 bg-border" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button className="rounded-lg border py-2.5 text-sm font-medium hover:bg-muted">
-              Google
-            </button>
-            <button className="rounded-lg border py-2.5 text-sm font-medium hover:bg-muted">
-              Microsoft SSO
-            </button>
-          </div>
           <p className="mt-8 text-center text-xs text-muted-foreground">
             Need an account? Contact your service desk administrator.
           </p>

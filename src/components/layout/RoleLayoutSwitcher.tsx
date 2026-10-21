@@ -46,6 +46,23 @@ interface DbStatsType {
   };
 }
 
+// Mapping between desktop module paths and permission codes
+const modulePermissionMap: Record<string, string> = {
+  "/transactions": "TRANSACTIONS",
+  "/masters": "MASTERS",
+  "/service-requests": "SERVICE_REQUESTS",
+  "/dashboard": "DASHBOARD",
+  "/incidents": "INCIDENTS",
+  "/jobs": "JOBS",
+  "/catalog": "CATALOG",
+  "/problems": "PROBLEMS",
+  "/changes": "CHANGES",
+  "/assets": "ASSETS",
+  "/knowledge": "KNOWLEDGE",
+  "/equipment": "EQUIPMENT",
+  "/incentive": "INCENTIVE",
+};
+
 const desktopModules = [
   {
     to: "/transactions",
@@ -123,6 +140,20 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
   const [dbStats, setDbStats] = useState<DbStatsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
+
+  // Filter desktop tiles according to permissions assigned to the user's role
+  const userPerms = (user.permissions && user.permissions.length > 0)
+    ? user.permissions.map((p) => p.toUpperCase().trim())
+    : (user.role.toUpperCase() === "ADMIN" ? ["ALL"] : []);
+
+  const hasAll = userPerms.includes("ALL");
+
+  const visibleModules = desktopModules.filter((mod) => {
+    if (hasAll) return true;
+    const requiredPerm = modulePermissionMap[mod.to];
+    if (!requiredPerm) return true;
+    return userPerms.includes(requiredPerm);
+  });
 
   const fetchPostgresData = async () => {
     setIsLoading(true);
@@ -312,7 +343,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-foreground">Service Desk Modules</h2>
         <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {desktopModules.map(({ to, label, icon: Icon, tone }) => (
+          {visibleModules.map(({ to, label, icon: Icon, tone }) => (
             <Button
               key={to}
               asChild

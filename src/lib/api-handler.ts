@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 /**
  * API Route Handler
  *
@@ -208,9 +209,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         JSON.stringify({
           database: "PostgreSQL 16",
           orm: "Prisma Client (PostgreSQL DataSource)",
-          datasource: prisma.$info.datasource,
-          databaseUrl: prisma.$info.databaseUrl.replace(/:[^:@]+@/, ":****@"),
-          status: "CONNECTED",
+                              status: "CONNECTED",
           counts: {
             jobs: jobCount,
             serviceRequests: requestCount,
@@ -220,6 +219,143 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         }),
         { status: 200, headers },
       );
+    }
+
+    
+    // 5. /api/roles — System Role Master CRUD connected to PostgreSQL
+    if (path === "/api/roles") {
+      if (method === "GET") {
+        const roles = await prisma.systemRole.findMany({
+          orderBy: { createdAt: "desc" },
+        });
+        return new Response(JSON.stringify({ success: true, roles }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const code = String(body.code || "").toUpperCase().trim();
+        const name = String(body.name || code);
+        if (!code || !name) {
+          return new Response(JSON.stringify({ error: "Role Code and Name are mandatory" }), { status: 400, headers });
+        }
+        const created = await prisma.systemRole.upsert({
+          where: { code },
+          update: {
+            name,
+            description: body.description || null,
+            permissions: typeof body.permissions === "object" ? JSON.stringify(body.permissions) : (body.permissions || null),
+            status: body.status || "Active",
+          },
+          create: {
+            code,
+            name,
+            description: body.description || null,
+            permissions: typeof body.permissions === "object" ? JSON.stringify(body.permissions) : (body.permissions || null),
+            status: body.status || "Active",
+          },
+        });
+        return new Response(JSON.stringify({ success: true, role: created }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const urlParams = new URL(request.url).searchParams;
+        const roleCode = urlParams.get("code");
+        if (!roleCode) {
+          return new Response(JSON.stringify({ error: "Role code is required" }), { status: 400, headers });
+        }
+        await prisma.systemRole.deleteMany({ where: { code: roleCode } });
+        return new Response(JSON.stringify({ success: true, message: "Role " + roleCode + " deleted" }), { status: 200, headers });
+      }
+    }
+
+    
+    // 6. /api/users — System User Master CRUD connected to PostgreSQL
+    if (path === "/api/users") {
+      if (method === "GET") {
+        const users = await prisma.user.findMany({
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            phone: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+        return new Response(JSON.stringify({ success: true, users }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const email = String(body.email || "").toLowerCase().trim();
+        const name = String(body.name || "").trim();
+        const role = String(body.role || "TECHNICIAN").toUpperCase().trim();
+        const phone = body.phone ? String(body.phone).trim() : null;
+        const status = String(body.status || "Active");
+        const rawPassword = body.password ? String(body.password).trim() : "";
+
+        if (!email || !name) {
+          return new Response(JSON.stringify({ error: "Name and Email are required" }), { status: 400, headers });
+        }
+
+        // Check if existing user
+        const existing = await prisma.user.findUnique({ where: { email } });
+
+        let passwordHash = existing ? existing.password : bcrypt.hashSync("User@123", 10);
+        if (rawPassword) {
+          passwordHash = bcrypt.hashSync(rawPassword, 10);
+        }
+
+        const savedUser = await prisma.user.upsert({
+          where: { email },
+          update: {
+            name,
+            role,
+            phone,
+            status,
+            password: passwordHash,
+          },
+          create: {
+            email,
+            name,
+            role,
+            phone,
+            status,
+            password: passwordHash,
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            phone: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        return new Response(JSON.stringify({ success: true, user: savedUser }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const urlParams = new URL(request.url).searchParams;
+        const emailToDelete = urlParams.get("email");
+        const idToDelete = urlParams.get("id");
+
+        if (emailToDelete) {
+          await prisma.user.deleteMany({ where: { email: emailToDelete.toLowerCase().trim() } });
+          return new Response(JSON.stringify({ success: true, message: "User deleted" }), { status: 200, headers });
+        } else if (idToDelete) {
+          await prisma.user.deleteMany({ where: { id: Number(idToDelete) } });
+          return new Response(JSON.stringify({ success: true, message: "User deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Email or ID is required" }), { status: 400, headers });
+        }
+      }
     }
 
     return new Response(JSON.stringify({ error: `Not Found: ${path}` }), {

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useSyncManager } from "@/hooks/useSyncManager";
 
-export type UserRole = "ADMIN" | "TECHNICIAN";
+export type UserRole = string;
 
 export interface UserProfile {
   id: string;
@@ -49,12 +49,29 @@ const TECH_PROFILE: UserProfile = {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("auth_user");
+      if (savedUser) {
+        try {
+          return JSON.parse(savedUser);
+        } catch {}
+      }
+    }
+    return ADMIN_PROFILE;
+  });
+
   const [role, setRoleState] = useState<UserRole>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("app_user_role");
-      if (saved === "ADMIN" || saved === "TECHNICIAN") {
-        return saved;
+      const savedUser = localStorage.getItem("auth_user");
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.role) return parsed.role;
+        } catch {}
       }
+      const saved = localStorage.getItem("app_user_role");
+      if (saved) return saved;
     }
     return "ADMIN";
   });
@@ -71,7 +88,25 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     setRole(nextRole);
   };
 
-  const user = role === "ADMIN" ? ADMIN_PROFILE : TECH_PROFILE;
+  // Sync user state if updated in localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handleStorage = () => {
+        const savedUser = localStorage.getItem("auth_user");
+        if (savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            setCurrentUser(parsed);
+            if (parsed.role) setRoleState(parsed.role);
+          } catch {}
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+  }, []);
+
+  const user = currentUser;
 
   return (
     <RoleContext.Provider value={{ role, user, setRole, toggleRole }}>

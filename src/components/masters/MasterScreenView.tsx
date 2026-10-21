@@ -21,6 +21,7 @@ import { MasterScreenMeta, MasterFieldDef } from "@/data/mastersSpecData";
 import { MasterField } from "./MasterField";
 import { MasterAuditModal } from "./MasterAuditModal";
 import { MasterExportModal } from "./MasterExportModal";
+import { apiFetch } from "@/lib/api-client";
 
 interface MasterScreenViewProps {
   meta: MasterScreenMeta;
@@ -36,6 +37,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [showSpecDetails, setShowSpecDetails] = useState(false);
   const [b1Syncing, setB1Syncing] = useState(false);
+  const [dynamicRoleOptions, setDynamicRoleOptions] = useState<string[]>([]);
 
   // Side popup notification state
   const [sidePopup, setSidePopup] = useState<{
@@ -78,6 +80,51 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       console.error("Failed to persist master records to localStorage", e);
     }
   }, [savedRecords, storageKey]);
+
+  // If this screen is System Role Master (MST-32), fetch directly from PostgreSQL
+  useEffect(() => {
+    if (meta.code === "MST-32" || meta.id === "O1-SCR-MST-32") {
+      apiFetch("/api/roles")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.roles && Array.isArray(data.roles)) {
+            setSavedRecords(data.roles);
+          }
+        })
+        .catch((err) => console.error("Failed to load roles from DB:", err));
+    }
+  }, [meta.code, meta.id]);
+
+  // If this screen is System User Master (MST-33), fetch dynamic roles and users from PostgreSQL
+  useEffect(() => {
+    if (meta.code === "MST-33" || meta.id === "O1-SCR-MST-33") {
+      // 1. Fetch live system roles for the dropdown
+      apiFetch("/api/roles")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.roles && Array.isArray(data.roles)) {
+            // Only include Active roles from database
+            const roleCodes = data.roles
+              .filter((r: any) => String(r.status || "Active").toLowerCase() === "active")
+              .map((r: any) => String(r.code).toUpperCase().trim());
+            if (roleCodes.length > 0) {
+              setDynamicRoleOptions(roleCodes);
+            }
+          }
+        })
+        .catch((e) => console.error("Failed to load roles for user dropdown:", e));
+
+      // 2. Fetch live users from PostgreSQL
+      apiFetch("/api/users")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.users && Array.isArray(data.users)) {
+            setSavedRecords(data.users);
+          }
+        })
+        .catch((e) => console.error("Failed to load users from DB:", e));
+    }
+  }, [meta.code, meta.id]);
 
   // Auto-dismiss side popup after 3.8s
   useEffect(() => {
@@ -171,8 +218,60 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       status: formData["status"] || "Active",
     };
 
-    // Prepend to saved records list
-    setSavedRecords((prev) => [newRecord, ...prev.filter((r) => r[primaryKey] !== primaryLabel)]);
+    // If System User Master, save directly to PostgreSQL DB
+    if (meta.code === "MST-33" || meta.id === "O1-SCR-MST-33") {
+      apiFetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.user) {
+            setSavedRecords((prev) => [
+              result.user,
+              ...prev.filter(
+                (u) =>
+                  String(u["email"]).toLowerCase() !== String(result.user["email"]).toLowerCase(),
+              ),
+            ]);
+          }
+        })
+        .catch((e) => console.error("Error saving user to DB:", e));
+    } else
+      // If System Role Master, save directly to PostgreSQL DB
+      if (meta.code === "MST-32" || meta.id === "O1-SCR-MST-32") {
+        const payload = {
+          ...formData,
+          code: String(formData["code"] || "")
+            .toUpperCase()
+            .trim(),
+        };
+        apiFetch("/api/roles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.role) {
+              setSavedRecords((prev) => [
+                result.role,
+                ...prev.filter(
+                  (r) =>
+                    String(r["code"]).toUpperCase() !== String(result.role["code"]).toUpperCase(),
+                ),
+              ]);
+            }
+          })
+          .catch((e) => console.error("Error saving role to DB:", e));
+      } else {
+        // Prepend to saved records list (local screens only)
+        setSavedRecords((prev) => [
+          newRecord,
+          ...prev.filter((r) => r[primaryKey] !== primaryLabel),
+        ]);
+      }
 
     // Trigger side popup
     setSidePopup({
@@ -211,6 +310,21 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     const primaryKey = meta.fields[0]?.key || "id";
     const recId = rec[primaryKey];
     setSavedRecords((prev) => prev.filter((r) => r[primaryKey] !== recId));
+
+    if (meta.code === "MST-33" || meta.id === "O1-SCR-MST-33") {
+      const emailToDelete = rec["email"] || recId;
+      apiFetch(`/api/users?email=${encodeURIComponent(String(emailToDelete))}`, {
+        method: "DELETE",
+      }).catch((e) => console.error("Error deleting user from DB:", e));
+    }
+
+    if (meta.code === "MST-32" || meta.id === "O1-SCR-MST-32") {
+      const codeToDelete = rec["code"] || recId;
+      apiFetch(`/api/roles?code=${encodeURIComponent(String(codeToDelete))}`, {
+        method: "DELETE",
+      }).catch((e) => console.error("Error deleting role from DB:", e));
+    }
+
     setSidePopup({
       show: true,
       title: "Record Removed",
@@ -269,7 +383,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
   }, [savedRecords, savedSearchQuery]);
 
   // Primary preview columns for saved records table (first 4 fields)
-  const previewFields = meta.fields.slice(0, 5);
+  const previewFields = meta.fields.filter((f) => f.key !== "status").slice(0, 4);
 
   const activeTab = meta.tabs.find((t) => t.id === activeTabId);
 
@@ -328,7 +442,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
             title="Return to Masters Hub"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Masters Hub</span>
+            <span>Back to Masters</span>
           </button>
           <div className="h-4 w-px bg-border" />
           <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
@@ -337,9 +451,6 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         </div>
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="font-mono text-[11px] hidden sm:inline">
-            User: Kasun Perera (Service Coordinator)
-          </span>
           <button
             onClick={() => setShowSpecDetails(!showSpecDetails)}
             className="flex items-center gap-1 text-primary hover:underline text-xs cursor-pointer font-medium"
@@ -352,15 +463,9 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         {/* Title Bar */}
         <div className="px-5 py-4 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-mono font-bold text-xs shrink-0">
-              {meta.code}
-            </div>
             <div>
               <h1 className="text-base font-bold text-foreground flex items-center gap-2">
                 <span>{meta.name}</span>
-                <span className="text-xs font-mono font-normal text-muted-foreground">
-                  ({meta.id})
-                </span>
               </h1>
             </div>
           </div>
@@ -431,32 +536,30 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
 
         {/* Form Fields Grid - Starts empty with placeholders */}
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {meta.fields.map((f) => (
-            <MasterField
-              key={f.key}
-              field={f}
-              value={formData[f.key]}
-              error={validationErrors[f.key]}
-              onChange={(val) => handleFieldChange(f.key, val)}
-            />
-          ))}
+          {meta.fields.map((f) => {
+            const fieldDef = (meta.code === "MST-33" && f.key === "role" && dynamicRoleOptions.length > 0)
+              ? { ...f, options: dynamicRoleOptions }
+              : f;
+            return (
+              <MasterField
+                key={f.key}
+                field={fieldDef}
+                value={formData[f.key]}
+                error={validationErrors[f.key]}
+                onChange={(val) => handleFieldChange(f.key, val)}
+              />
+            );
+          })}
         </div>
 
         {/* Legend Footer */}
         <div className="px-5 py-2.5 bg-muted/40 border-t border-border text-[11px] text-muted-foreground flex flex-wrap items-center justify-between gap-4 font-mono">
           <div className="flex flex-wrap items-center gap-4">
             <span className="flex items-center gap-1">
-              <span className="px-1 py-0.2 rounded-xs bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-300 dark:border-sky-800 text-[10px]">
-                ⇄B1
-              </span>
-              <span>SAP B1 Integration Point</span>
-            </span>
-            <span className="flex items-center gap-1">
               <span className="text-red-500 font-bold">*</span>
               <span>Mandatory Field (Required for Save)</span>
             </span>
           </div>
-          <span>Total Fields: {meta.fields.length}</span>
         </div>
       </div>
 
