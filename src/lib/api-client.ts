@@ -7,7 +7,11 @@
 
 import { handleApiRequest } from "./api-handler";
 
-export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+export async function apiFetch(
+  url: string,
+  init?: RequestInit,
+  options?: { networkOnly?: boolean },
+): Promise<Response> {
   const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
   const fullUrl = url.startsWith("http") ? url : `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
 
@@ -18,9 +22,19 @@ export async function apiFetch(url: string, init?: RequestInit): Promise<Respons
       if (res.status !== 404) {
         return res;
       }
-    } catch {
+      if (options?.networkOnly) {
+        throw new Error("Main database was not reachable");
+      }
+    } catch (error) {
+      if (options?.networkOnly) {
+        throw error instanceof Error ? error : new Error("Main database was not reachable");
+      }
       // If network fails (e.g. offline, simulated offline, dev server proxy), fallback to local Prisma handler
     }
+  }
+
+  if (options?.networkOnly) {
+    throw new Error("Main database was not reachable");
   }
 
   // Direct local dispatch against the PostgreSQL (via Prisma) handler

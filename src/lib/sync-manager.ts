@@ -198,22 +198,26 @@ class GlobalSyncManager {
       );
 
       // 2. Perform secure /api/sync request
-      const response = await apiFetch("/api/sync", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Auth-Role": "TECHNICIAN",
-          "X-Device-Id": "TECH-MOBILE-PWA-01",
+      const response = await apiFetch(
+        "/api/sync",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Role": "TECHNICIAN",
+            "X-Device-Id": "TECH-MOBILE-PWA-01",
+          },
+          body: JSON.stringify({
+            role: "TECHNICIAN",
+            deviceId: "TECH-MOBILE-PWA-01",
+            timestamp: new Date().toISOString(),
+            triggerReason: reason,
+            queueItems,
+            pendingJobs,
+          }),
         },
-        body: JSON.stringify({
-          role: "TECHNICIAN",
-          deviceId: "TECH-MOBILE-PWA-01",
-          timestamp: new Date().toISOString(),
-          triggerReason: reason,
-          queueItems,
-          pendingJobs,
-        }),
-      });
+        { networkOnly: true },
+      );
 
       if (!response.ok) {
         throw new Error(

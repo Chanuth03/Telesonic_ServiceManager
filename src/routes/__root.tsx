@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 import { RoleProvider } from "@/context/RoleContext";
+import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
 
 function NotFoundComponent() {
   return (
@@ -126,6 +127,7 @@ function RootComponent() {
   const bare = pathname === "/login";
   useEffect(() => {
     applyTheme(getSavedTheme());
+    void startMobileOfflineBridge();
   }, []);
   return (
     <RoleProvider>

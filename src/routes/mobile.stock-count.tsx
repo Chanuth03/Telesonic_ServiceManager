@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   getStockCountItems,
+  subscribeMobileJobs,
   updateStockCountItem,
   MOCK_TECHNICIAN_NAME,
   type StockCountItem,
@@ -40,6 +41,12 @@ function MobileStockCountScreen() {
   const [selectedVan, setSelectedVan] = useState("VAN-04 (Nimal Perera Mobile Store)");
   const [scannedSku, setScannedSku] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    return subscribeMobileJobs((event) => {
+      if (event === "hydrate" || event === "stock") setItems(getStockCountItems());
+    });
+  }, []);
 
   const filteredItems = items.filter((item) => {
     if (!searchQuery.trim()) return true;
@@ -81,7 +88,7 @@ function MobileStockCountScreen() {
     items.forEach((item) => {
       updateStockCountItem(item.sku, item.countedQty, item.varianceReason);
     });
-    setFeedback("Van stock physical count audit submitted successfully!");
+    setFeedback("Van stock count saved on this device.");
     setTimeout(() => setFeedback(null), 4000);
   };
 

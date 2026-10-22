@@ -46,7 +46,7 @@ export function SyncStatusBadge() {
           {syncState === "syncing" ? (
             <div className="flex items-center gap-1 text-[11px] font-semibold text-primary">
               <RefreshCw size={12} className="animate-spin text-primary" />
-              <span>Syncing to PostgreSQL...</span>
+              <span>Sending to the main database...</span>
             </div>
           ) : (
             <button
@@ -97,6 +97,13 @@ export function SyncStatusBadge() {
           {isSimulatedOffline ? "Go Online & Push Sync" : "Test Offline Mode"}
         </button>
       </div>
+
+      {!isOnline && pendingCount > 0 ? (
+        <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-300">
+          Saved on this device. These changes will be sent to the main database when the connection
+          returns.
+        </p>
+      ) : null}
 
       {lastError && (
         <div className="text-[10px] text-destructive bg-destructive/10 px-2 py-1 rounded flex items-center gap-1">

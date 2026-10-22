@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useMatches } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   CheckCircle,
@@ -16,7 +16,9 @@ import {
   Table2,
 } from "lucide-react";
 import {
-  initialMobileJobs,
+  getMobileJobs,
+  subscribeMobileJobs,
+  updateMobileJobStatus,
   MOCK_TECHNICIAN_NAME,
   type MobileJob,
   type MobileJobStatus,
@@ -69,7 +71,7 @@ const priorityBadgeStyle = {
 };
 
 function MobileJobListScreen() {
-  const [jobs, setJobs] = useState<MobileJob[]>(initialMobileJobs);
+  const [jobs, setJobs] = useState<MobileJob[]>(() => getMobileJobs());
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"All" | "Today" | "Upcoming">("All");
@@ -80,6 +82,11 @@ function MobileJobListScreen() {
   const [selectedJobPreview, setSelectedJobPreview] = useState<MobileJob | null>(null);
 
   const todayStr = "2026-10-13"; // Mock system date
+
+  useEffect(() => {
+    setJobs(getMobileJobs());
+    return subscribeMobileJobs(() => setJobs(getMobileJobs()));
+  }, []);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -106,22 +113,16 @@ function MobileJobListScreen() {
   }, [jobs, searchQuery, dateFilter, statusFilter]);
 
   const handleAcceptJob = (jobId: string) => {
-    setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: "Accepted" } : j)));
-    setFeedbackMessage(`Job ${jobId} accepted. Updated in local demo state.`);
+    updateMobileJobStatus(jobId, "Accepted");
+    setFeedbackMessage(`Job ${jobId} saved on this device. It will upload when you are online.`);
     setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
   const handleDeclineJob = () => {
     if (!declineModalJob) return;
     const jobId = declineModalJob.id;
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === jobId
-          ? { ...j, status: "Declined", declineReason: declineReason || "Technician unavailable" }
-          : j,
-      ),
-    );
-    setFeedbackMessage(`Job ${jobId} declined. Updated in local demo state.`);
+    updateMobileJobStatus(jobId, "Declined", declineReason || "Technician unavailable");
+    setFeedbackMessage(`Job ${jobId} saved on this device. It will upload when you are online.`);
     setDeclineModalJob(null);
     setDeclineReason("");
     setTimeout(() => setFeedbackMessage(null), 4000);
