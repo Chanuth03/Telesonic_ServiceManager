@@ -55,6 +55,7 @@ class GlobalSyncManager {
     // Register Dynamic Online/Offline Listeners
     window.addEventListener("online", this.handleOnlineEvent);
     window.addEventListener("offline", this.handleOfflineEvent);
+    window.addEventListener("beforeunload", this.handleBeforeUnloadEvent);
 
     // Listen to local Dexie updates to recount pending changes
     window.addEventListener("telesonic:dexie-update", () => {
@@ -88,6 +89,14 @@ class GlobalSyncManager {
     console.log("[SyncManager] ⚠️ Network changed to OFFLINE.");
     this.syncState = "offline";
     this.notify();
+  };
+
+  private handleBeforeUnloadEvent = (event: BeforeUnloadEvent) => {
+    if (this.pendingCount > 0 || this.syncState === "syncing") {
+      event.preventDefault();
+      event.returnValue = "Unsynced offline changes detected. Are you sure you want to reload or leave?";
+      return event.returnValue;
+    }
   };
 
   public getIsOnline(): boolean {

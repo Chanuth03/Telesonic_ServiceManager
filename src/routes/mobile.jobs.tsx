@@ -76,8 +76,6 @@ function MobileJobListScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"All" | "Today" | "Upcoming">("All");
   const [statusFilter, setStatusFilter] = useState<"All" | MobileJobStatus>("All");
-  const [declineModalJob, setDeclineModalJob] = useState<MobileJob | null>(null);
-  const [declineReason, setDeclineReason] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [selectedJobPreview, setSelectedJobPreview] = useState<MobileJob | null>(null);
 
@@ -115,16 +113,6 @@ function MobileJobListScreen() {
   const handleAcceptJob = (jobId: string) => {
     updateMobileJobStatus(jobId, "Accepted");
     setFeedbackMessage(`Job ${jobId} saved on this device. It will upload when you are online.`);
-    setTimeout(() => setFeedbackMessage(null), 4000);
-  };
-
-  const handleDeclineJob = () => {
-    if (!declineModalJob) return;
-    const jobId = declineModalJob.id;
-    updateMobileJobStatus(jobId, "Declined", declineReason || "Technician unavailable");
-    setFeedbackMessage(`Job ${jobId} saved on this device. It will upload when you are online.`);
-    setDeclineModalJob(null);
-    setDeclineReason("");
     setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
@@ -454,12 +442,12 @@ function MobileJobListScreen() {
                 )}
               </Link>
 
-              {/* Card Footer Actions: Accept / Decline for Assigned Status */}
+              {/* Card Footer Action: Accept for Assigned Status */}
               {job.status === "Assigned" && (
-                <div className="pt-2 border-t flex items-center gap-2">
+                <div className="pt-2 border-t flex items-center">
                   <Button
                     size="sm"
-                    className="flex-1 text-xs bg-success text-success-foreground hover:bg-success/90 h-9 font-semibold"
+                    className="w-full text-xs bg-success text-success-foreground hover:bg-success/90 h-9 font-semibold"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAcceptJob(job.id);
@@ -468,19 +456,6 @@ function MobileJobListScreen() {
                     <CheckCircle size={14} className="mr-1.5" />
                     Accept Job
                   </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 text-xs text-destructive hover:bg-destructive-soft hover:text-destructive h-9 font-semibold"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeclineModalJob(job);
-                    }}
-                  >
-                    <XCircle size={14} className="mr-1.5" />
-                    Decline
-                  </Button>
                 </div>
               )}
             </div>
@@ -488,65 +463,7 @@ function MobileJobListScreen() {
         </div>
       )}
 
-      {/* Decline Confirmation Modal */}
-      {declineModalJob && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-xs"
-          onClick={() => setDeclineModalJob(null)}
-        >
-          <div
-            className="card-surface rise w-full max-w-xs p-4 space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-sm font-bold">Decline Job Assignment</h3>
-              <button
-                onClick={() => setDeclineModalJob(null)}
-                className="p-1 hover:bg-muted rounded-md text-muted-foreground"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to decline job{" "}
-              <span className="font-mono font-bold text-foreground">{declineModalJob.id}</span>?
-            </p>
-
-            <div>
-              <label className="block text-[11px] font-semibold mb-1">
-                Reason for declining (optional):
-              </label>
-              <input
-                type="text"
-                value={declineReason}
-                onChange={(e) => setDeclineReason(e.target.value)}
-                placeholder="e.g. Vehicle breakdown, travel conflict..."
-                className="input-field text-xs py-1.5"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-xs"
-                onClick={() => setDeclineModalJob(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="text-xs font-semibold"
-                onClick={handleDeclineJob}
-              >
-                Decline Job
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
       {/* Job Preview Modal (Temporary prior to full Job Detail screen Task 5) */}
       {selectedJobPreview && (

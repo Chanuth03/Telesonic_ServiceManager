@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight, Smartphone, Download } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -25,6 +25,20 @@ function LoginPage() {
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleDownloadApp = () => {
+    // If accessed on a mobile phone or directly requested, redirect to the mobile app installation page
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+    if (isMobileDevice) {
+      // Direct mobile device redirection to mobile installation / mobile workspace
+      navigate({ to: "/mobile-apk-download" });
+    } else {
+      // Desktop or default redirect
+      navigate({ to: "/mobile-apk-download" });
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,40 +113,91 @@ function LoginPage() {
           <h2 className="max-w-md text-3xl font-bold leading-tight tracking-tight">
             Every ticket, job and asset — one service desk.
           </h2>
-          <p className="mt-3 max-w-md text-sm text-sidebar-muted">
-            Track incidents, dispatch field jobs, manage changes and keep SLAs green from a single
-            workspace.
+          <p className="mt-3 max-w-sm text-sm text-sidebar-muted">
+            Designed for IT operations teams who need clarity, speed and compliance across
+            departments.
           </p>
-          <div className="mt-8 grid max-w-md grid-cols-3 gap-3 text-center">
-            {[
-              ["99.9%", "Uptime"],
-              ["24/7", "Support"],
-              ["92%", "SLA health"],
-            ].map(([v, l]) => (
-              <div key={l} className="rounded-xl bg-sidebar-accent p-4">
-                <p className="text-xl font-bold">{v}</p>
-                <p className="mt-0.5 text-xs text-sidebar-muted">{l}</p>
+          <div className="mt-8 grid max-w-sm grid-cols-3 gap-4 border-t border-sidebar-border pt-6">
+            <div>
+              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">
+                99.8%
               </div>
-            ))}
+              <div className="text-xs text-sidebar-muted">SLA compliance</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">12m</div>
+              <div className="text-xs text-sidebar-muted">Mean resolution</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">4.9★</div>
+              <div className="text-xs text-sidebar-muted">User satisfaction</div>
+            </div>
           </div>
         </div>
-        <p className="text-xs text-sidebar-muted">© 2026 Servio ITSM</p>
+        <div className="flex items-center justify-between text-xs text-sidebar-muted">
+          <span>© 2026 Telesonic Service Manager</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleDownloadApp}
+              className="inline-flex items-center gap-1.5 font-medium text-sidebar-foreground hover:text-primary transition-colors cursor-pointer"
+            >
+              <Smartphone size={13} />
+              Download Mobile App
+            </button>
+            <span>·</span>
+            <span>Privacy</span>
+            <span>·</span>
+            <span>Terms</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Headset size={18} />
-            </span>
-            <span className="text-lg font-bold tracking-tight">Servio ITSM</span>
+          <div className="mb-8 flex items-center justify-between lg:hidden">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                <Headset size={18} />
+              </span>
+              <span className="text-lg font-bold tracking-tight">Servio ITSM</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadApp}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+            >
+              <Smartphone size={13} />
+              Get App
+            </button>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Sign in to your service desk account.
           </p>
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
+          {/* Prominent Download Mobile App Button */}
+          <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+                <Smartphone size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground leading-tight">Field Technician?</p>
+                <p className="text-[11px] text-muted-foreground truncate">Get the dedicated mobile app</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadApp}
+              className="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              <Download size={13} />
+              Download Mobile App
+            </button>
+          </div>
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
               <label className="mb-1 block text-xs font-semibold">Work email</label>
               <div className="relative">

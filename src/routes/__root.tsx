@@ -17,6 +17,7 @@ import { AppShell } from "@/components/itsm/AppShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 import { RoleProvider } from "@/context/RoleContext";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
+import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
 
 function NotFoundComponent() {
   return (
@@ -132,6 +133,7 @@ function RootComponent() {
   return (
     <RoleProvider>
       <QueryClientProvider client={queryClient}>
+        <UnsyncedDataGuard />
         {bare ? (
           <Outlet />
         ) : (

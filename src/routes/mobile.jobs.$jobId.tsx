@@ -94,8 +94,6 @@ function MobileJobDetailScreen() {
   const { jobId } = Route.useParams();
   const [job, setJob] = useState<MobileJob | undefined>(() => getMobileJobById(jobId));
   const [activeTab, setActiveTab] = useState<"overview" | "components" | "history">("overview");
-  const [declineModalOpen, setDeclineModalOpen] = useState(false);
-  const [declineReason, setDeclineReason] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,15 +107,6 @@ function MobileJobDetailScreen() {
     if (!job) return;
     updateMobileJobStatus(job.id, "Accepted");
     setFeedbackMessage(`Job ${job.id} accepted. Status updated.`);
-    setTimeout(() => setFeedbackMessage(null), 4000);
-  };
-
-  const handleDecline = () => {
-    if (!job) return;
-    updateMobileJobStatus(job.id, "Declined", declineReason || "Technician unavailable");
-    setFeedbackMessage(`Job ${job.id} declined.`);
-    setDeclineModalOpen(false);
-    setDeclineReason("");
     setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
@@ -267,25 +256,16 @@ function MobileJobDetailScreen() {
           </span>
         </div>
 
-        {/* Accept / Decline actions for Assigned status */}
+        {/* Accept action for Assigned status */}
         {job.status === "Assigned" && (
           <div className="flex items-center gap-2 bg-info-soft/50 p-2.5 rounded-lg border border-info/20">
             <Button
               size="sm"
-              className="flex-1 text-xs bg-success text-success-foreground hover:bg-success/90 h-8 font-semibold shadow-2xs"
+              className="w-full text-xs bg-success text-success-foreground hover:bg-success/90 h-8 font-semibold shadow-2xs"
               onClick={handleAccept}
             >
               <CheckCircle size={14} className="mr-1.5" />
               Accept Job
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs text-destructive hover:bg-destructive-soft hover:text-destructive h-8 font-semibold bg-card"
-              onClick={() => setDeclineModalOpen(true)}
-            >
-              <XCircle size={14} className="mr-1.5" />
-              Decline Job
             </Button>
           </div>
         )}
@@ -577,64 +557,7 @@ function MobileJobDetailScreen() {
         </p>
       </div>
 
-      {declineModalOpen && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={() => setDeclineModalOpen(false)}
-        >
-          <div
-            className="card-surface rise w-full max-w-xs p-4 space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-sm font-bold">Decline Job Assignment</h3>
-              <button
-                onClick={() => setDeclineModalOpen(false)}
-                className="p-1 hover:bg-muted rounded-md text-muted-foreground"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Are you sure you want to decline job{" "}
-              <span className="font-mono font-bold text-foreground">{job.id}</span>?
-            </p>
-
-            <div>
-              <label className="block text-[11px] font-semibold mb-1">
-                Reason for declining (optional):
-              </label>
-              <input
-                type="text"
-                value={declineReason}
-                onChange={(e) => setDeclineReason(e.target.value)}
-                placeholder="e.g. Vehicle breakdown, schedule conflict..."
-                className="input-field text-xs py-1.5"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-xs"
-                onClick={() => setDeclineModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="text-xs font-semibold"
-                onClick={handleDecline}
-              >
-                Decline Job
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }
