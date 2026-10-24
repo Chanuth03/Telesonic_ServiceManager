@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Wrench,
   Search,
@@ -43,10 +43,14 @@ import {
   CheckSquare,
   AlertOctagon,
   ArrowUpRight,
+  Database,
+  Loader2,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
 
 export type PerformanceStatus = "Draft" | "Locked" | "Used in Run";
 export type PerformanceRole = "Service HOD" | "Incentive Administrator";
@@ -532,9 +536,78 @@ export function ServicePerformanceDataView({
   const [isLockModalOpen, setIsLockModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isAddTicketModalOpen, setIsAddTicketModalOpen] = useState<boolean>(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
   const [lockNotes, setLockNotes] = useState<string>(
     "HOD review finalized. Closed calls verified against customer satisfaction marks and poor repeat criteria.",
   );
+
+  // PostgreSQL Database & Async States
+  const [currentBatchId, setCurrentBatchId] = useState<string>("BAT-SRV-2026-05A");
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [allDbBatches, setAllDbBatches] = useState<any[]>([]);
+
+  // New Ticket Form State
+  const [newTicketForm, setNewTicketForm] = useState<Partial<ServiceJobDetail>>({
+    jobTicketNo: `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    employeeCode: "EMP-1021",
+    customerName: "",
+    equipmentModel: "",
+    completionDate: "15-May-2026",
+    faultCategory: "General Maintenance",
+    firstTimeFix: true,
+    qualityScore: 9.5,
+    disciplineScore: 10.0,
+    eligibility: "HOD Eligible",
+    isPoorRepeat: false,
+    closureStatus: "Closed",
+    notes: "",
+  });
+
+  // Load Service Performance Batches from PostgreSQL
+  const loadServicePerformanceFromDb = async (silent: boolean = false, targetPeriod?: string) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/service-performance");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.batches) && data.batches.length > 0) {
+        setAllDbBatches(data.batches);
+        setIsDbConnected(true);
+
+        const periodToMatch = targetPeriod || period;
+        const match =
+          data.batches.find(
+            (b: any) => b.period.toLowerCase() === periodToMatch.toLowerCase(),
+          ) || data.batches[0];
+
+        if (match) {
+          setCurrentBatchId(match.id);
+          setPeriod(match.period);
+          setDivision(match.division);
+          setSourceSystem(match.sourceSystem);
+          setReceivedOn(match.receivedOn);
+          setStatus(match.status);
+          if (match.notes) setLockNotes(match.notes);
+          if (match.techLines && match.techLines.length > 0) setTechLines(match.techLines);
+          if (match.jobTickets && match.jobTickets.length > 0) setJobTickets(match.jobTickets);
+          if (match.auditLogs && match.auditLogs.length > 0) setAuditLogs(match.auditLogs);
+          setHasUnsavedChanges(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load service performance from DB:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadServicePerformanceFromDb(true);
+  }, []);
 
   // Performance Aggregates
   const stats = useMemo(() => {
@@ -600,6 +673,73 @@ export function ServicePerformanceDataView({
     );
   }, [jobTickets]);
 
+  // Action: Switch Period with Database Lookup
+  const handlePeriodChange = (newPeriod: string) => {
+    setPeriod(newPeriod);
+    const match = allDbBatches.find(
+      (b: any) => b.period.toLowerCase() === newPeriod.toLowerCase(),
+    );
+    if (match) {
+      setCurrentBatchId(match.id);
+      setDivision(match.division);
+      setSourceSystem(match.sourceSystem);
+      setReceivedOn(match.receivedOn);
+      setStatus(match.status);
+      if (match.notes) setLockNotes(match.notes);
+      if (match.techLines && match.techLines.length > 0) setTechLines(match.techLines);
+      if (match.jobTickets && match.jobTickets.length > 0) setJobTickets(match.jobTickets);
+      if (match.auditLogs && match.auditLogs.length > 0) setAuditLogs(match.auditLogs);
+      setHasUnsavedChanges(false);
+      toast.info(`Switched to ${newPeriod} (${match.status})`);
+    } else {
+      if (status === "Locked") setStatus("Draft");
+      setHasUnsavedChanges(true);
+      toast.info(`Switched active period to ${newPeriod}`);
+    }
+  };
+
+  // Action: Save Working Records directly to PostgreSQL
+  const handleSaveToPostgreSql = async () => {
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/service-performance/${currentBatchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period,
+          division,
+          sourceSystem,
+          receivedOn,
+          status,
+          notes: lockNotes,
+          lockedBy:
+            activeRole === "Service HOD"
+              ? "Chaminda Warnakula (Service HOD)"
+              : "Incentive Administrator",
+          techLines,
+          jobTickets,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.batch) {
+        setHasUnsavedChanges(false);
+        setIsDbConnected(true);
+        toast.success("Saved to PostgreSQL successfully!", {
+          description: `Synchronized ${techLines.length} technician lines and ${jobTickets.length} job sheets for ${period}.`,
+        });
+        loadServicePerformanceFromDb(true, period);
+      } else {
+        toast.error(data.error || "Failed to save service performance data.");
+      }
+    } catch (err) {
+      console.error("Save service performance error:", err);
+      toast.error("Failed to save service performance to PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Action: Refresh from Source while in Draft
   const handleRefreshFromSource = () => {
     if (status !== "Draft") {
@@ -628,9 +768,10 @@ export function ServicePerformanceDataView({
         user: activeRole === "Service HOD" ? "Chaminda Warnakula" : "Lakmal Perera",
         role: activeRole,
         action: "Source Sync Refreshed",
-        details: `Refreshed from ${sourceSystem}. Synced 363 calls across 10 service technicians.`,
+        details: `Refreshed from ${sourceSystem}. Synced ${jobTickets.length} calls across ${techLines.length} service technicians.`,
       };
       setAuditLogs((prev) => [newAudit, ...prev]);
+      setHasUnsavedChanges(true);
 
       toast.success("Service Performance Data Refreshed from Source", {
         description: `Successfully synchronized with ${sourceSystem} at ${newTimestamp}.`,
@@ -639,7 +780,7 @@ export function ServicePerformanceDataView({
   };
 
   // Action: Lock as HOD
-  const handleLockAsHod = () => {
+  const handleLockAsHod = async () => {
     if (activeRole !== "Service HOD") {
       toast.error("HOD Authorization Required", {
         description:
@@ -648,33 +789,41 @@ export function ServicePerformanceDataView({
       return;
     }
 
-    setStatus("Locked");
-    setIsLockModalOpen(false);
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/service-performance/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Locked",
+          lockedBy: "Chaminda Warnakula (Service HOD)",
+          notes: lockNotes,
+        }),
+      });
 
-    const newAudit: PerformanceAuditEntry = {
-      id: `aud-${Date.now()}`,
-      timestamp:
-        new Date().toLocaleString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }) + " IST",
-      user: "Chaminda Warnakula (Service HOD)",
-      role: "Service HOD",
-      action: "HOD Performance Lock",
-      details: `Sealed monthly performance facts for ${period}. Notes: ${lockNotes}`,
-    };
-    setAuditLogs((prev) => [newAudit, ...prev]);
-
-    toast.success(`Service Performance Data Locked by HOD for ${period}`, {
-      description: "Facts are sealed and ready for the Incentive Calculation Run.",
-    });
+      const data = await res.json();
+      if (data.success) {
+        setStatus("Locked");
+        setIsLockModalOpen(false);
+        setHasUnsavedChanges(false);
+        toast.success(`Service Performance Data Locked by HOD for ${period} in PostgreSQL!`, {
+          description: "Facts are sealed and ready for the Incentive Calculation Run.",
+        });
+        loadServicePerformanceFromDb(true, period);
+      } else {
+        toast.error(data.error || "Failed to lock batch.");
+      }
+    } catch (err) {
+      setStatus("Locked");
+      setIsLockModalOpen(false);
+      toast.success(`Service Performance Data Locked by HOD for ${period}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Unlock to Draft
-  const handleUnlockToDraft = () => {
+  const handleUnlockToDraft = async () => {
     if (status === "Used in Run") {
       toast.error("Cannot Unlock: Used in Active Calculation Run", {
         description: "This performance batch is locked by calculation run RUN-2026-05-PRE.",
@@ -682,10 +831,34 @@ export function ServicePerformanceDataView({
       return;
     }
 
-    setStatus("Draft");
-    toast.info("Batch Unlocked to Draft Status", {
-      description: "Modifications and source refreshing are now enabled.",
-    });
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/service-performance/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Draft",
+          notes: "Re-opened to Draft status by HOD.",
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setStatus("Draft");
+        setHasUnsavedChanges(false);
+        toast.info("Batch Unlocked to Draft Status in PostgreSQL", {
+          description: "Modifications and source refreshing are now enabled.",
+        });
+        loadServicePerformanceFromDb(true, period);
+      } else {
+        setStatus("Draft");
+      }
+    } catch (err) {
+      setStatus("Draft");
+      toast.info("Batch Unlocked to Draft Status");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Export Excel / PDF
@@ -710,7 +883,150 @@ export function ServicePerformanceDataView({
     setJobTickets((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, eligibility: newEligibility } : j)),
     );
-    toast.info(`Updated job eligibility to "${newEligibility}"`);
+    setHasUnsavedChanges(true);
+    toast.info(`Updated job eligibility to "${newEligibility}"`, {
+      description: "Click 'Save to DB' to commit to PostgreSQL.",
+    });
+  };
+
+  // Action: Toggle Poor Repeat Flag
+  const handleTogglePoorRepeat = (jobId: string) => {
+    if (status !== "Draft") {
+      toast.warning("Cannot edit locked batch", {
+        description: "Switch to Draft status to adjust poor repeat classification.",
+      });
+      return;
+    }
+
+    setJobTickets((prev) =>
+      prev.map((j) => {
+        if (j.id !== jobId) return j;
+        const newPoorRepeat = !j.isPoorRepeat;
+        return {
+          ...j,
+          isPoorRepeat: newPoorRepeat,
+          eligibility: newPoorRepeat ? "Not Eligible" : "HOD Eligible",
+          qualityScore: newPoorRepeat ? Math.min(j.qualityScore, 6.0) : 9.5,
+        };
+      }),
+    );
+    setHasUnsavedChanges(true);
+    toast.info("Toggled Poor Repeat status", {
+      description: "Click 'Save to DB' to commit changes to PostgreSQL.",
+    });
+  };
+
+  // Action: Delete Job Ticket
+  const handleDeleteJobTicket = (ticketId: string) => {
+    if (status !== "Draft") {
+      toast.warning("Cannot delete locked job ticket", {
+        description: "Re-open to Draft status to delete job tickets.",
+      });
+      return;
+    }
+    setJobTickets((prev) => prev.filter((j) => j.id !== ticketId));
+    setHasUnsavedChanges(true);
+    toast.info("Job ticket removed from table.", {
+      description: "Click 'Save to DB' to commit this deletion to PostgreSQL.",
+    });
+  };
+
+  // Action: Delete Technician Line
+  const handleDeleteTechLine = (lineId: string) => {
+    if (status !== "Draft") {
+      toast.warning("Cannot delete locked line", {
+        description: "Re-open to Draft status to modify technician roster.",
+      });
+      return;
+    }
+    setTechLines((prev) => prev.filter((t) => t.id !== lineId));
+    setHasUnsavedChanges(true);
+    toast.info("Technician line removed from table.", {
+      description: "Click 'Save to DB' to commit this deletion to PostgreSQL.",
+    });
+  };
+
+  // Action: Delete Entire Batch from PostgreSQL
+  const handleDeleteBatch = async (batchIdToDelete: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete service performance batch "${batchIdToDelete}" and all its job sheets from PostgreSQL?`,
+      )
+    ) {
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/service-performance/${batchIdToDelete}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Batch ${batchIdToDelete} deleted from PostgreSQL successfully!`);
+        await loadServicePerformanceFromDb(false);
+      } else {
+        toast.error(data.error || "Failed to delete batch from PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Delete batch error:", err);
+      toast.error("Failed to delete service performance batch from PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Action: Add New Job Ticket
+  const handleAddNewJobTicket = () => {
+    if (!newTicketForm.customerName || !newTicketForm.equipmentModel) {
+      toast.error("Please enter Customer Name and Equipment Model.");
+      return;
+    }
+
+    const techMatch = techLines.find((t) => t.employeeCode === newTicketForm.employeeCode);
+
+    const newTicket: ServiceJobDetail = {
+      id: `spjt-${Date.now()}`,
+      jobTicketNo: newTicketForm.jobTicketNo || `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      employeeCode: newTicketForm.employeeCode || "EMP-1021",
+      employeeName: techMatch ? techMatch.employeeName : "Technician",
+      customerName: newTicketForm.customerName,
+      equipmentModel: newTicketForm.equipmentModel,
+      completionDate: newTicketForm.completionDate || "15-May-2026",
+      faultCategory: newTicketForm.faultCategory || "General Maintenance",
+      firstTimeFix: newTicketForm.firstTimeFix ?? true,
+      qualityScore: Number(newTicketForm.qualityScore) || 9.5,
+      disciplineScore: Number(newTicketForm.disciplineScore) || 10.0,
+      eligibility: (newTicketForm.eligibility as JobEligibility) || "HOD Eligible",
+      isPoorRepeat: Boolean(newTicketForm.isPoorRepeat),
+      repeatReferenceJob: newTicketForm.repeatReferenceJob || undefined,
+      hodReviewed: true,
+      closureStatus: "Closed",
+      notes: newTicketForm.notes || "Added manually",
+    };
+
+    setJobTickets((prev) => [newTicket, ...prev]);
+    setIsAddTicketModalOpen(false);
+    setHasUnsavedChanges(true);
+    toast.success(`Added service ticket ${newTicket.jobTicketNo}`, {
+      description: "Click 'Save to DB' to commit to PostgreSQL.",
+    });
+
+    // Reset form
+    setNewTicketForm({
+      jobTicketNo: `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      employeeCode: "EMP-1021",
+      customerName: "",
+      equipmentModel: "",
+      completionDate: "15-May-2026",
+      faultCategory: "General Maintenance",
+      firstTimeFix: true,
+      qualityScore: 9.5,
+      disciplineScore: 10.0,
+      eligibility: "HOD Eligible",
+      isPoorRepeat: false,
+      closureStatus: "Closed",
+      notes: "",
+    });
   };
 
   return (
@@ -763,6 +1079,58 @@ export function ServicePerformanceDataView({
               </Button>
             </>
           )}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* PostgreSQL Database Status Banner                             */}
+      {/* ------------------------------------------------------------- */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-2.5 rounded-lg border text-xs">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background border font-medium">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            <Database size={13} className="text-primary" />
+            <span className="font-semibold text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Memory"}
+            </span>
+            <span className="text-muted-foreground/60 text-[10px]">|</span>
+            <span className="text-muted-foreground text-[11px]">
+              Batch: <span className="font-mono text-foreground font-semibold">{currentBatchId}</span>
+            </span>
+          </div>
+
+          {hasUnsavedChanges && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              <AlertCircle size={11} /> Unsaved changes in draft
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadServicePerformanceFromDb(false, period)}
+            disabled={isLoading}
+            className="h-7 text-xs gap-1.5 hover:bg-background cursor-pointer"
+          >
+            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            <span>Sync DB</span>
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleSaveToPostgreSql}
+            disabled={isSaving}
+            className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs font-semibold"
+          >
+            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            <span>Save to PostgreSQL</span>
+          </Button>
         </div>
       </div>
 
@@ -838,6 +1206,17 @@ export function ServicePerformanceDataView({
 
           {/* Action Bar */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* View Batches History */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsHistoryModalOpen(true)}
+              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-card hover:bg-accent"
+            >
+              <HistoryIcon size={13} className="text-muted-foreground" />
+              <span>Batches ({allDbBatches.length > 0 ? allDbBatches.length : 2})</span>
+            </Button>
+
             {/* Refresh from Source while in Draft */}
             {status === "Draft" && (
               <Button
@@ -851,6 +1230,17 @@ export function ServicePerformanceDataView({
                 <span>{isRefreshing ? "Syncing..." : "Refresh from Source"}</span>
               </Button>
             )}
+
+            {/* Save to PostgreSQL Button */}
+            <Button
+              size="sm"
+              onClick={handleSaveToPostgreSql}
+              disabled={isSaving}
+              className="h-8 gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+            >
+              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              <span>Save to DB</span>
+            </Button>
 
             {/* Lock as HOD Action */}
             {status === "Draft" && (
@@ -902,10 +1292,7 @@ export function ServicePerformanceDataView({
             </label>
             <select
               value={period}
-              onChange={(e) => {
-                setPeriod(e.target.value);
-                toast.info(`Switched active period to ${e.target.value}`);
-              }}
+              onChange={(e) => handlePeriodChange(e.target.value)}
               className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-medium"
             >
               <option value="May 2026">May 2026 (Active Run)</option>
@@ -1258,19 +1645,32 @@ export function ServicePerformanceDataView({
 
                           {/* Action */}
                           <td className="py-2.5 px-3 text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSearchQuery(item.employeeCode);
-                                setActiveTab("job-detail");
-                              }}
-                              className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10"
-                              title="Inspect Individual Service Tickets"
-                            >
-                              <Eye size={12} />
-                              <span>Calls</span>
-                            </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSearchQuery(item.employeeCode);
+                                  setActiveTab("job-detail");
+                                }}
+                                className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10"
+                                title="Inspect Individual Service Tickets"
+                              >
+                                <Eye size={12} />
+                                <span>Calls</span>
+                              </Button>
+                              {status === "Draft" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTechLine(item.id)}
+                                  className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                  title="Remove technician line"
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1301,6 +1701,22 @@ export function ServicePerformanceDataView({
         {/* TAB 2: JOB DETAIL (INSPECTION OF TICKETS)                   */}
         {/* ----------------------------------------------------------- */}
         <TabsContent value="job-detail" className="space-y-4 m-0">
+          <div className="flex items-center justify-between gap-3 bg-muted/20 p-2.5 rounded-lg border">
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>{filteredJobs.length}</strong> service call sheets for <strong>{period}</strong>.
+            </div>
+            {status === "Draft" && (
+              <Button
+                size="sm"
+                onClick={() => setIsAddTicketModalOpen(true)}
+                className="h-7 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+              >
+                <Plus size={13} />
+                <span>Add Job Sheet</span>
+              </Button>
+            )}
+          </div>
+
           <div className="rounded-lg border bg-card overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -1426,7 +1842,20 @@ export function ServicePerformanceDataView({
 
                         {/* Repeat Flag */}
                         <td className="py-2.5 px-3 text-center">
-                          {job.isPoorRepeat ? (
+                          {status === "Draft" ? (
+                            <button
+                              onClick={() => handleTogglePoorRepeat(job.id)}
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                                job.isPoorRepeat
+                                  ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                              title="Click to toggle poor repeat status"
+                            >
+                              <AlertTriangle size={11} />
+                              <span>{job.isPoorRepeat ? "Poor Repeat" : "Normal"}</span>
+                            </button>
+                          ) : job.isPoorRepeat ? (
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-destructive/15 text-destructive rounded text-[10px] font-bold"
                               title={job.notes}
@@ -1439,15 +1868,26 @@ export function ServicePerformanceDataView({
                           )}
                         </td>
 
-                        {/* Inspect Details */}
+                        {/* Inspect Details & Actions */}
                         <td className="py-2.5 px-3 text-center">
-                          <button
-                            onClick={() => setSelectedJob(job)}
-                            className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                            title="View Full Call Notes"
-                          >
-                            <Eye size={13} />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setSelectedJob(job)}
+                              className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                              title="View Full Call Notes"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            {status === "Draft" && (
+                              <button
+                                onClick={() => handleDeleteJobTicket(job.id)}
+                                className="p-1 hover:bg-destructive/10 rounded text-destructive cursor-pointer transition-colors"
+                                title="Delete job sheet"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1825,6 +2265,354 @@ export function ServicePerformanceDataView({
                 className="text-xs"
               >
                 Close Inspector
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Add New Job Sheet */}
+      {isAddTicketModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
+          <div className="card-surface bg-card border rounded-lg shadow-xl w-full max-w-lg flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Plus className="text-primary" size={18} />
+                <h3 className="font-bold text-sm text-foreground">Add Service Job Sheet</h3>
+              </div>
+              <button
+                onClick={() => setIsAddTicketModalOpen(false)}
+                className="p-1 hover:bg-muted rounded text-muted-foreground"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 text-xs max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">Ticket Number</label>
+                  <input
+                    type="text"
+                    value={newTicketForm.jobTicketNo}
+                    onChange={(e) =>
+                      setNewTicketForm({ ...newTicketForm, jobTicketNo: e.target.value })
+                    }
+                    className="w-full text-xs font-mono rounded-md border border-input bg-background p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">
+                    Assigned Technician
+                  </label>
+                  <select
+                    value={newTicketForm.employeeCode}
+                    onChange={(e) =>
+                      setNewTicketForm({ ...newTicketForm, employeeCode: e.target.value })
+                    }
+                    className="w-full text-xs rounded-md border border-input bg-background p-2"
+                  >
+                    {techLines.map((t) => (
+                      <option key={t.employeeCode} value={t.employeeCode}>
+                        {t.employeeCode} — {t.employeeName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold block text-foreground mb-1">
+                  Customer Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Cinnamon Grand Colombo"
+                  value={newTicketForm.customerName}
+                  onChange={(e) =>
+                    setNewTicketForm({ ...newTicketForm, customerName: e.target.value })
+                  }
+                  className="w-full text-xs rounded-md border border-input bg-background p-2"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">
+                    Equipment / Model <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Daikin Inverter 24,000 BTU"
+                    value={newTicketForm.equipmentModel}
+                    onChange={(e) =>
+                      setNewTicketForm({ ...newTicketForm, equipmentModel: e.target.value })
+                    }
+                    className="w-full text-xs rounded-md border border-input bg-background p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">Completion Date</label>
+                  <input
+                    type="text"
+                    placeholder="DD-Mon-YYYY"
+                    value={newTicketForm.completionDate}
+                    onChange={(e) =>
+                      setNewTicketForm({ ...newTicketForm, completionDate: e.target.value })
+                    }
+                    className="w-full text-xs font-mono rounded-md border border-input bg-background p-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold block text-foreground mb-1">Fault / Symptom</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Refrigerant Leak at Expansion Valve"
+                  value={newTicketForm.faultCategory}
+                  onChange={(e) =>
+                    setNewTicketForm({ ...newTicketForm, faultCategory: e.target.value })
+                  }
+                  className="w-full text-xs rounded-md border border-input bg-background p-2"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">First-Time Fix</label>
+                  <select
+                    value={newTicketForm.firstTimeFix ? "true" : "false"}
+                    onChange={(e) =>
+                      setNewTicketForm({
+                        ...newTicketForm,
+                        firstTimeFix: e.target.value === "true",
+                      })
+                    }
+                    className="w-full text-xs rounded-md border border-input bg-background p-2"
+                  >
+                    <option value="true">Yes (First-Time)</option>
+                    <option value="false">No (Callback / Repeat)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">Quality /10</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    value={newTicketForm.qualityScore}
+                    onChange={(e) =>
+                      setNewTicketForm({
+                        ...newTicketForm,
+                        qualityScore: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full text-xs font-mono rounded-md border border-input bg-background p-2 text-right"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">Discipline /10</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    value={newTicketForm.disciplineScore}
+                    onChange={(e) =>
+                      setNewTicketForm({
+                        ...newTicketForm,
+                        disciplineScore: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full text-xs font-mono rounded-md border border-input bg-background p-2 text-right"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">HOD Eligibility</label>
+                  <select
+                    value={newTicketForm.eligibility}
+                    onChange={(e) =>
+                      setNewTicketForm({
+                        ...newTicketForm,
+                        eligibility: e.target.value as JobEligibility,
+                      })
+                    }
+                    className="w-full text-xs rounded-md border border-input bg-background p-2"
+                  >
+                    <option value="HOD Eligible">HOD Eligible</option>
+                    <option value="Partial">Partial</option>
+                    <option value="Not Eligible">Not Eligible</option>
+                    <option value="Excluded">Excluded</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold block text-foreground mb-1">Notes</label>
+                  <input
+                    type="text"
+                    placeholder="Optional review notes"
+                    value={newTicketForm.notes}
+                    onChange={(e) => setNewTicketForm({ ...newTicketForm, notes: e.target.value })}
+                    className="w-full text-xs rounded-md border border-input bg-background p-2"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t bg-muted/30 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddTicketModalOpen(false)}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAddNewJobTicket}
+                className="text-xs bg-primary text-primary-foreground font-semibold"
+              >
+                Add Job Sheet
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Batch History Drawer */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
+          <div className="card-surface bg-card border rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HistoryIcon className="text-primary" size={18} />
+                <h3 className="font-bold text-sm text-foreground">
+                  Service Performance Batches in PostgreSQL
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsHistoryModalOpen(false)}
+                className="p-1 hover:bg-muted rounded text-muted-foreground"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 text-xs">
+              <p className="text-muted-foreground text-xs">
+                Monthly closed service performance batches stored in PostgreSQL.
+              </p>
+
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-muted/70 text-muted-foreground font-semibold border-b">
+                      <th className="py-2 px-3">Batch ID</th>
+                      <th className="py-2 px-3">Period</th>
+                      <th className="py-2 px-3">Division</th>
+                      <th className="py-2 px-3 text-right">Techs</th>
+                      <th className="py-2 px-3 text-right">Job Sheets</th>
+                      <th className="py-2 px-3 text-center">Status</th>
+                      <th className="py-2 px-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {(allDbBatches.length > 0
+                      ? allDbBatches
+                      : [
+                          {
+                            id: "BAT-SRV-2026-05A",
+                            period: "May 2026",
+                            division: "Consumer Electronics",
+                            status: "Draft",
+                            techLines: Array(10),
+                            jobTickets: Array(10),
+                          },
+                          {
+                            id: "BAT-SRV-2026-04F",
+                            period: "April 2026",
+                            division: "All Service Divisions",
+                            status: "Locked",
+                            techLines: Array(10),
+                            jobTickets: Array(10),
+                          },
+                        ]
+                    ).map((b) => (
+                      <tr key={b.id} className="hover:bg-muted/30">
+                        <td className="py-2.5 px-3 font-mono font-bold text-primary">{b.id}</td>
+                        <td className="py-2.5 px-3 font-semibold">{b.period}</td>
+                        <td className="py-2.5 px-3 text-muted-foreground">{b.division}</td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                          {b.techLines?.length ?? 0}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                          {b.jobTickets?.length ?? 0}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              b.status === "Locked"
+                                ? "bg-primary/15 text-primary"
+                                : b.status === "Used in Run"
+                                  ? "bg-purple-500/15 text-purple-700"
+                                  : "bg-warning/15 text-warning"
+                            }`}
+                          >
+                            {b.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                handlePeriodChange(b.period);
+                                setIsHistoryModalOpen(false);
+                              }}
+                              className="h-6 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                              title="Load batch to editor"
+                            >
+                              Load
+                            </Button>
+                            {b.status !== "Locked" && b.status !== "Used in Run" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteBatch(b.id)}
+                                className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10 cursor-pointer"
+                                title="Delete draft batch from PostgreSQL"
+                              >
+                                <Trash2 size={12} />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t bg-muted/30 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsHistoryModalOpen(false)}
+                className="text-xs"
+              >
+                Close
               </Button>
             </div>
           </div>

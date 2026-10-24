@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { type IncentiveScreenItem, INCENTIVE_SCREENS } from "@/lib/incentive-screens-data";
 import { SchemeMasterView } from "@/components/incentive/SchemeMasterView";
 import { CommissionRateMatrixView } from "@/components/incentive/CommissionRateMatrixView";
@@ -9,34 +9,29 @@ import { AttendanceLeaveImportView } from "@/components/incentive/AttendanceLeav
 import { ServicePerformanceDataView } from "@/components/incentive/ServicePerformanceDataView";
 import { CalculationResultsDetailView } from "@/components/incentive/CalculationResultsDetailView";
 import { IncentiveCalculationRunView } from "@/components/incentive/IncentiveCalculationRunView";
+import { ManualAdjustmentsView } from "@/components/incentive/ManualAdjustmentsView";
+import { MultiLevelApprovalView } from "@/components/incentive/MultiLevelApprovalView";
+import { GLPostingPayrollView } from "@/components/incentive/GLPostingPayrollView";
+import { ParticipantStatementView } from "@/components/incentive/ParticipantStatementView";
+import { DisputeResolutionView } from "@/components/incentive/DisputeResolutionView";
+import { SchemeAnalyticsView } from "@/components/incentive/SchemeAnalyticsView";
+import { IncentiveDashboardWorkspace } from "@/components/incentive/IncentiveDashboardWorkspace";
+import { ClawbackPenaltyView } from "@/components/incentive/ClawbackPenaltyView";
+import { AuditTrailView } from "@/components/incentive/AuditTrailView";
+import { SystemParametersView } from "@/components/incentive/SystemParametersView";
+import { DivisionMasterView } from "@/components/incentive/DivisionMasterView";
 
 import {
   ArrowLeft,
   ArrowRight,
-  Search,
-  Filter,
-  Save,
-  Download,
-  Printer,
-  CheckCircle2,
-  Clock,
-  Shield,
+  ChevronLeft,
+  ChevronRight,
   Layers,
-  FileSpreadsheet,
-  AlertCircle,
-  HelpCircle,
+  Sparkles,
+  CheckCircle2,
   Sliders,
-  CheckSquare,
-  Send,
-  Receipt,
-  BarChart3,
-  ShieldAlert,
-  History,
-  Settings2,
-  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 interface IncentiveScreenWorkspaceProps {
   screen: IncentiveScreenItem;
@@ -44,90 +39,30 @@ interface IncentiveScreenWorkspaceProps {
   onNavigateScreen: (screenId: string) => void;
 }
 
-export function IncentiveScreenWorkspace({
-  screen,
-  onBack,
-  onNavigateScreen,
-}: IncentiveScreenWorkspaceProps) {
-  // If the active screen has a dedicated full-fidelity component, route to it!
-  switch (screen.id) {
-    case "scheme-master":
-      return (
-        <div className="space-y-4">
-          <TopWorkspaceBar screen={screen} onBack={onBack} onNavigateScreen={onNavigateScreen} />
-          <SchemeMasterView onNavigateScreen={onNavigateScreen} />
-        </div>
-      );
-
-    case "rate-matrix":
-      return (
-        <div className="space-y-4">
-          <CommissionRateMatrixView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "slab-table":
-      return (
-        <div className="space-y-4">
-          <TargetIncentiveSlabTableView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "monthly-target":
-      return (
-        <div className="space-y-4">
-          <MonthlyTargetEntryView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "participant-profile":
-      return (
-        <div className="space-y-4">
-          <IncentiveParticipantProfileView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "attendance-import":
-      return (
-        <div className="space-y-4">
-          <AttendanceLeaveImportView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "service-performance":
-      return (
-        <div className="space-y-4">
-          <ServicePerformanceDataView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "calculation-results":
-      return (
-        <div className="space-y-4">
-          <CalculationResultsDetailView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    case "calculation-run":
-      return (
-        <div className="space-y-4">
-          <IncentiveCalculationRunView onNavigateScreen={onNavigateScreen} onBack={onBack} />
-        </div>
-      );
-
-    default:
-      // Generic high-fidelity operational screen template for remaining screens (10 to 19)
-      return (
-        <GenericIncentiveScreenWorkspace
-          screen={screen}
-          onBack={onBack}
-          onNavigateScreen={onNavigateScreen}
-        />
-      );
+// Stage mapping based on Section 5 Process Flow
+function getStageInfo(screenNumber: number): { stageNumber: number; stageName: string; stageTone: string } {
+  if ([1, 2, 3, 5, 20].includes(screenNumber)) {
+    return { stageNumber: 1, stageName: "Master Scheme Setup", stageTone: "bg-blue-100 text-blue-800 border-blue-200" };
   }
+  if ([4, 6, 7].includes(screenNumber)) {
+    return { stageNumber: 2, stageName: "Operational Quotas & Inputs", stageTone: "bg-cyan-100 text-cyan-800 border-cyan-200" };
+  }
+  if ([8, 9, 10].includes(screenNumber)) {
+    return { stageNumber: 3, stageName: "Engine Execution & Adjustments", stageTone: "bg-purple-100 text-purple-800 border-purple-200" };
+  }
+  if ([11, 12].includes(screenNumber)) {
+    return { stageNumber: 4, stageName: "Governance & Financial Handover", stageTone: "bg-amber-100 text-amber-800 border-amber-200" };
+  }
+  if ([13, 14].includes(screenNumber)) {
+    return { stageNumber: 5, stageName: "Payslips & Dispute Resolution", stageTone: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  }
+  return { stageNumber: 6, stageName: "Risk, Audit & Settings", stageTone: "bg-slate-100 text-slate-800 border-slate-200" };
 }
 
-function TopWorkspaceBar({
+/**
+ * Clean Top Navigation Bar with Step Sequence & Previous/Next Navigation
+ */
+function ProcessLifecycleHeader({
   screen,
   onBack,
   onNavigateScreen,
@@ -136,251 +71,168 @@ function TopWorkspaceBar({
   onBack: () => void;
   onNavigateScreen: (screenId: string) => void;
 }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onBack}
-          className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
-        >
-          <ArrowLeft size={13} />
-          <span>All Incentive Screens</span>
-        </Button>
-        <span className="text-xs text-muted-foreground font-mono bg-muted px-2.5 py-1 rounded">
-          Screen #{screen.screenNumber.toString().padStart(2, "0")} · {screen.category}
-        </span>
-      </div>
+  const currentIndex = INCENTIVE_SCREENS.findIndex((s) => s.id === screen.id);
+  const prevScreen = currentIndex > 0 ? INCENTIVE_SCREENS[currentIndex - 1] : null;
+  const nextScreen = currentIndex < INCENTIVE_SCREENS.length - 1 ? INCENTIVE_SCREENS[currentIndex + 1] : null;
 
-      <div className="flex items-center gap-2">
-        <select
-          value={screen.id}
-          onChange={(e) => onNavigateScreen(e.target.value)}
-          className="input-field text-xs h-8 bg-card"
-        >
-          {INCENTIVE_SCREENS.map((s) => (
-            <option key={s.id} value={s.id}>
-              #{s.screenNumber.toString().padStart(2, "0")} {s.title}
-            </option>
-          ))}
-        </select>
+  const stage = getStageInfo(screen.screenNumber);
+
+  return (
+    <div className="bg-card border border-border p-3 rounded-xl shadow-xs space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Back to launcher & Step Badge */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onBack}
+            className="h-8 px-2.5 gap-1.5 text-xs font-semibold hover:bg-muted cursor-pointer"
+          >
+            <ArrowLeft size={13} />
+            <span>All {INCENTIVE_SCREENS.length} Screens</span>
+          </Button>
+
+          <span className="font-mono text-xs font-bold px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+            Step {screen.screenNumber.toString().padStart(2, "0")} / {INCENTIVE_SCREENS.length}
+          </span>
+
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stage.stageTone}`}>
+            Stage {stage.stageNumber}: {stage.stageName}
+          </span>
+        </div>
+
+        {/* Right: Step Switcher & Prev/Next Buttons */}
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+          {prevScreen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateScreen(prevScreen.id)}
+              className="h-8 px-2.5 text-xs gap-1 font-medium"
+              title={`Previous: #${prevScreen.screenNumber} ${prevScreen.title}`}
+            >
+              <ChevronLeft size={14} />
+              <span className="hidden sm:inline">Prev</span>
+            </Button>
+          )}
+
+          <select
+            value={screen.id}
+            onChange={(e) => onNavigateScreen(e.target.value)}
+            className="h-8 px-2.5 text-xs bg-background border border-border rounded-lg font-medium focus:ring-1 focus:ring-primary max-w-[220px] sm:max-w-[260px] truncate"
+          >
+            {INCENTIVE_SCREENS.map((s) => (
+              <option key={s.id} value={s.id}>
+                #{s.screenNumber.toString().padStart(2, "0")} {s.title}
+              </option>
+            ))}
+          </select>
+
+          {nextScreen && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onNavigateScreen(nextScreen.id)}
+              className="h-8 px-2.5 text-xs gap-1 font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              title={`Next: #${nextScreen.screenNumber} ${nextScreen.title}`}
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight size={14} />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function GenericIncentiveScreenWorkspace({
+/**
+ * Main Workspace Router for all 19 Screens
+ */
+export function IncentiveScreenWorkspace({
   screen,
   onBack,
   onNavigateScreen,
-}: {
-  screen: IncentiveScreenItem;
-  onBack: () => void;
-  onNavigateScreen: (screenId: string) => void;
-}) {
-  const ScreenIcon = screen.icon;
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeDivision, setActiveDivision] = useState("All Divisions");
+}: IncentiveScreenWorkspaceProps) {
+  const renderContent = () => {
+    switch (screen.id) {
+      case "scheme-master":
+        return <SchemeMasterView onNavigateScreen={onNavigateScreen} />;
+
+      case "rate-matrix":
+        return <CommissionRateMatrixView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "slab-table":
+        return <TargetIncentiveSlabTableView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "monthly-target":
+        return <MonthlyTargetEntryView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "participant-profile":
+        return <IncentiveParticipantProfileView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "attendance-import":
+        return <AttendanceLeaveImportView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "service-performance":
+        return <ServicePerformanceDataView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "calculation-results":
+        return <CalculationResultsDetailView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "calculation-run":
+        return <IncentiveCalculationRunView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "manual-adjustment":
+        return <ManualAdjustmentsView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "approval-posting":
+        return <MultiLevelApprovalView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "gl-posting":
+        return <GLPostingPayrollView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "statement-slip":
+        return <ParticipantStatementView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "dispute-query":
+        return <DisputeResolutionView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "scheme-analytics":
+        return <SchemeAnalyticsView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "incentive-dashboard":
+        return <IncentiveDashboardWorkspace onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "clawback-register":
+        return <ClawbackPenaltyView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "audit-trail":
+        return <AuditTrailView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "system-parameters":
+        return <SystemParametersView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      case "division-master":
+        return <DivisionMasterView onNavigateScreen={onNavigateScreen} onBack={onBack} />;
+
+      default:
+        return (
+          <div className="p-8 text-center text-muted-foreground bg-card border rounded-xl">
+            Screen {screen.title} ({screen.id}) is active.
+          </div>
+        );
+    }
+  };
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Top Bar */}
-      <TopWorkspaceBar screen={screen} onBack={onBack} onNavigateScreen={onNavigateScreen} />
-
-      {/* Screen Banner */}
-      <div className="card-surface p-5 sm:p-6 rounded-lg border bg-card shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <span
-              className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${screen.tone} shadow-xs`}
-            >
-              <ScreenIcon size={24} />
-            </span>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                  {screen.title}
-                </h1>
-                <span className="rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs font-semibold">
-                  Screen #{screen.screenNumber.toString().padStart(2, "0")}
-                </span>
-              </div>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-2xl">
-                {screen.description}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                toast.success("Module configuration exported to Excel.");
-              }}
-              className="gap-1.5 text-xs h-8"
-            >
-              <Download size={13} />
-              <span>Export</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.print()}
-              className="gap-1.5 text-xs h-8"
-            >
-              <Printer size={13} />
-              <span>Print</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                toast.success("Parameters and settings saved successfully.", {
-                  description: `${screen.title} state updated.`,
-                });
-              }}
-              className="gap-1.5 text-xs h-8 shadow-xs"
-            >
-              <Save size={13} />
-              <span>Save Record</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Toolbar */}
-      <div className="card-surface p-4 rounded-lg border bg-card flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <input
-            type="text"
-            placeholder={`Search ${screen.title.toLowerCase()} records...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field pl-9 text-xs h-9 w-full bg-card"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <select
-            value={activeDivision}
-            onChange={(e) => setActiveDivision(e.target.value)}
-            className="input-field h-9 text-xs bg-card"
-          >
-            <option value="All Divisions">All Divisions</option>
-            <option value="Consumer Electronics">Consumer Electronics</option>
-            <option value="Biomedical Engineering">Biomedical Engineering</option>
-            <option value="Telecommunications & Networks">Telecommunications & Networks</option>
-            <option value="Enterprise IT Solutions">Enterprise IT Solutions</option>
-          </select>
-
-          <Button
-            size="sm"
-            onClick={() => {
-              toast.info(`New record form opened for ${screen.title}`);
-            }}
-            className="h-9 gap-1.5 text-xs"
-          >
-            <Plus size={13} />
-            <span>New Record</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Interactive Table Representation */}
-      <div className="card-surface overflow-hidden rounded-lg border bg-card shadow-xs">
-        <div className="p-4 border-b bg-muted/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers size={15} className="text-primary" />
-            <span className="font-semibold text-xs text-foreground">
-              {screen.title} Active Register
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-muted-foreground">
-            Status: Operational &middot; ERP Connected
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse min-w-[700px]">
-            <thead>
-              <tr className="border-b bg-muted/20 text-left font-semibold text-muted-foreground">
-                <th className="px-4 py-3 w-14 text-center">#</th>
-                <th className="px-4 py-3">Reference / Code</th>
-                <th className="px-4 py-3">Description / Parameter</th>
-                <th className="px-4 py-3">Effective Scope</th>
-                <th className="px-4 py-3">Last Modified</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {[
-                {
-                  code: `${screen.id.toUpperCase().slice(0, 3)}-2026-001`,
-                  name: `Default ${screen.title} Configuration Matrix`,
-                  scope: activeDivision,
-                  date: "14-May-2026 10:30 IST",
-                  status: "Active",
-                },
-                {
-                  code: `${screen.id.toUpperCase().slice(0, 3)}-2026-002`,
-                  name: `Secondary Branch Exception Policy`,
-                  scope: "All Outstations (Kandy, Galle, Jaffna)",
-                  date: "10-May-2026 14:15 IST",
-                  status: "Active",
-                },
-                {
-                  code: `${screen.id.toUpperCase().slice(0, 3)}-2026-003`,
-                  name: `Special Quarterly Incentive Adjustment Criteria`,
-                  scope: "Enterprise Accounts & High-Value SLAs",
-                  date: "04-May-2026 09:00 IST",
-                  status: "Under Review",
-                },
-              ].map((item, idx) => (
-                <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 text-center font-mono text-muted-foreground">
-                    {idx + 1}
-                  </td>
-                  <td className="px-4 py-3 font-mono font-medium text-primary">{item.code}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">{item.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{item.scope}</td>
-                  <td className="px-4 py-3 text-muted-foreground font-mono text-[11px]">
-                    {item.date}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        item.status === "Active"
-                          ? "bg-success-soft text-success"
-                          : "bg-warning-soft text-warning"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        toast.success(`Loaded details for ${item.code}`);
-                      }}
-                      className="h-7 text-xs text-primary hover:underline cursor-pointer"
-                    >
-                      Configure &rarr;
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <ProcessLifecycleHeader
+        screen={screen}
+        onBack={onBack}
+        onNavigateScreen={onNavigateScreen}
+      />
+      {renderContent()}
     </div>
   );
 }

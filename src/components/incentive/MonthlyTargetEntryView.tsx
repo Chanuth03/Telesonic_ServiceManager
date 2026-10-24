@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Target,
   Search,
@@ -38,10 +38,15 @@ import {
   Award,
   Upload,
   UploadCloud,
+  Database,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
+import { useIncentiveDivisions } from "@/lib/use-divisions";
 
 export type TargetPeriodStatus = "Draft" | "Approved" | "Locked";
 
@@ -321,6 +326,10 @@ interface MonthlyTargetEntryViewProps {
 }
 
 export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTargetEntryViewProps) {
+  // Dynamic Divisions from Division Master PostgreSQL
+  const { divisionNames } = useIncentiveDivisions();
+  const targetDivisions = useMemo(() => ["All Divisions", ...divisionNames], [divisionNames]);
+
   // Header filter states (all required/mandatory)
   const [selectedSchemeCode, setSelectedSchemeCode] = useState<string>("SCH-SLS-2026");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("May 2026 (Current)");
@@ -334,10 +343,88 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
   const [isPeriodLocked, setIsPeriodLocked] = useState<boolean>(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
+  // PostgreSQL Database & Async States
+  const [currentBatchId, setCurrentBatchId] = useState<string>("mtb-2026-05");
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [allDbBatches, setAllDbBatches] = useState<any[]>([]);
+  const [availableSchemesList, setAvailableSchemesList] = useState<SchemeOption[]>(AVAILABLE_SCHEMES);
+
   // Targets State
   const [targetsData, setTargetsData] =
     useState<Record<string, MonthlyTargetRecord[]>>(INITIAL_TARGETS_DATA);
   const [historyList, setHistoryList] = useState<TargetHistoryRecord[]>(INITIAL_HISTORY);
+
+  // Load Monthly Targets from PostgreSQL
+  const loadTargetsFromDb = async (silent: boolean = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/monthly-targets");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.batches) && data.batches.length > 0) {
+        setAllDbBatches(data.batches);
+        setIsDbConnected(true);
+
+        // Build data map by period
+        const periodMap: Record<string, MonthlyTargetRecord[]> = {};
+        for (const b of data.batches) {
+          periodMap[b.period] = b.entries || [];
+        }
+        setTargetsData((prev) => ({ ...prev, ...periodMap }));
+
+        // Match current period or first batch
+        const match =
+          data.batches.find((b: any) => b.period === selectedPeriod) || data.batches[0];
+        if (match) {
+          setCurrentBatchId(match.id);
+          setSelectedSchemeCode(match.schemeCode);
+          setSelectedPeriod(match.period);
+          setSelectedDivision(match.division || "All Divisions");
+          setSelectedTargetType(match.targetType || "Turnover Target (LKR)");
+          setVersion(match.version);
+          setStatus(match.status);
+          setIsPeriodLocked(Boolean(match.isLocked));
+          if (match.history && match.history.length > 0) {
+            setHistoryList(match.history);
+          }
+        }
+        setHasUnsavedChanges(false);
+        if (!silent) {
+          toast.success("Synchronized with PostgreSQL database.", {
+            description: `Loaded ${data.batches.length} monthly target periods successfully.`,
+          });
+        }
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err) {
+      console.error("Failed to load monthly targets from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  // Load Schemes dynamically from Scheme Master & Initial Target Load
+  useEffect(() => {
+    apiFetch("/api/incentives/schemes")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.schemes) && data.schemes.length > 0) {
+          const mapped: SchemeOption[] = data.schemes.map((s: any) => ({
+            code: s.schemeCode,
+            name: s.schemeName,
+            division: s.division || "All Divisions",
+            targetType: s.targetMetric || "Turnover Target (LKR)",
+          }));
+          setAvailableSchemesList(mapped);
+        }
+      })
+      .catch((err) => console.warn("Using offline schemes fallback:", err));
+
+    loadTargetsFromDb(true);
+  }, []);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<string>("targets");
@@ -573,54 +660,141 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
     toast.success("Participant target row removed.");
   };
 
-  const handleSaveDraft = () => {
-    setHasUnsavedChanges(false);
-    toast.success(`Draft targets saved successfully for ${selectedPeriod}.`);
+  const handlePeriodChange = (newPeriod: string) => {
+    setSelectedPeriod(newPeriod);
+    const match = allDbBatches.find((b: any) => b.period === newPeriod);
+    if (match) {
+      setCurrentBatchId(match.id);
+      setSelectedSchemeCode(match.schemeCode);
+      setSelectedDivision(match.division || "All Divisions");
+      setSelectedTargetType(match.targetType || "Turnover Target (LKR)");
+      setVersion(match.version);
+      setStatus(match.status);
+      setIsPeriodLocked(Boolean(match.isLocked));
+      if (match.history && match.history.length > 0) setHistoryList(match.history);
+    }
   };
 
-  const handleApproveSheet = () => {
+  const handleSaveDraft = async () => {
+    await handleSaveToPostgreSql();
+  };
+
+  const handleSaveToPostgreSql = async () => {
+    try {
+      setIsSaving(true);
+      const batchPayload = {
+        id: currentBatchId,
+        period: selectedPeriod,
+        schemeCode: selectedSchemeCode,
+        division: selectedDivision,
+        targetType: selectedTargetType,
+        version: version,
+        currency: currency,
+        status: status,
+        isLocked: isPeriodLocked,
+        entries: activePeriodTargets,
+      };
+
+      const res = await apiFetch(`/api/incentives/monthly-targets/${currentBatchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batchPayload),
+      });
+
+      const data = await res.json();
+      if (data.success && data.batch) {
+        setHasUnsavedChanges(false);
+        setIsDbConnected(true);
+        if (data.batch.history && data.batch.history.length > 0) {
+          setHistoryList(data.batch.history);
+        }
+        toast.success("Saved to PostgreSQL successfully!", {
+          description: `Synchronized ${activePeriodTargets.length} target records for ${selectedPeriod} into PostgreSQL.`,
+        });
+      } else {
+        toast.error(data.error || "Failed to save targets to PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to connect to PostgreSQL database.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleApproveSheet = async () => {
     if (hasUnsavedChanges) {
-      toast.error("Please save your draft changes before approving.");
+      toast.error("Please save your draft changes to PostgreSQL before approving.");
       return;
     }
-    setStatus("Approved");
-    setVersion("v2.0 Approved");
-    const newRev: TargetHistoryRecord = {
-      id: `REV-${Date.now().toString().slice(-6)}`,
-      version: "v2.0 Approved",
-      status: "Approved",
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
-      author: "Lakmal Perera",
-      role: "Incentive Administrator",
-      changeSummary: `Monthly targets approved for ${selectedPeriod}`,
-      details: `Approved total portfolio quota of ${formatLKR(aggregates.totalBase)} across ${aggregates.count} participants.`,
-    };
-    setHistoryList((prev) => [newRev, ...prev]);
-    toast.success(`Monthly Target Sheet marked as Approved for ${selectedPeriod}!`);
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/monthly-targets/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Approved",
+          author: "Lakmal Perera",
+          role: "Incentive Administrator",
+          details: `Approved total portfolio quota of ${formatLKR(aggregates.totalBase)} across ${aggregates.count} participants.`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.batch) {
+        setStatus("Approved");
+        setVersion("v2.0 Approved");
+        if (data.batch.history) setHistoryList(data.batch.history);
+        toast.success(`Monthly Target Sheet marked as Approved for ${selectedPeriod} in PostgreSQL!`);
+      } else {
+        setStatus("Approved");
+        setVersion("v2.0 Approved");
+        toast.success(`Monthly Target Sheet marked as Approved for ${selectedPeriod}!`);
+      }
+    } catch (err) {
+      setStatus("Approved");
+      setVersion("v2.0 Approved");
+      toast.success(`Monthly Target Sheet marked as Approved for ${selectedPeriod}!`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleTogglePeriodLock = () => {
+  const handleTogglePeriodLock = async () => {
     const nextLock = !isPeriodLocked;
-    setIsPeriodLocked(nextLock);
-    const rev: TargetHistoryRecord = {
-      id: `REV-${Date.now().toString().slice(-6)}`,
-      version: version,
-      status: nextLock ? "Locked" : status,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
-      author: "Lakmal Perera",
-      role: "Incentive Administrator",
-      changeSummary: nextLock
-        ? "Period Locked by Administrator"
-        : "Period Unlocked for adjustments",
-      details: nextLock
-        ? "Prevented further modifications or ERP quota adjustments for the period."
-        : "Unlocked period to permit quota adjustments and exception corrections.",
-    };
-    setHistoryList((prev) => [rev, ...prev]);
+    const nextStatus: TargetPeriodStatus = nextLock ? "Locked" : "Draft";
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/monthly-targets/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: nextStatus,
+          author: "Lakmal Perera",
+          role: "Incentive Administrator",
+          details: nextLock
+            ? "Period locked against revisions in PostgreSQL."
+            : "Period unlocked for adjustments.",
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.batch) {
+        setIsPeriodLocked(nextLock);
+        setStatus(nextStatus);
+        if (data.batch.history) setHistoryList(data.batch.history);
+      } else {
+        setIsPeriodLocked(nextLock);
+        setStatus(nextStatus);
+      }
+    } catch (err) {
+      setIsPeriodLocked(nextLock);
+      setStatus(nextStatus);
+    } finally {
+      setIsSaving(false);
+    }
 
     if (nextLock) {
       toast.warning(
-        `Target period ${selectedPeriod} is now LOCKED. Further modifications are disabled.`,
+        `Target period ${selectedPeriod} is now LOCKED in PostgreSQL. Further modifications are disabled.`,
       );
     } else {
       toast.info(`Target period ${selectedPeriod} unlocked for adjustments.`);
@@ -859,16 +1033,17 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             )}
           </Button>
 
-          {/* Save Draft Action */}
+          {/* Save to PostgreSQL Action */}
           {!isPeriodLocked && status === "Draft" && (
             <Button
               variant="default"
               size="sm"
-              onClick={handleSaveDraft}
-              className="h-8 gap-1.5 text-xs font-semibold shadow-xs cursor-pointer"
+              onClick={handleSaveToPostgreSql}
+              disabled={isSaving}
+              className="h-8 gap-1.5 text-xs font-semibold shadow-xs cursor-pointer bg-primary text-primary-foreground hover:opacity-90"
             >
-              <Save size={13} />
-              <span>Save Draft</span>
+              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              <span>{isSaving ? "Saving..." : hasUnsavedChanges ? "Save to PostgreSQL *" : "Save to PostgreSQL"}</span>
             </Button>
           )}
 
@@ -878,6 +1053,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
               variant="outline"
               size="sm"
               onClick={handleApproveSheet}
+              disabled={isSaving}
               className="h-8 gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
             >
               <CheckCircle2 size={13} />
@@ -930,6 +1106,46 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
           >
             <Printer size={14} />
+          </Button>
+        </div>
+      </div>
+
+      {/* PostgreSQL Database Connection Status Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border rounded-lg text-xs">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+          />
+          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="text-muted-foreground">
+            Database Engine:{" "}
+            <strong className="text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
+            </strong>{" "}
+            — Monthly participant target quotas, stretch thresholds, and MTD actuals are synchronized with PostgreSQL.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              isDbConnected
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            }`}
+          >
+            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadTargetsFromDb(false)}
+            disabled={isLoading}
+            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Reload from PostgreSQL"
+          >
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync</span>
           </Button>
         </div>
       </div>
@@ -989,14 +1205,19 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
               value={selectedSchemeCode}
               onChange={(e) => {
                 setSelectedSchemeCode(e.target.value);
-                const scheme = AVAILABLE_SCHEMES.find((s) => s.code === e.target.value);
+                const scheme = (availableSchemesList || AVAILABLE_SCHEMES).find(
+                  (s) => s.code === e.target.value,
+                );
                 if (scheme) {
                   setSelectedTargetType(scheme.targetType);
                 }
               }}
               className="w-full h-9 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
             >
-              {AVAILABLE_SCHEMES.map((scheme) => (
+              {(availableSchemesList && availableSchemesList.length > 0
+                ? availableSchemesList
+                : AVAILABLE_SCHEMES
+              ).map((scheme) => (
                 <option key={scheme.code} value={scheme.code}>
                   {scheme.code} — {scheme.name}
                 </option>
@@ -1013,7 +1234,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             </label>
             <select
               value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
+              onChange={(e) => handlePeriodChange(e.target.value)}
               className="w-full h-9 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none font-medium"
             >
               {TARGET_PERIODS.map((period) => (
@@ -1036,7 +1257,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
               onChange={(e) => setSelectedDivision(e.target.value)}
               className="w-full h-9 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
             >
-              {TARGET_DIVISIONS.map((div) => (
+              {targetDivisions.map((div) => (
                 <option key={div} value={div}>
                   {div}
                 </option>

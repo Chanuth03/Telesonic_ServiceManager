@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Award,
   Layers,
@@ -34,10 +34,16 @@ import {
   Sparkles,
   Target,
   UploadCloud,
+  Database,
+  RefreshCw,
+  Save,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
+import { useIncentiveDivisions } from "@/lib/use-divisions";
 
 export type SchemeStatus = "Draft" | "Approved" | "Active" | "Superseded" | "Inactive";
 
@@ -73,8 +79,8 @@ export interface SchemeVersionItem {
   status: SchemeStatus;
   createdBy: string;
   createdDate: string;
-  approvedBy?: string;
-  approvalDate?: string;
+  approvedBy?: string | undefined;
+  approvalDate?: string | undefined;
   changeSummary: string;
 }
 
@@ -838,6 +844,40 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [divisionFilter, setDivisionFilter] = useState<string>("all");
 
+  // Database connection & Loading states
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+
+  // Load schemes from PostgreSQL
+  const loadSchemesFromDb = async (silent: boolean = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/schemes");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.schemes && data.schemes.length > 0) {
+          setSchemes(data.schemes);
+          setIsDbConnected(true);
+          if (!silent) {
+            toast.success("Synchronized with PostgreSQL database.", {
+              description: `Loaded ${data.schemes.length} schemes successfully.`,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load schemes from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchemesFromDb(true);
+  }, []);
+
   // Dialog & Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -911,13 +951,8 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     });
   }, [schemes, searchTerm, statusFilter, divisionFilter]);
 
-  // Divisions available
-  const availableDivisions = [
-    "Mobile & Accessories",
-    "Consumer Electronics",
-    "Enterprise Solutions",
-    "Service & Warranty",
-  ];
+  // Dynamic Divisions from Division Master PostgreSQL
+  const { divisionNames: availableDivisions } = useIncentiveDivisions();
 
   // Helper for status badge styling
   const getStatusBadge = (status: SchemeStatus) => {
@@ -1100,9 +1135,32 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     setSchemes((prev) => [createdScheme, ...prev]);
     setSelectedSchemeId(newId);
     setIsAddModalOpen(false);
-    toast.success(`Scheme ${createdScheme.schemeCode} created in Draft status.`, {
-      description: "Define rules, slabs and rate tables before submitting for approval.",
-    });
+
+    // Persist to PostgreSQL
+    apiFetch("/api/incentives/schemes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createdScheme),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.scheme) {
+            setSchemes((prev) => [data.scheme, ...prev.filter((s) => s.id !== newId)]);
+            setSelectedSchemeId(data.scheme.id);
+            setIsDbConnected(true);
+            toast.success(`Scheme ${data.scheme.schemeCode} saved directly to PostgreSQL!`, {
+              description: "Draft created. You can define rules, slabs and rate tables before submitting for approval.",
+            });
+            return;
+          }
+        }
+        toast.info(`Scheme ${createdScheme.schemeCode} created locally in Draft status.`);
+      })
+      .catch((err) => {
+        console.error("PostgreSQL persist error:", err);
+        toast.info(`Scheme ${createdScheme.schemeCode} created locally in Draft status.`);
+      });
   };
 
   // Action: Copy to New Version for an active scheme
@@ -1181,6 +1239,27 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
           "You can now edit parameters in this draft without altering active production rules.",
       },
     );
+
+    // Persist cloned version to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}/clone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        newCode: `${currentScheme.schemeCode}-${newVersionString.replace(".", "_")}`,
+        newName: `${currentScheme.schemeName} (${newVersionString})`,
+        user: "Incentive Administrator",
+      }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.scheme) {
+            setSchemes((prev) => [data.scheme, ...prev.filter((s) => s.id !== newId)]);
+            setSelectedSchemeId(data.scheme.id);
+          }
+        }
+      })
+      .catch((err) => console.error("PostgreSQL clone error:", err));
   };
 
   // Action: Activate an approved scheme after Finance/CEO approval
@@ -1246,6 +1325,18 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     toast.success(`Scheme ${currentScheme.schemeCode} (${currentScheme.version}) is now ACTIVE.`, {
       description: `Finance/CEO approval verified. Ready for calculation runs. Prior active versions marked Superseded.`,
     });
+
+    // Persist activation to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "Active",
+        user: "Head of Finance / CEO",
+        role: "Executive Authorizer",
+        notes: `Scheme activated. Authorization: ${activationAuthNote}`,
+      }),
+    }).catch((err) => console.error("PostgreSQL activate status error:", err));
   };
 
   // Action: Deactivate only when there is no open calculation run
@@ -1290,6 +1381,18 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     toast.success(`Scheme ${currentScheme.schemeCode} has been marked Inactive.`, {
       description: "Scheme is locked from inclusion in new calculation runs.",
     });
+
+    // Persist deactivation to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "Inactive",
+        user: "S. Perera",
+        role: "Incentive Administrator",
+        notes: "Deactivated following audit clearance. No open calculation runs detected.",
+      }),
+    }).catch((err) => console.error("PostgreSQL deactivate error:", err));
   };
 
   // Action: Submit Draft for Approval (Draft -> Approved)
@@ -1321,6 +1424,18 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
       description:
         "Scheme is now in 'Approved' status. Click 'Activate Scheme' to put into live production.",
     });
+
+    // Persist approval status to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "Approved",
+        user: "D. Fernando",
+        role: "Head of Finance",
+        notes: "Approved for production rollout pending activation.",
+      }),
+    }).catch((err) => console.error("PostgreSQL approve error:", err));
   };
 
   // Action: Add Rule to scheme
@@ -1347,12 +1462,14 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
       source: newRuleForm.source,
     };
 
+    const updatedRules = [...currentScheme.rules, newRule];
+
     setSchemes((prev) =>
       prev.map((s) => {
         if (s.id === currentScheme.id) {
           return {
             ...s,
-            rules: [...s.rules, newRule],
+            rules: updatedRules,
             history: [
               {
                 id: `h-rule-${Date.now()}`,
@@ -1373,6 +1490,16 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     setNewRuleForm({ rule: "", parameter: "", value: "", source: "Monthly Target Entry" });
     setIsAddRuleModalOpen(false);
     toast.success("Rule added successfully to scheme definition.");
+
+    // Persist updated rules to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rules: updatedRules,
+        changeNote: `Added qualification rule: ${newRule.rule}`,
+      }),
+    }).catch((err) => console.error("PostgreSQL rule add error:", err));
   };
 
   // Action: Delete Rule
@@ -1383,18 +1510,108 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
       );
       return;
     }
+
+    const remainingRules = currentScheme.rules.filter((r) => r.id !== ruleId);
+
     setSchemes((prev) =>
       prev.map((s) => {
         if (s.id === currentScheme.id) {
           return {
             ...s,
-            rules: s.rules.filter((r) => r.id !== ruleId),
+            rules: remainingRules,
           };
         }
         return s;
       }),
     );
     toast.info("Rule removed from scheme.");
+
+    // Persist updated rules to PostgreSQL
+    apiFetch(`/api/incentives/schemes/${currentScheme.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rules: remainingRules,
+        changeNote: `Removed qualification rule ${ruleId}`,
+      }),
+    }).catch((err) => console.error("PostgreSQL rule delete error:", err));
+  };
+
+  // Action: Save Entire Scheme Definition to PostgreSQL
+  const handleSaveSchemeToDb = async () => {
+    if (!currentScheme) return;
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/schemes/${currentScheme.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...currentScheme,
+          modifiedBy: "Incentive Administrator",
+          changeNote: `Manual save for ${currentScheme.schemeCode} (${currentScheme.version}).`,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.scheme) {
+          setSchemes((prev) =>
+            prev.map((s) => (s.id === currentScheme.id ? data.scheme : s)),
+          );
+        }
+        toast.success(`Scheme ${currentScheme.schemeCode} saved to PostgreSQL!`, {
+          description: "All rules, rate tables, slabs, and posting codes are saved to the database.",
+        });
+      } else {
+        toast.error("Failed to save scheme to PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Save scheme error:", err);
+      toast.error("Network or database error while saving scheme.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Action: Delete Scheme from PostgreSQL (Draft or Inactive)
+  const handleDeleteScheme = async () => {
+    if (!currentScheme) return;
+    if (currentScheme.status === "Active" || currentScheme.status === "Approved") {
+      toast.error("Active or Approved schemes cannot be deleted. Deactivate first.");
+      return;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Are you sure you want to permanently delete scheme "${currentScheme.schemeCode}" from PostgreSQL?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/schemes/${currentScheme.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success(`Scheme ${currentScheme.schemeCode} deleted from PostgreSQL.`);
+        const remaining = schemes.filter((s) => s.id !== currentScheme.id);
+        setSchemes(remaining);
+        if (remaining.length > 0 && remaining[0]) {
+          setSelectedSchemeId(remaining[0].id);
+        }
+      } else {
+        toast.error("Failed to delete scheme from database.");
+      }
+    } catch (err) {
+      console.error("Delete scheme error:", err);
+      toast.error("Error communicating with PostgreSQL server.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Export Excel / PDF
@@ -1496,6 +1713,19 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
                 <span className="text-xs px-2 py-0.5 rounded font-mono font-medium bg-muted text-muted-foreground border">
                   Total Schemes: {schemes.length}
                 </span>
+                <span
+                  className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-medium border ${
+                    isDbConnected
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
+                      : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+                  />
+                  <Database size={11} />
+                  <span>{isDbConnected ? "PostgreSQL Connected" : "Local Mode"}</span>
+                </span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Define incentive and commission schemes, participants, calculation basis,
@@ -1506,6 +1736,16 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
           {/* Top Primary Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => loadSchemesFromDb(false)}
+              className="h-8 gap-1.5 text-xs cursor-pointer"
+            >
+              <RefreshCw size={13} className={isLoading ? "animate-spin text-primary" : ""} />
+              <span>{isLoading ? "Syncing..." : "Sync DB"}</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1683,6 +1923,17 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
           {/* Scheme Actions (Status-flow sensitive) */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Action: Save Scheme Definition to PostgreSQL */}
+            <Button
+              size="sm"
+              disabled={isSaving}
+              onClick={handleSaveSchemeToDb}
+              className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+            >
+              <Save size={13} className={isSaving ? "animate-spin" : ""} />
+              <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
+            </Button>
+
             {/* Action 1: Copy to New Version (available for Active/Approved schemes) */}
             <Button
               variant="outline"
@@ -1738,6 +1989,20 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
               >
                 <AlertCircle size={13} />
                 <span>Deactivate</span>
+              </Button>
+            )}
+
+            {/* Action 5: Delete Draft or Inactive Scheme from PostgreSQL */}
+            {(currentScheme.status === "Draft" || currentScheme.status === "Inactive") && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isSaving}
+                onClick={handleDeleteScheme}
+                className="h-8 text-xs gap-1.5 text-destructive border-destructive/40 hover:bg-destructive-soft cursor-pointer"
+              >
+                <Trash2 size={13} />
+                <span>Delete</span>
               </Button>
             )}
           </div>

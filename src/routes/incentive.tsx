@@ -32,6 +32,7 @@ import { PenaltyRiskView } from "@/components/incentive/PenaltyRiskView";
 import { RunStatusView } from "@/components/incentive/RunStatusView";
 import { IncentiveActionBar } from "@/components/incentive/IncentiveActionBar";
 import { IncentiveScreenWorkspace } from "@/components/incentive/IncentiveScreenWorkspace";
+import { IncentiveDashboardWorkspace } from "@/components/incentive/IncentiveDashboardWorkspace";
 
 export const Route = createFileRoute("/incentive")({
   head: () => ({
@@ -59,16 +60,39 @@ function IncentiveModulePage() {
   // Active Screen ID (null means the 19-tile landing page)
   const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
 
-  // Sync with URL query parameter if present on mount
+  // Sync with URL query parameter if present on mount and on popstate
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window === "undefined") return;
+    const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const screenParam = params.get("screen");
-      if (screenParam) {
-        setSelectedScreenId(screenParam);
-      }
-    }
+      setSelectedScreenId(screenParam);
+    };
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
+
+  const handleOpenScreen = (screenId: string) => {
+    setSelectedScreenId(screenId);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("screen", screenId);
+      window.history.pushState({}, "", url.toString());
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleCloseScreen = () => {
+    setSelectedScreenId(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("screen");
+      window.history.pushState({}, "", url.pathname);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Search & category filter on the 19 tiles landing page
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,10 +107,67 @@ function IncentiveModulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<number | null>(null);
+
+  const LIFECYCLE_STAGES = [
+    {
+      stageNumber: 1,
+      title: "Master Scheme Setup",
+      screenNumbers: [1, 2, 3, 5, 20],
+      screenCodes: "Screens 1, 2, 3, 5, 20",
+      description: "Scheme Master, Rate Matrix, Slabs, Profiles & Divisions",
+      tone: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900",
+    },
+    {
+      stageNumber: 2,
+      title: "Quotas & Inputs",
+      screenNumbers: [4, 6, 7],
+      screenCodes: "Screens 4, 6, 7",
+      description: "Monthly Targets, Attendance & Service Facts",
+      tone: "text-cyan-600 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:border-cyan-900",
+    },
+    {
+      stageNumber: 3,
+      title: "Engine & Adjustments",
+      screenNumbers: [8, 9, 10],
+      screenCodes: "Screens 8, 9, 10",
+      description: "Batch Engine, Drill-Down & Bonus Claims",
+      tone: "text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-900",
+    },
+    {
+      stageNumber: 4,
+      title: "Governance & GL",
+      screenNumbers: [11, 12],
+      screenCodes: "Screens 11, 12",
+      description: "Four-Eyes Sign-Off, SAP B1 Accrual JE & Period Lock",
+      tone: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900",
+    },
+    {
+      stageNumber: 5,
+      title: "Payslips & Disputes",
+      screenNumbers: [13, 14],
+      screenCodes: "Screens 13, 14",
+      description: "Participant Statements & Dispute Resolution Log",
+      tone: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900",
+    },
+    {
+      stageNumber: 6,
+      title: "Monitoring & Risk",
+      screenNumbers: [15, 16, 17, 18, 19],
+      screenCodes: "Screens 15, 16, 17, 18, 19",
+      description: "Analytics, Dashboard, Penalty, Audit & Parameters",
+      tone: "text-slate-700 bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-700",
+    },
+  ];
 
   // Filtered 19 tiles
   const filteredScreens = useMemo(() => {
     return INCENTIVE_SCREENS.filter((screen) => {
+      if (selectedStage !== null) {
+        const stage = LIFECYCLE_STAGES.find((s) => s.stageNumber === selectedStage);
+        if (stage && !stage.screenNumbers.includes(screen.screenNumber)) return false;
+      }
+
       const matchCategory = selectedCategory === "All" || screen.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
@@ -97,7 +178,7 @@ function IncentiveModulePage() {
         screen.category.toLowerCase().includes(q);
       return matchCategory && matchSearch;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedStage]);
 
   const activeScreen = useMemo(() => {
     if (!selectedScreenId) return null;
@@ -301,6 +382,73 @@ function IncentiveModulePage() {
             </div>
           </div>
 
+          {/* ========================================================== */}
+          {/* VISUAL 6-STAGE PROCESS LIFECYCLE (SECTION 5 STANDARD)      */}
+          {/* ========================================================== */}
+          <div className="card-surface p-4 sm:p-5 rounded-xl border bg-card shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-primary" />
+                  Telesonic End-to-End Month-End Incentive Lifecycle
+                </span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sequential business process flow matching Section 5 specifications. Click any stage to inspect relevant screens.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedStage !== null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedStage(null)}
+                    className="h-7 text-xs text-primary font-semibold hover:bg-primary/10"
+                  >
+                    View All Stages
+                  </Button>
+                )}
+                <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded">
+                  {INCENTIVE_SCREENS.length} Active Modules
+                </span>
+              </div>
+            </div>
+
+            {/* Stepper Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
+              {LIFECYCLE_STAGES.map((st) => {
+                const isSelected = selectedStage === st.stageNumber;
+                return (
+                  <button
+                    key={st.stageNumber}
+                    onClick={() => setSelectedStage(isSelected ? null : st.stageNumber)}
+                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
+                        : "border-border bg-card hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-foreground">
+                        Stage {st.stageNumber}
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {st.screenNumbers.length} Screens
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-xs text-foreground leading-tight">{st.title}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                        {st.screenCodes}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Grid of 19 Clickable Screen Tiles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredScreens.map((screen) => {
@@ -308,46 +456,43 @@ function IncentiveModulePage() {
               return (
                 <button
                   key={screen.id}
-                  onClick={() => {
-                    setSelectedScreenId(screen.id);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="group relative flex flex-col justify-between text-left rounded-lg border bg-card p-5 text-card-foreground shadow-sm transition-all hover:-translate-y-1 hover:border-primary/40 hover:bg-card hover:shadow-md cursor-pointer motion-reduce:transform-none"
+                  onClick={() => handleOpenScreen(screen.id)}
+                  className="group relative flex flex-col justify-between text-left rounded-xl border bg-card p-5 text-card-foreground shadow-xs transition-all hover:-translate-y-1 hover:border-primary/40 hover:bg-card hover:shadow-md cursor-pointer motion-reduce:transform-none"
                 >
                   <div className="w-full">
                     {/* Top Row: Icon, Screen # and Arrow */}
-                    <div className="flex w-full items-start justify-between gap-2 mb-4">
+                    <div className="flex w-full items-start justify-between gap-2 mb-3">
                       <span
-                        className={`grid h-12 w-12 shrink-0 place-items-center rounded-lg ${screen.tone}`}
+                        className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${screen.tone}`}
                       >
-                        <ScreenIcon className="size-6" />
+                        <ScreenIcon className="size-5" />
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                          #{screen.screenNumber.toString().padStart(2, "0")}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-mono font-bold text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                          Step #{screen.screenNumber.toString().padStart(2, "0")}
                         </span>
-                        <ArrowUpRight className="text-muted-foreground transition-colors group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform size-4" />
                       </div>
                     </div>
 
                     {/* Title */}
-                    <h2 className="text-base font-semibold sm:text-lg group-hover:text-primary transition-colors leading-tight">
+                    <h2 className="text-sm font-bold sm:text-base group-hover:text-primary transition-colors leading-snug">
                       {screen.title}
                     </h2>
 
                     {/* Description */}
-                    <p className="mt-2 text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                    <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {screen.description}
                     </p>
                   </div>
 
                   {/* Bottom Footer Meta */}
-                  <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3 text-xs">
-                    <span className="text-[11px] font-medium text-muted-foreground">
+                  <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-xs">
+                    <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
                       {screen.category}
                     </span>
                     <span className="text-xs font-semibold text-primary group-hover:underline">
-                      Open &rarr;
+                      Open Step &rarr;
                     </span>
                   </div>
                 </button>
@@ -375,157 +520,14 @@ function IncentiveModulePage() {
             </div>
           )}
         </div>
-      ) : activeScreen.id === "incentive-dashboard" ? (
-        /* ========================================================== */
-        /* CASE 2: SCREEN 16 — OPERATIONAL INCENTIVE DASHBOARD       */
-        /* ========================================================== */
-        <div className="space-y-6">
-          {/* Breadcrumb Navigation */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground"
-            >
-              <Link
-                to="/"
-                className="flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Home size={14} />
-                <span>Home</span>
-              </Link>
-              <span className="text-muted-foreground/60">&gt;</span>
-              <button
-                onClick={() => setSelectedScreenId(null)}
-                className="font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Incentive & Commission Management
-              </button>
-              <span className="text-muted-foreground/60">&gt;</span>
-              <span className="font-semibold text-foreground">Incentive Dashboard</span>
-            </nav>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedScreenId(null)}
-              className="h-8 gap-1.5 text-xs font-medium"
-            >
-              <ArrowLeft size={13} />
-              <span>Back to All Screens</span>
-            </Button>
-          </div>
-
-          {/* Operational Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b pb-4">
-            <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-                <Trophy size={20} />
-              </span>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                  Incentive Dashboard
-                </h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Telesonic Lanka &middot; Operational incentive tracking, turnover achievements,
-                  and penalty risk monitor
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-mono bg-muted px-2.5 py-1 rounded-md border">
-                Period: {filters.period} &middot; Division: {filters.division}
-              </span>
-            </div>
-          </div>
-
-          {/* Section A: Dashboard Filter Panel */}
-          <IncentiveFilters
-            filters={filters}
-            onChangeFilters={handleUpdateFilters}
-            participants={participants}
-          />
-
-          {/* Section B: Dashboard Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <TabsList className="h-9 bg-muted/80 p-1">
-                <TabsTrigger
-                  value="achievement"
-                  className="text-xs font-semibold data-[state=active]:bg-card"
-                >
-                  Achievement
-                </TabsTrigger>
-                <TabsTrigger
-                  value="penalty-risk"
-                  className="text-xs font-semibold data-[state=active]:bg-card"
-                >
-                  Penalty Risk
-                </TabsTrigger>
-                <TabsTrigger
-                  value="run-status"
-                  className="text-xs font-semibold data-[state=active]:bg-card"
-                >
-                  Run Status
-                </TabsTrigger>
-              </TabsList>
-
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Layers size={13} />
-                <span>Scope: {filteredParticipants.length} Record(s)</span>
-              </span>
-            </div>
-
-            {/* Tab 1: Achievement Table */}
-            <TabsContent value="achievement" className="mt-0 focus-visible:outline-none">
-              <AchievementTable
-                participants={filteredParticipants}
-                onResetFilters={() => handleUpdateFilters({ participant: "All" })}
-              />
-            </TabsContent>
-
-            {/* Tab 2: Penalty Risk View */}
-            <TabsContent value="penalty-risk" className="mt-0 focus-visible:outline-none">
-              <PenaltyRiskView
-                participants={filteredParticipants}
-                selectedParticipantFilter={filters.participant}
-              />
-            </TabsContent>
-
-            {/* Tab 3: Run Status View */}
-            <TabsContent value="run-status" className="mt-0 focus-visible:outline-none">
-              <RunStatusView
-                filters={filters}
-                onTriggerRecalculation={handleTriggerRecalculation}
-                isRecalculating={isRecalculating}
-              />
-            </TabsContent>
-          </Tabs>
-
-          {/* Section C: Action Bar */}
-          <IncentiveActionBar
-            onSave={handleSave}
-            onClose={handleClose}
-            onRefresh={handleRefresh}
-            onExportExcel={handleExportExcel}
-            onExportPdf={handleExportPdf}
-            isSaving={isSaving}
-            isRefreshing={isRefreshing}
-          />
-        </div>
       ) : (
         /* ========================================================== */
-        /* CASE 3: SCREENS 1 TO 15, 17, 18, 19 DEDICATED WORKSPACE   */
+        /* UNIFORM 19-SCREEN WORKSPACE WITH PROCESS LIFECYCLE HEADER  */
         /* ========================================================== */
         <IncentiveScreenWorkspace
           screen={activeScreen}
-          onBack={() => {
-            setSelectedScreenId(null);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-          onNavigateScreen={(screenId) => {
-            setSelectedScreenId(screenId);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
+          onBack={handleCloseScreen}
+          onNavigateScreen={handleOpenScreen}
         />
       )}
     </div>

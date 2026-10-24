@@ -45,10 +45,15 @@ import {
   ChevronDown,
   Target,
   UploadCloud,
+  Database,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
+import { useIncentiveDivisions } from "@/lib/use-divisions";
 
 export type ParticipantStatus = "Active" | "Inactive";
 export type SchemeAssignmentStatus = "Active" | "Inactive" | "Pending Approval";
@@ -476,11 +481,67 @@ export function IncentiveParticipantProfileView({
   onNavigateScreen,
   onBack,
 }: IncentiveParticipantProfileViewProps) {
+  // Dynamic Divisions from Division Master PostgreSQL
+  const { divisionNames: dynamicDivisions } = useIncentiveDivisions();
+  const activeDivisions = dynamicDivisions.length > 0 ? dynamicDivisions : DIVISIONS;
+
   // Master participants state
   const [participants, setParticipants] = useState<ParticipantRecord[]>(INITIAL_PARTICIPANTS);
 
+  // PostgreSQL Database & Async States
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [availableSchemesList, setAvailableSchemesList] =
+    useState<AvailableSchemeOption[]>(AVAILABLE_SCHEMES_LIST);
+
   // Currently selected participant id
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>("EMP-1021");
+
+  // Load Participants from PostgreSQL
+  const loadParticipantsFromDb = async (silent: boolean = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/participants");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.participants) && data.participants.length > 0) {
+        setParticipants(data.participants);
+        setIsDbConnected(true);
+        if (!silent) {
+          toast.success("Synchronized with PostgreSQL database.", {
+            description: `Loaded ${data.participants.length} incentive participant profiles.`,
+          });
+        }
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err) {
+      console.error("Failed to load participants from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  // Load Schemes dynamically from Scheme Master & Initial Participant Load
+  React.useEffect(() => {
+    apiFetch("/api/incentives/schemes")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.schemes) && data.schemes.length > 0) {
+          const mapped: AvailableSchemeOption[] = data.schemes.map((s: any) => ({
+            code: s.schemeCode,
+            name: s.schemeName,
+            division: s.division || "Consumer Electronics",
+            applicableRoles: CALCULATION_ROLES,
+          }));
+          setAvailableSchemesList(mapped);
+        }
+      })
+      .catch((err) => console.warn("Using offline schemes fallback:", err));
+
+    loadParticipantsFromDb(true);
+  }, []);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<string>("assignments");
@@ -655,9 +716,9 @@ export function IncentiveParticipantProfileView({
   };
 
   // =========================================================================
-  // Handlers: Save Header Changes
+  // Handlers: Save Header Changes to PostgreSQL
   // =========================================================================
-  const handleSaveHeader = (e?: React.FormEvent) => {
+  const handleSaveHeader = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     // Mandatory field validations
@@ -678,82 +739,47 @@ export function IncentiveParticipantProfileView({
       return;
     }
 
-    const previousDiv = currentParticipant.division;
-    const previousDesig = currentParticipant.designation;
-    const previousStatus = currentParticipant.active ? "Active" : "Inactive";
-    const newStatus = headerForm.active ? "Active" : "Inactive";
-
-    const newHistoryRecords: ParticipantHistoryItem[] = [];
-
-    if (previousDiv !== headerForm.division) {
-      newHistoryRecords.push({
-        id: `HIST-${Date.now()}-1`,
-        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-        author: "admin.incentive@telesonic.lk",
-        role: "Incentive Administrator",
-        eventType: "Division Transfer",
-        previousValue: previousDiv,
-        newValue: headerForm.division,
-        changeReason: "Updated employee divisional assignment in profile header",
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/participants/${currentParticipant.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: headerForm.name,
+          salesEmployeeCode: headerForm.salesEmployeeCode,
+          division: headerForm.division,
+          segmentChannel: headerForm.segmentChannel,
+          areaManager: headerForm.areaManager,
+          designation: headerForm.designation,
+          payrollId: headerForm.payrollId,
+          active: headerForm.active,
+        }),
       });
+
+      const data = await res.json();
+      if (data.success && data.participant) {
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currentParticipant.id ? data.participant : p)),
+        );
+        setIsDbConnected(true);
+        toast.success(`Profile updated in PostgreSQL for ${headerForm.name} (${currentParticipant.id})`, {
+          description: "Header details and audit history saved successfully.",
+        });
+      } else {
+        toast.error(data.error || "Failed to update profile.");
+      }
+    } catch (err) {
+      console.error("Save header error:", err);
+      toast.error("Failed to update participant profile in PostgreSQL.");
+    } finally {
+      setIsSaving(false);
     }
-
-    if (previousDesig !== headerForm.designation) {
-      newHistoryRecords.push({
-        id: `HIST-${Date.now()}-2`,
-        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-        author: "admin.incentive@telesonic.lk",
-        role: "Incentive Administrator",
-        eventType: "Role Reassigned",
-        previousValue: previousDesig,
-        newValue: headerForm.designation,
-        changeReason: "Designation title updated by Incentive Administrator",
-      });
-    }
-
-    if (previousStatus !== newStatus) {
-      newHistoryRecords.push({
-        id: `HIST-${Date.now()}-3`,
-        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-        author: "admin.incentive@telesonic.lk",
-        role: "Incentive Administrator",
-        eventType: "Status Changed",
-        previousValue: previousStatus,
-        newValue: newStatus,
-        changeReason: `Participant active flag modified to ${newStatus}`,
-      });
-    }
-
-    // Update in participant list
-    setParticipants((prev) =>
-      prev.map((p) => {
-        if (p.id === currentParticipant.id) {
-          return {
-            ...p,
-            name: headerForm.name,
-            salesEmployeeCode: headerForm.salesEmployeeCode,
-            division: headerForm.division,
-            segmentChannel: headerForm.segmentChannel,
-            areaManager: headerForm.areaManager,
-            designation: headerForm.designation,
-            payrollId: headerForm.payrollId,
-            active: headerForm.active,
-            history: [...newHistoryRecords, ...p.history],
-          };
-        }
-        return p;
-      }),
-    );
-
-    toast.success(`Profile updated for ${headerForm.name} (${currentParticipant.id})`, {
-      description: "Header details and audit history saved successfully.",
-    });
   };
 
   // =========================================================================
   // Handlers: Add Scheme Assignment (Enforce 1 primary role per scheme/period)
   // =========================================================================
-  const handleValidateAndAddAssignment = (e: React.FormEvent) => {
+  const handleValidateAndAddAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     setAssignmentValidationError(null);
 
@@ -806,71 +832,65 @@ export function IncentiveParticipantProfileView({
       }
     }
 
-    const schemeInfo = AVAILABLE_SCHEMES_LIST.find((s) => s.code === newAssignment.schemeCode);
+    try {
+      setIsSaving(true);
+      const schemeInfo = (availableSchemesList || AVAILABLE_SCHEMES_LIST).find(
+        (s) => s.code === newAssignment.schemeCode,
+      );
 
-    const createdAssignment: SchemeAssignment = {
-      id: `ASG-${Date.now()}`,
-      schemeCode: newAssignment.schemeCode,
-      schemeName: schemeInfo ? schemeInfo.name : newAssignment.schemeCode,
-      calculationRole: newAssignment.calculationRole,
-      isPrimaryRole: newAssignment.isPrimaryRole,
-      effectiveFrom: newAssignment.effectiveFrom,
-      effectiveTo: newAssignment.effectiveTo,
-      targetAllocationPercent: Number(newAssignment.targetAllocationPercent) || 100,
-      status: newAssignment.status,
-      notes: newAssignment.notes,
-    };
+      const res = await apiFetch(
+        `/api/incentives/participants/${currentParticipant.id}/assignments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schemeCode: newAssignment.schemeCode,
+            schemeName: schemeInfo ? schemeInfo.name : newAssignment.schemeCode,
+            calculationRole: newAssignment.calculationRole,
+            isPrimaryRole: newAssignment.isPrimaryRole,
+            effectiveFrom: newAssignment.effectiveFrom,
+            effectiveTo: newAssignment.effectiveTo || null,
+            targetAllocationPercent: Number(newAssignment.targetAllocationPercent) || 100,
+            status: newAssignment.status,
+            notes: newAssignment.notes,
+          }),
+        },
+      );
 
-    const historyRecord: ParticipantHistoryItem = {
-      id: `HIST-${Date.now()}`,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "admin.incentive@telesonic.lk",
-      role: "Incentive Administrator",
-      eventType: "Scheme Enrolled",
-      schemeCode: newAssignment.schemeCode,
-      previousValue: "None",
-      newValue: `${newAssignment.calculationRole} (${newAssignment.targetAllocationPercent}%, ${
-        newAssignment.isPrimaryRole ? "Primary" : "Secondary"
-      })`,
-      changeReason: newAssignment.notes || "Scheme assignment added by Incentive Administrator",
-    };
-
-    setParticipants((prev) =>
-      prev.map((p) => {
-        if (p.id === currentParticipant.id) {
-          return {
-            ...p,
-            assignments: [createdAssignment, ...p.assignments],
-            history: [historyRecord, ...p.history],
-          };
-        }
-        return p;
-      }),
-    );
-
-    setIsAddAssignmentModalOpen(false);
-    setNewAssignment({
-      schemeCode: "SCH-SRV-2026",
-      calculationRole: "Primary Technician",
-      isPrimaryRole: true,
-      effectiveFrom: "2026-05-01",
-      effectiveTo: "2026-12-31",
-      targetAllocationPercent: 100,
-      status: "Active",
-      notes: "",
-    });
-
-    toast.success(`Assigned ${newAssignment.schemeCode} to ${currentParticipant.name}`, {
-      description: `Role: ${newAssignment.calculationRole} (${
-        newAssignment.isPrimaryRole ? "Primary" : "Secondary"
-      }) with ${newAssignment.targetAllocationPercent}% allocation.`,
-    });
+      const data = await res.json();
+      if (data.success && data.participant) {
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currentParticipant.id ? data.participant : p)),
+        );
+        setIsAddAssignmentModalOpen(false);
+        setNewAssignment({
+          schemeCode: "SCH-SRV-2026",
+          calculationRole: "Primary Technician",
+          isPrimaryRole: true,
+          effectiveFrom: "2026-05-01",
+          effectiveTo: "2026-12-31",
+          targetAllocationPercent: 100,
+          status: "Active",
+          notes: "",
+        });
+        toast.success(`Assigned ${newAssignment.schemeCode} in PostgreSQL!`, {
+          description: `Role: ${newAssignment.calculationRole} with ${newAssignment.targetAllocationPercent}% allocation.`,
+        });
+      } else {
+        toast.error(data.error || "Failed to assign scheme.");
+      }
+    } catch (err) {
+      console.error("Assign error:", err);
+      toast.error("Failed to save scheme assignment to PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // =========================================================================
   // Handlers: Save Edited Scheme Assignment
   // =========================================================================
-  const handleSaveEditAssignment = (e: React.FormEvent) => {
+  const handleSaveEditAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAssignment) return;
 
@@ -897,82 +917,72 @@ export function IncentiveParticipantProfileView({
       }
     }
 
-    const prevAssignment = currentParticipant.assignments.find(
-      (a) => a.id === editingAssignment.id,
-    );
+    try {
+      setIsSaving(true);
+      const updatedAssignments = currentParticipant.assignments.map((a) =>
+        a.id === editingAssignment.id ? editingAssignment : a,
+      );
 
-    const hist: ParticipantHistoryItem = {
-      id: `HIST-${Date.now()}`,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "admin.incentive@telesonic.lk",
-      role: "Incentive Administrator",
-      eventType: "Quota Adjusted",
-      schemeCode: editingAssignment.schemeCode,
-      previousValue: prevAssignment
-        ? `${prevAssignment.calculationRole} (${prevAssignment.targetAllocationPercent}%, ${prevAssignment.status})`
-        : "N/A",
-      newValue: `${editingAssignment.calculationRole} (${editingAssignment.targetAllocationPercent}%, ${editingAssignment.status})`,
-      changeReason: editingAssignment.notes || "Assignment details updated",
-    };
+      const res = await apiFetch(`/api/incentives/participants/${currentParticipant.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignments: updatedAssignments,
+        }),
+      });
 
-    setParticipants((prev) =>
-      prev.map((p) => {
-        if (p.id === currentParticipant.id) {
-          return {
-            ...p,
-            assignments: p.assignments.map((a) =>
-              a.id === editingAssignment.id ? editingAssignment : a,
-            ),
-            history: [hist, ...p.history],
-          };
-        }
-        return p;
-      }),
-    );
-
-    setEditingAssignment(null);
-    toast.success("Assignment updated successfully.");
+      const data = await res.json();
+      if (data.success && data.participant) {
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currentParticipant.id ? data.participant : p)),
+        );
+        setEditingAssignment(null);
+        toast.success("Assignment updated in PostgreSQL successfully.");
+      } else {
+        toast.error(data.error || "Failed to update assignment.");
+      }
+    } catch (err) {
+      console.error("Edit assignment error:", err);
+      toast.error("Failed to update assignment in PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // =========================================================================
   // Handlers: Remove Scheme Assignment
   // =========================================================================
-  const handleRemoveAssignment = (assignmentId: string) => {
+  const handleRemoveAssignment = async (assignmentId: string) => {
     const toRemove = currentParticipant.assignments.find((a) => a.id === assignmentId);
     if (!toRemove) return;
 
-    const hist: ParticipantHistoryItem = {
-      id: `HIST-${Date.now()}`,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "admin.incentive@telesonic.lk",
-      role: "Incentive Administrator",
-      eventType: "Role Reassigned",
-      schemeCode: toRemove.schemeCode,
-      previousValue: `${toRemove.calculationRole} (${toRemove.schemeCode})`,
-      newValue: "Unassigned / Removed",
-      changeReason: "Assignment removed by Incentive Administrator",
-    };
-
-    setParticipants((prev) =>
-      prev.map((p) => {
-        if (p.id === currentParticipant.id) {
-          return {
-            ...p,
-            assignments: p.assignments.filter((a) => a.id !== assignmentId),
-            history: [hist, ...p.history],
-          };
-        }
-        return p;
-      }),
-    );
-
-    toast.info(`Assignment for ${toRemove.schemeCode} removed.`);
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(
+        `/api/incentives/participants/${currentParticipant.id}/assignments/${assignmentId}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (data.success && data.participant) {
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currentParticipant.id ? data.participant : p)),
+        );
+        toast.info(`Assignment for ${toRemove.schemeCode} removed from PostgreSQL.`);
+      } else {
+        toast.error(data.error || "Failed to remove assignment.");
+      }
+    } catch (err) {
+      console.error("Remove assignment error:", err);
+      toast.error("Failed to remove assignment from PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // =========================================================================
   // Handlers: Create New Participant
   // =========================================================================
-  const handleCreateParticipant = (e: React.FormEvent) => {
+  const handleCreateParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!newParticipantData.name.trim()) {
@@ -992,39 +1002,31 @@ export function IncentiveParticipantProfileView({
       return;
     }
 
-    const created: ParticipantRecord = {
-      id: newParticipantData.id || `EMP-${1030 + participants.length}`,
-      name: newParticipantData.name,
-      salesEmployeeCode: newParticipantData.salesEmployeeCode || `SL-${500 + participants.length}`,
-      division: newParticipantData.division,
-      segmentChannel: newParticipantData.segmentChannel,
-      areaManager: newParticipantData.areaManager,
-      designation: newParticipantData.designation,
-      payrollId: newParticipantData.payrollId,
-      active: newParticipantData.active,
-      joinDate: new Date().toISOString().substring(0, 10),
-      assignments: [],
-      history: [
-        {
-          id: `HIST-${Date.now()}`,
-          timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-          author: "admin.incentive@telesonic.lk",
-          role: "Incentive Administrator",
-          eventType: "Profile Created",
-          previousValue: "None",
-          newValue: `${newParticipantData.name} (${newParticipantData.id})`,
-          changeReason: "New participant profile registered into Incentive Master",
-        },
-      ],
-    };
+    try {
+      setIsSaving(true);
+      const res = await apiFetch("/api/incentives/participants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newParticipantData),
+      });
 
-    setParticipants((prev) => [created, ...prev]);
-    setSelectedParticipantId(created.id);
-    setIsNewParticipantModalOpen(false);
-
-    toast.success(`Participant ${created.name} registered successfully.`, {
-      description: `Employee ID: ${created.id} • Payroll: ${created.payrollId}`,
-    });
+      const data = await res.json();
+      if (data.success && data.participant) {
+        setParticipants((prev) => [data.participant, ...prev]);
+        setSelectedParticipantId(data.participant.id);
+        setIsNewParticipantModalOpen(false);
+        toast.success(`Participant ${data.participant.name} registered in PostgreSQL!`, {
+          description: `Employee ID: ${data.participant.id} • Payroll: ${data.participant.payrollId}`,
+        });
+      } else {
+        toast.error(data.error || "Failed to create participant.");
+      }
+    } catch (err) {
+      console.error("Create participant error:", err);
+      toast.error("Failed to save participant profile to PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // =========================================================================
@@ -1144,6 +1146,18 @@ export function IncentiveParticipantProfileView({
 
         {/* Top Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Save to PostgreSQL */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => handleSaveHeader()}
+            disabled={isSaving}
+            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            <span>{isSaving ? "Saving..." : isHeaderDirty ? "Save to PostgreSQL *" : "Save to PostgreSQL"}</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -1168,10 +1182,50 @@ export function IncentiveParticipantProfileView({
             variant="default"
             size="sm"
             onClick={() => setIsNewParticipantModalOpen(true)}
-            className="h-9 gap-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+            className="h-9 gap-1.5 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer shadow-xs border"
           >
             <Plus size={14} />
             <span>New Participant</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* PostgreSQL Database Connection Status Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border rounded-lg text-xs">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+          />
+          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="text-muted-foreground">
+            Database Engine:{" "}
+            <strong className="text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
+            </strong>{" "}
+            — Participant profiles, scheme enrolments, roles, and payroll IDs are synchronized with PostgreSQL.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              isDbConnected
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            }`}
+          >
+            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadParticipantsFromDb(false)}
+            disabled={isLoading}
+            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Reload from PostgreSQL"
+          >
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync</span>
           </Button>
         </div>
       </div>
@@ -1215,7 +1269,7 @@ export function IncentiveParticipantProfileView({
                   className="w-full p-1.5 text-xs bg-card border rounded-md focus:outline-hidden focus:ring-1 focus:ring-primary text-foreground"
                 >
                   <option value="All">All Divisions</option>
-                  {DIVISIONS.map((d) => (
+                  {activeDivisions.map((d) => (
                     <option key={d} value={d}>
                       {d}
                     </option>
@@ -1470,7 +1524,7 @@ export function IncentiveParticipantProfileView({
                     className="w-full px-2.5 py-1.5 text-xs bg-background border rounded-md focus:outline-hidden focus:ring-1 focus:ring-primary text-foreground"
                     required
                   >
-                    {DIVISIONS.map((d) => (
+                    {activeDivisions.map((d) => (
                       <option key={d} value={d}>
                         {d}
                       </option>
@@ -1957,7 +2011,10 @@ export function IncentiveParticipantProfileView({
                   className="w-full p-2 text-xs bg-background border rounded-md focus:outline-hidden focus:ring-1 focus:ring-primary text-foreground"
                   required
                 >
-                  {AVAILABLE_SCHEMES_LIST.map((s) => (
+                  {(availableSchemesList && availableSchemesList.length > 0
+                    ? availableSchemesList
+                    : AVAILABLE_SCHEMES_LIST
+                  ).map((s) => (
                     <option key={s.code} value={s.code}>
                       {s.code} — {s.name} ({s.division})
                     </option>
@@ -2456,7 +2513,7 @@ export function IncentiveParticipantProfileView({
                     className="w-full p-2 text-xs bg-background border rounded-md"
                     required
                   >
-                    {DIVISIONS.map((d) => (
+                    {activeDivisions.map((d) => (
                       <option key={d} value={d}>
                         {d}
                       </option>
