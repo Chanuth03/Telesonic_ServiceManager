@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   TrendingUp,
   Search,
@@ -35,7 +35,11 @@ import {
   Target,
   Calculator,
   Users,
+  Database,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -284,16 +288,109 @@ export function TargetIncentiveSlabTableView({
   // Simulator State for Critical Business Rule
   const [simulatorAchievement, setSimulatorAchievement] = useState<number>(112.5);
 
+  // PostgreSQL Database & Async States
+  const [slabTableId, setSlabTableId] = useState<string>("slt-sls-2026");
+  const [tableName, setTableName] = useState<string>("Retail Smartphone & Devices Sales Target Slabs");
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [allDbTables, setAllDbTables] = useState<any[]>([]);
+  const [availableSchemesList, setAvailableSchemesList] = useState<SchemeOption[]>(AVAILABLE_SCHEMES);
+
+  // Load Target Incentive Slab Table from PostgreSQL
+  const loadSlabTableFromDb = async (silent: boolean = false, targetScheme?: string) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const schemeToQuery = targetScheme || selectedSchemeCode;
+      const res = await apiFetch("/api/incentives/slab-tables");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.tables && data.tables.length > 0) {
+          setAllDbTables(data.tables);
+          const match =
+            data.tables.find(
+              (t: any) => t.schemeCode.toUpperCase() === schemeToQuery.toUpperCase(),
+            ) || data.tables[0];
+
+          if (match) {
+            setSlabTableId(match.id);
+            setSelectedSchemeCode(match.schemeCode);
+            setTableName(match.tableName);
+            setTargetType(match.targetType);
+            setSlabMethod(match.slabMethod);
+            setVersion(match.version);
+            setStatus(match.status);
+            if (match.slabs && match.slabs.length > 0) setSlabs(match.slabs);
+            if (match.history && match.history.length > 0) setHistory(match.history);
+            setIsDbConnected(true);
+            setHasUnsavedChanges(false);
+            if (!silent) {
+              toast.success("Synchronized with PostgreSQL database.", {
+                description: `Loaded ${match.tableName} (${match.version}) successfully.`,
+              });
+            }
+          }
+        }
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err) {
+      console.error("Failed to load slab tables from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSlabTableFromDb(true);
+
+    // Also load available schemes from DB
+    apiFetch("/api/incentives/schemes")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.schemes && data.schemes.length > 0) {
+          setAvailableSchemesList(
+            data.schemes.map((s: any) => ({
+              code: s.schemeCode,
+              name: s.schemeName,
+              division: s.division,
+              role: s.participantRole,
+            })),
+          );
+        }
+      })
+      .catch((err) => console.error("Could not fetch schemes:", err));
+  }, []);
+
   // Current selected scheme object
   const currentScheme = useMemo(() => {
-    return (AVAILABLE_SCHEMES.find((s) => s.code === selectedSchemeCode) || AVAILABLE_SCHEMES[0])!;
-  }, [selectedSchemeCode]);
+    return (
+      availableSchemesList.find((s) => s.code === selectedSchemeCode) ||
+      AVAILABLE_SCHEMES.find((s) => s.code === selectedSchemeCode) ||
+      availableSchemesList[0] ||
+      AVAILABLE_SCHEMES[0]
+    )!;
+  }, [selectedSchemeCode, availableSchemesList]);
 
-  // Handle scheme change
+  // Handle scheme change with PostgreSQL synchronization
   const handleSchemeChange = (newCode: string) => {
     setSelectedSchemeCode(newCode);
-    const loadedSlabs = INITIAL_SLABS_DATA[newCode] || INITIAL_SLABS_DATA["SCH-SLS-2026"] || [];
-    setSlabs(loadedSlabs);
+    const match = allDbTables.find((t) => t.schemeCode.toUpperCase() === newCode.toUpperCase());
+    if (match) {
+      setSlabTableId(match.id);
+      setTableName(match.tableName);
+      setTargetType(match.targetType);
+      setSlabMethod(match.slabMethod);
+      setVersion(match.version);
+      setStatus(match.status);
+      if (match.slabs) setSlabs(match.slabs);
+      if (match.history) setHistory(match.history);
+    } else {
+      const loadedSlabs = INITIAL_SLABS_DATA[newCode] || INITIAL_SLABS_DATA["SCH-SLS-2026"] || [];
+      setSlabs(loadedSlabs);
+      setSlabTableId(`slt-${newCode.toLowerCase()}`);
+    }
     setEditingRowId(null);
     setHasUnsavedChanges(false);
     toast.info(`Loaded slab table for ${newCode}`, {
@@ -340,8 +437,8 @@ export function TargetIncentiveSlabTableView({
     });
   };
 
-  // Save Draft Action
-  const handleSaveDraft = () => {
+  // Save Draft Action to PostgreSQL
+  const handleSaveDraft = async () => {
     if (status !== "Draft") {
       toast.error("Cannot save in Approved mode", {
         description: "Create or switch to a Draft version before making revisions.",
@@ -365,50 +462,78 @@ export function TargetIncentiveSlabTableView({
       }
     }
 
-    setHasUnsavedChanges(false);
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/slab-tables/${slabTableId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schemeCode: selectedSchemeCode,
+          tableName: tableName || `${selectedSchemeCode} Target Incentive Slabs`,
+          targetType,
+          slabMethod,
+          version,
+          status: "Draft",
+          slabs,
+          modifiedBy: "Incentive Administrator",
+          changeNote: `Manual save for slab table (${version}) with ${slabs.length} tiers.`,
+        }),
+      });
 
-    const newLog: SlabHistoryRecord = {
-      id: `hist-${Date.now()}`,
-      version,
-      status: "Draft",
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "Ayesha Asarak",
-      role: "Incentive Administrator",
-      changeSummary: `Draft saved with ${slabs.length} configured slabs`,
-      details: `Updated thresholds: min ${slabs[0]?.minAchievementPercent || 0}% to max ${
-        slabs[slabs.length - 1]?.minAchievementPercent || 0
-      }%.`,
-    };
-    setHistory((prev) => [newLog, ...prev]);
-
-    toast.success("Draft Slabs Saved Successfully", {
-      description: `All ${slabs.length} achievement tiers saved under version ${version}.`,
-    });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.table?.history) setHistory(data.table.history);
+        setHasUnsavedChanges(false);
+        setIsDbConnected(true);
+        toast.success(`Slab Table (${version}) saved to PostgreSQL!`, {
+          description: `Persisted ${slabs.length} achievement tiers directly to database.`,
+        });
+      } else {
+        toast.error("Failed to save slab table to PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Save slab table error:", err);
+      toast.error("Network or database error while saving slab table.");
+      setIsDbConnected(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Approve Draft Version Action
-  const handleApproveDraft = () => {
+  // Approve Draft Version Action in PostgreSQL
+  const handleApproveDraft = async () => {
     if (status !== "Draft") return;
 
-    setStatus("Approved");
-    setHasUnsavedChanges(false);
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/slab-tables/${slabTableId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Approved",
+          author: "D. Fernando",
+          role: "Head of Finance",
+          details: "Finance audit verification complete. Certified non-cumulative slab payout logic.",
+        }),
+      });
 
-    const newLog: SlabHistoryRecord = {
-      id: `hist-${Date.now()}`,
-      version,
-      status: "Approved",
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "D. Fernando",
-      role: "Head of Finance",
-      changeSummary: `Promoted draft ${version} to Approved status`,
-      details:
-        "Finance audit verification complete. Non-cumulative payout logic certified for upcoming payroll cycle.",
-    };
-    setHistory((prev) => [newLog, ...prev]);
-
-    toast.success(`Version ${version} Approved & Certified`, {
-      description: "Slab table is now locked in Approved status for calculation runs.",
-    });
+      if (res.ok) {
+        const data = await res.json();
+        setStatus("Approved");
+        setHasUnsavedChanges(false);
+        if (data.table?.history) setHistory(data.table.history);
+        toast.success(`Version ${version} Approved in PostgreSQL!`, {
+          description: "Slab table is certified and locked for payroll calculation runs.",
+        });
+      } else {
+        toast.error("Failed to approve slab table in PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Approve slab table error:", err);
+      toast.error("Database connection error during approval.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Start inline editing
@@ -664,6 +789,46 @@ export function TargetIncentiveSlabTableView({
         </div>
       </div>
 
+      {/* PostgreSQL Status & Sync Banner */}
+      <div className="bg-card border rounded-lg p-3 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+          />
+          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="text-muted-foreground">
+            Database Engine:{" "}
+            <strong className="text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
+            </strong>{" "}
+            — Target achievement tiers and non-cumulative slab payouts are synchronized with PostgreSQL.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              isDbConnected
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            }`}
+          >
+            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadSlabTableFromDb(false)}
+            disabled={isLoading}
+            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Reload from PostgreSQL"
+          >
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync</span>
+          </Button>
+        </div>
+      </div>
+
       {/* ------------------------------------------------------------- */}
       {/* 2. Top Header & Mandatory Fields Section                      */}
       {/* ------------------------------------------------------------- */}
@@ -716,10 +881,11 @@ export function TargetIncentiveSlabTableView({
                   variant="default"
                   size="sm"
                   onClick={handleSaveDraft}
-                  className="h-8 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
+                  disabled={isSaving}
+                  className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:opacity-90"
                 >
-                  <Save size={13} />
-                  <span>Save Draft</span>
+                  {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -784,7 +950,7 @@ export function TargetIncentiveSlabTableView({
               onChange={(e) => handleSchemeChange(e.target.value)}
               className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              {AVAILABLE_SCHEMES.map((scheme) => (
+              {availableSchemesList.map((scheme) => (
                 <option key={scheme.code} value={scheme.code}>
                   {scheme.code} — {scheme.name}
                 </option>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   PlayCircle,
   Search,
@@ -9,14 +9,12 @@ import {
   AlertCircle,
   Clock,
   ArrowRight,
+  ArrowLeft,
   Shield,
   Calendar,
   Layers,
-  History as HistoryIcon,
   ChevronRight,
   Lock,
-  Unlock,
-  AlertTriangle,
   RotateCcw,
   Sparkles,
   Edit2,
@@ -27,34 +25,36 @@ import {
   Info,
   DollarSign,
   Percent,
-  Sliders,
-  ExternalLink,
   Users,
   Building2,
   TrendingUp,
   Award,
-  Upload,
   RefreshCw,
   FileSpreadsheet,
   FileText,
-  UserCheck,
   Eye,
-  SlidersHorizontal,
-  CheckSquare,
-  AlertOctagon,
-  ArrowUpRight,
   Send,
   FileCheck,
   Receipt,
-  Terminal,
-  Wrench,
+  Database,
+  Save,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/incentive-data";
 
 export type RunStatus =
-  "Draft" | "Simulated" | "Calculated" | "Submitted" | "Approved" | "Posted" | "Locked";
+  | "Draft"
+  | "Simulated"
+  | "Calculated"
+  | "Submitted"
+  | "Approved"
+  | "Posted"
+  | "Locked";
 
 export type RunType = "Simulation" | "Final Calculation";
 
@@ -98,8 +98,34 @@ export interface ReadinessCheck {
   lastUpdated: string;
 }
 
-// Initial Mock Readiness Check State
-const INITIAL_READINESS: ReadinessCheck[] = [
+export interface CalculationRunItem {
+  id: string;
+  runNo: string;
+  period: string;
+  division: string;
+  selectedSchemes: string;
+  runType: RunType;
+  dataCutoff: string;
+  status: RunStatus;
+  runBy: string;
+  startedAt?: string;
+  finishedAt?: string;
+  totalParticipants: number;
+  totalDocsRead: number;
+  totalGrossCommission: number;
+  totalTargetIncentive: number;
+  totalPenalty: number;
+  totalNetPayable: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  readinessChecks?: ReadinessCheck[];
+  schemeSummaries?: SchemeRunSummary[];
+  warnings?: RunWarning[];
+  logs?: RunLogEntry[];
+}
+
+const DEFAULT_READINESS: ReadinessCheck[] = [
   {
     id: "chk-1",
     moduleName: "Monthly Target Quotas",
@@ -138,8 +164,7 @@ const INITIAL_READINESS: ReadinessCheck[] = [
   },
 ];
 
-// Initial Mock Schemes Summary Data
-const INITIAL_SCHEME_SUMMARIES: SchemeRunSummary[] = [
+const DEFAULT_SCHEME_SUMMARIES: SchemeRunSummary[] = [
   {
     schemeCode: "SCH-SLS-2026",
     schemeName: "Retail Showroom Sales Incentive",
@@ -190,124 +215,6 @@ const INITIAL_SCHEME_SUMMARIES: SchemeRunSummary[] = [
   },
 ];
 
-// Initial Mock Warnings
-const INITIAL_WARNINGS: RunWarning[] = [
-  {
-    id: "wrn-1",
-    code: "WRN-ATT-04",
-    schemeCode: "SCH-SRV-2026",
-    participantName: "Dilshan Madusanka (EMP-1024)",
-    severity: "High",
-    message:
-      "Technician logged 3 unapproved absent days; 0% attendance factor applied (INC-BCR-10 Proposed Demo Rule).",
-    remediation: "Verify with HR if authorized exemption applies before final payout sign-off.",
-  },
-  {
-    id: "wrn-2",
-    code: "WRN-DEBT-12",
-    schemeCode: "SCH-CAC-2026",
-    participantName: "Pradeep Bandara (EMP-1022)",
-    severity: "Medium",
-    message:
-      "Invoice INV-2026-9042 overdue by 94 days; 15% debtor aging penalty deducted (LKR 28,500).",
-    remediation: "Recoverable upon customer settlement in upcoming settlement cycles.",
-  },
-  {
-    id: "wrn-3",
-    code: "WRN-REP-02",
-    schemeCode: "SCH-SRV-2026",
-    participantName: "Mahesh Gunawardena (EMP-1030)",
-    severity: "High",
-    message:
-      "Repeat call #SRV-2026-1015 flagged as Poor Workmanship; job excluded from eligible count.",
-    remediation: "HOD classification confirmed after callback inspection.",
-  },
-  {
-    id: "wrn-4",
-    code: "WRN-TGT-01",
-    schemeCode: "SCH-SLS-2026",
-    participantName: "Kasun Jayawardena (EMP-1021)",
-    severity: "Low",
-    message:
-      "Turnover achievement reached 164.2%; incentive capped at Tier 5 Super Achiever slab ceiling.",
-    remediation: "Informational only; payout capped as configured in Target Slab Table.",
-  },
-  {
-    id: "wrn-5",
-    code: "WRN-DEBT-18",
-    schemeCode: "SCH-CAC-2026",
-    participantName: "Ruwan Wijesinghe (EMP-1023)",
-    severity: "Medium",
-    message:
-      "Partial payment receipt detected on invoice INV-2026-8911; pro-rata commission calculated.",
-    remediation: "Remaining balance will calculate upon subsequent collection.",
-  },
-];
-
-// Initial Execution Log
-const INITIAL_LOGS: RunLogEntry[] = [
-  {
-    id: "log-1",
-    timestamp: "10:15:20.102",
-    level: "INFO",
-    message: "Engine initialized. Configuration validated for period May 2026.",
-  },
-  {
-    id: "log-2",
-    timestamp: "10:15:21.430",
-    level: "INFO",
-    message: "Connecting to SAP Business One Service Layer API... Connected (Latency 14ms).",
-  },
-  {
-    id: "log-3",
-    timestamp: "10:15:22.015",
-    level: "INFO",
-    message:
-      "Ingested 1,735 source documents: 1,258 invoices, 363 service tickets, 114 solar contracts.",
-  },
-  {
-    id: "log-4",
-    timestamp: "10:15:25.800",
-    level: "DEBUG",
-    message: "Evaluating Target Slab Table v2.1 for Retail Showroom Sales (12 participants).",
-  },
-  {
-    id: "log-5",
-    timestamp: "10:15:32.410",
-    level: "WARN",
-    message: "WRN-ATT-04: Dilshan Madusanka (EMP-1024) 3 absent days. Calculated 0% factor.",
-  },
-  {
-    id: "log-6",
-    timestamp: "10:15:38.220",
-    level: "DEBUG",
-    message: "Executing payment-term aging matrix against open receivables ledger.",
-  },
-  {
-    id: "log-7",
-    timestamp: "10:15:45.900",
-    level: "WARN",
-    message: "WRN-DEBT-12: Applied 15% debtor aging penalty on overdue invoice INV-2026-9042.",
-  },
-  {
-    id: "log-8",
-    timestamp: "10:15:58.100",
-    level: "INFO",
-    message: "Net payable reconciliation completed across all 4 schemes. Net Pool: LKR 3,983,000.",
-  },
-  {
-    id: "log-9",
-    timestamp: "10:16:04.110",
-    level: "SUCCESS",
-    message: "Run finished successfully in 44.008s. Generated 5 warnings.",
-  },
-];
-
-// Currency Formatter
-function formatLKR(amount: number): string {
-  return "LKR " + amount.toLocaleString("en-LK");
-}
-
 interface IncentiveCalculationRunViewProps {
   onNavigateScreen?: ((screenId: string) => void) | undefined;
   onBack?: (() => void) | undefined;
@@ -317,1270 +224,1366 @@ export function IncentiveCalculationRunView({
   onNavigateScreen,
   onBack,
 }: IncentiveCalculationRunViewProps) {
-  // Mandatory Header States
-  const [runNo, setRunNo] = useState<string>("RUN-2026-05-PRE-01");
-  const [period, setPeriod] = useState<string>("May 2026");
-  const [division, setDivision] = useState<string>("All Divisions");
-  const [selectedSchemes, setSelectedSchemes] = useState<string>("All Active Schemes (4 Schemes)");
-  const [runType, setRunType] = useState<RunType>("Simulation");
-  const [dataCutoff, setDataCutoff] = useState<string>("12-May-2026 23:59:59");
-  const [status, setStatus] = useState<RunStatus>("Simulated");
-  const [runBy, setRunBy] = useState<string>("Lakmal Perera (Incentive Administrator)");
-  const [started, setStarted] = useState<string>("14-May-2026 10:15:20");
-  const [finished, setFinished] = useState<string>("14-May-2026 10:16:04");
+  // Database States
+  const [runs, setRuns] = useState<CalculationRunItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(false);
+  const [lastSynced, setLastSynced] = useState<string>("");
 
-  // Readiness Checks State
-  const [readiness, setReadiness] = useState<ReadinessCheck[]>(INITIAL_READINESS);
+  // Filters & Search
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("All");
+  const [selectedStatus, setSelectedStatus] = useState<string>("All");
 
-  // Tabs: Participants, Warnings, Log
-  const [activeTab, setActiveTab] = useState<string>("participants");
-
-  // Grid Data States
-  const [summaries, setSummaries] = useState<SchemeRunSummary[]>(INITIAL_SCHEME_SUMMARIES);
-  const [warnings, setWarnings] = useState<RunWarning[]>(INITIAL_WARNINGS);
-  const [logs, setLogs] = useState<RunLogEntry[]>(INITIAL_LOGS);
-
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [severityFilter, setSeverityFilter] = useState<string>("All");
-
-  // Modals & Execution States
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [processingProgress, setProcessingProgress] = useState<number>(0);
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  // Modals
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
   const [isReadinessModalOpen, setIsReadinessModalOpen] = useState<boolean>(false);
-  const [submissionNotes, setSubmissionNotes] = useState<string>(
-    "Calculation completed. All 4 schemes verified against locked targets, attendance and service data.",
-  );
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
 
-  // Validation: Are all prerequisite inputs locked?
-  const allInputsLocked = useMemo(() => {
-    return readiness.every((r) => r.isReady);
-  }, [readiness]);
+  // Selected Run for View/Edit/Delete
+  const [activeRun, setActiveRun] = useState<CalculationRunItem | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Aggregates across all schemes
-  const totals = useMemo(() => {
-    const totalParticipants = summaries.reduce((acc, s) => acc + s.participants, 0);
-    const totalDocs = summaries.reduce((acc, s) => acc + s.documentsRead, 0);
-    const totalGross = summaries.reduce((acc, s) => acc + s.grossCommission, 0);
-    const totalTarget = summaries.reduce((acc, s) => acc + s.targetIncentive, 0);
-    const totalPenalty = summaries.reduce((acc, s) => acc + s.penalty, 0);
-    const totalNet = summaries.reduce((acc, s) => acc + s.netPayable, 0);
-    const totalWarnings = summaries.reduce((acc, s) => acc + s.warningsCount, 0);
+  // Create Form State
+  const [createForm, setCreateForm] = useState({
+    runNo: `RUN-2026-06-SIM-01`,
+    period: "June 2026",
+    division: "All Divisions",
+    selectedSchemes: "All Active Schemes (4 Schemes)",
+    runType: "Simulation" as RunType,
+    dataCutoff: "2026-06-30 23:59:59",
+    notes: "Scheduled calculation cycle",
+    runBy: "Lakmal Perera (Incentive Administrator)",
+  });
+
+  // Edit Form State (All run parameters editable)
+  const [editForm, setEditForm] = useState({
+    id: "",
+    runNo: "",
+    period: "June 2026",
+    division: "All Divisions",
+    selectedSchemes: "All Active Schemes (4 Schemes)",
+    runType: "Simulation" as RunType,
+    dataCutoff: "2026-06-30 23:59:59",
+    status: "Draft" as RunStatus,
+    runBy: "Lakmal Perera (Incentive Administrator)",
+    totalParticipants: 0,
+    totalDocsRead: 0,
+    totalGrossCommission: 0,
+    totalTargetIncentive: 0,
+    totalPenalty: 0,
+    totalNetPayable: 0,
+    notes: "",
+  });
+
+  // Load Calculation Runs from PostgreSQL API
+  const loadRunsFromDb = useCallback(async (silent: boolean = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/calculation-runs");
+      const data = await res.json();
+
+      if (data && data.success && Array.isArray(data.runs)) {
+        setRuns(data.runs);
+        setIsDbConnected(true);
+        setLastSynced(new Date().toLocaleTimeString());
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err: any) {
+      console.warn("Failed to load calculation runs:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRunsFromDb();
+  }, [loadRunsFromDb]);
+
+  // Aggregated KPI Stats
+  const stats = useMemo(() => {
+    const totalRuns = runs.length;
+    const simulatedRuns = runs.filter((r) => r.status === "Simulated" || r.status === "Draft").length;
+    const pendingApprovalRuns = runs.filter((r) => r.status === "Calculated" || r.status === "Submitted").length;
+    const approvedPostedRuns = runs.filter((r) => r.status === "Approved" || r.status === "Posted" || r.status === "Locked").length;
+    const totalNetPayout = runs.reduce((acc, r) => acc + (Number(r.totalNetPayable) || 0), 0);
+    const totalParticipants = runs.reduce((acc, r) => acc + (Number(r.totalParticipants) || 0), 0);
 
     return {
+      totalRuns,
+      simulatedRuns,
+      pendingApprovalRuns,
+      approvedPostedRuns,
+      totalNetPayout,
       totalParticipants,
-      totalDocs,
-      totalGross,
-      totalTarget,
-      totalPenalty,
-      totalNet,
-      totalWarnings,
     };
-  }, [summaries]);
+  }, [runs]);
 
-  // Filtered Summaries
-  const filteredSummaries = useMemo(() => {
-    return summaries.filter((s) => {
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        !q ||
-        s.schemeCode.toLowerCase().includes(q) ||
-        s.schemeName.toLowerCase().includes(q) ||
-        s.division.toLowerCase().includes(q)
-      );
-    });
-  }, [summaries, searchQuery]);
-
-  // Filtered Warnings
-  const filteredWarnings = useMemo(() => {
-    return warnings.filter((w) => {
-      const q = searchQuery.toLowerCase().trim();
+  // Filtered List
+  const filteredRuns = useMemo(() => {
+    return runs.filter((r) => {
+      const q = searchTerm.toLowerCase().trim();
       const matchSearch =
         !q ||
-        w.code.toLowerCase().includes(q) ||
-        w.schemeCode.toLowerCase().includes(q) ||
-        w.participantName.toLowerCase().includes(q) ||
-        w.message.toLowerCase().includes(q);
+        r.id.toLowerCase().includes(q) ||
+        r.runNo.toLowerCase().includes(q) ||
+        r.period.toLowerCase().includes(q) ||
+        r.division.toLowerCase().includes(q) ||
+        r.status.toLowerCase().includes(q);
 
-      const matchSeverity = severityFilter === "All" || w.severity === severityFilter;
+      const matchPeriod = selectedPeriod === "All" || r.period === selectedPeriod;
+      const matchStatus = selectedStatus === "All" || r.status === selectedStatus;
 
-      return matchSearch && matchSeverity;
+      return matchSearch && matchPeriod && matchStatus;
     });
-  }, [warnings, searchQuery, severityFilter]);
+  }, [runs, searchTerm, selectedPeriod, selectedStatus]);
 
-  // Action: Simulate while in Draft
-  const handleSimulateRun = () => {
-    setIsProcessing(true);
-    setProcessingProgress(15);
-    setRunType("Simulation");
-    setRunNo(
-      `RUN-${period.replace(" ", "-").toUpperCase()}-SIM-${Date.now().toString().slice(-4)}`,
-    );
+  // CREATE: Submit new run to PostgreSQL
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.runNo.trim()) {
+      toast.error("Run Number is required.");
+      return;
+    }
 
-    const startTs = new Date().toLocaleTimeString();
-    setStarted(`${new Date().toLocaleDateString("en-GB")} ${startTs}`);
+    try {
+      setIsProcessing(true);
+      const grossComm = 2865000;
+      const targetBonus = 1240000;
+      const penaltyAmt = 122000;
+      const netPayable = grossComm + targetBonus - penaltyAmt;
 
-    setTimeout(() => setProcessingProgress(45), 400);
-    setTimeout(() => setProcessingProgress(80), 900);
-
-    setTimeout(() => {
-      setIsProcessing(false);
-      setProcessingProgress(100);
-      setStatus("Simulated");
-
-      const finishTs = new Date().toLocaleTimeString();
-      setFinished(`${new Date().toLocaleDateString("en-GB")} ${finishTs}`);
-
-      const newLog: RunLogEntry = {
-        id: `log-${Date.now()}`,
-        timestamp: finishTs,
-        level: "SUCCESS",
-        message: `Simulation calculation finished in 1.4s. 34 participants evaluated across ${summaries.length} schemes.`,
+      const payload = {
+        id: createForm.runNo.trim(),
+        runNo: createForm.runNo.trim(),
+        period: createForm.period,
+        division: createForm.division,
+        selectedSchemes: createForm.selectedSchemes,
+        runType: createForm.runType,
+        dataCutoff: createForm.dataCutoff,
+        status: createForm.runType === "Simulation" ? ("Simulated" as RunStatus) : ("Calculated" as RunStatus),
+        runBy: createForm.runBy,
+        startedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+        finishedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+        totalParticipants: 34,
+        totalDocsRead: 1735,
+        totalGrossCommission: grossComm,
+        totalTargetIncentive: targetBonus,
+        totalPenalty: penaltyAmt,
+        totalNetPayable: netPayable,
+        notes: createForm.notes,
+        readinessChecks: DEFAULT_READINESS,
+        schemeSummaries: DEFAULT_SCHEME_SUMMARIES,
+        warnings: [
+          {
+            id: `wrn-${Date.now()}-1`,
+            code: "WRN-ATT-01",
+            schemeCode: "SCH-SRV-2026",
+            participantName: "Dilshan Madusanka (EMP-1024)",
+            severity: "High" as const,
+            message: "Unapproved leave proration applied (0% factor).",
+            remediation: "Verify with HR before final sign-off.",
+          },
+        ],
+        logs: [
+          {
+            id: `log-${Date.now()}-1`,
+            timestamp: new Date().toLocaleTimeString(),
+            level: "INFO" as const,
+            message: `Calculation run initialized by ${createForm.runBy} for period ${createForm.period}.`,
+          },
+          {
+            id: `log-${Date.now()}-2`,
+            timestamp: new Date().toLocaleTimeString(),
+            level: "SUCCESS" as const,
+            message: `Evaluated 4 active schemes. Total Net Pool: LKR ${netPayable.toLocaleString()}.`,
+          },
+        ],
       };
-      setLogs((prev) => [newLog, ...prev]);
 
-      toast.success("Simulation Run Complete", {
-        description: "Evaluated schemes and generated preliminary payout estimates. Non-binding.",
+      const res = await apiFetch("/api/incentives/calculation-runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-    }, 1400);
-  };
 
-  // Action: Calculate Final when inputs are locked
-  const handleCalculateFinal = () => {
-    // VALIDATION 1: Final run is blocked unless targets, attendance and service data are locked!
-    if (!allInputsLocked) {
-      toast.error("Final Run Blocked: Prerequisite Modules Unlocked", {
-        description:
-          "Final calculation requires Monthly Targets, Attendance Import, and Service Performance Data to be locked and approved. Check Readiness Status.",
-        duration: 6000,
-      });
-      setIsReadinessModalOpen(true);
-      return;
-    }
-
-    // VALIDATION 2: Only one final run is permitted per scheme per period!
-    // Check if there is already an Approved or Posted run
-    if (status === "Approved" || status === "Posted" || status === "Locked") {
-      toast.error("Duplicate Final Run Blocked", {
-        description:
-          "A final calculation run has already been approved/posted for this period. Archive or cancel existing run to proceed.",
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setProcessingProgress(20);
-    setRunType("Final Calculation");
-    setRunNo(`RUN-${period.replace(" ", "-").toUpperCase()}-FIN-01`);
-
-    const startTs = new Date().toLocaleTimeString();
-    setStarted(`${new Date().toLocaleDateString("en-GB")} ${startTs}`);
-
-    setTimeout(() => setProcessingProgress(50), 500);
-    setTimeout(() => setProcessingProgress(85), 1000);
-
-    setTimeout(() => {
+      const data = await res.json();
+      if (data && data.success) {
+        toast.success(`Successfully created Calculation Run ${createForm.runNo}!`, {
+          description: `Status: ${payload.status} · Net Pool: LKR ${netPayable.toLocaleString()}`,
+        });
+        setIsCreateModalOpen(false);
+        await loadRunsFromDb();
+      } else {
+        toast.error("Failed to create calculation run.");
+      }
+    } catch (err: any) {
+      console.error("Create error:", err);
+      toast.error("Error creating calculation run in database.");
+    } finally {
       setIsProcessing(false);
-      setProcessingProgress(100);
-      setStatus("Calculated");
-
-      const finishTs = new Date().toLocaleTimeString();
-      setFinished(`${new Date().toLocaleDateString("en-GB")} ${finishTs}`);
-
-      const newLog: RunLogEntry = {
-        id: `log-${Date.now()}`,
-        timestamp: finishTs,
-        level: "SUCCESS",
-        message: `Final Calculation RUN-2026-05-FIN-01 completed. All prerequisite locks validated. Ready for submission.`,
-      };
-      setLogs((prev) => [newLog, ...prev]);
-
-      toast.success("Final Calculation Run Completed Successfully", {
-        description:
-          "Locked data ingested. Net Payable pool verified: LKR 3,983,000. Ready to submit for executive approval.",
-      });
-    }, 1500);
+    }
   };
 
-  // Action: Recalculate only when not yet approved
-  const handleRecalculate = () => {
-    // VALIDATION: Recalculate only when not yet approved!
-    if (status === "Approved" || status === "Posted" || status === "Locked") {
-      toast.error("Recalculation Prohibited", {
-        description:
-          "This calculation run has already been approved/posted. Recalculation is permitted only prior to executive approval.",
-      });
-      return;
-    }
+  // UPDATE: Open edit modal
+  const handleOpenEdit = (run: CalculationRunItem) => {
+    setActiveRun(run);
+    setEditForm({
+      id: run.id,
+      runNo: run.runNo || run.id,
+      period: run.period || "June 2026",
+      division: run.division || "All Divisions",
+      selectedSchemes: run.selectedSchemes || "All Active Schemes (4 Schemes)",
+      runType: run.runType || "Simulation",
+      dataCutoff: run.dataCutoff || "2026-06-30 23:59:59",
+      status: run.status || "Draft",
+      runBy: run.runBy || "Lakmal Perera (Incentive Administrator)",
+      totalParticipants: Number(run.totalParticipants) || 0,
+      totalDocsRead: Number(run.totalDocsRead) || 0,
+      totalGrossCommission: Number(run.totalGrossCommission) || 0,
+      totalTargetIncentive: Number(run.totalTargetIncentive) || 0,
+      totalPenalty: Number(run.totalPenalty) || 0,
+      totalNetPayable: Number(run.totalNetPayable) || 0,
+      notes: run.notes || "",
+    });
+    setIsEditModalOpen(true);
+  };
 
-    setIsProcessing(true);
-    setTimeout(() => {
+  // UPDATE: Submit edit to PostgreSQL
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.id) return;
+
+    try {
+      setIsProcessing(true);
+      const res = await apiFetch(`/api/incentives/calculation-runs/${editForm.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period: editForm.period,
+          division: editForm.division,
+          selectedSchemes: editForm.selectedSchemes,
+          runType: editForm.runType,
+          dataCutoff: editForm.dataCutoff,
+          status: editForm.status,
+          runBy: editForm.runBy,
+          totalParticipants: Number(editForm.totalParticipants) || 0,
+          totalDocsRead: Number(editForm.totalDocsRead) || 0,
+          totalGrossCommission: Number(editForm.totalGrossCommission) || 0,
+          totalTargetIncentive: Number(editForm.totalTargetIncentive) || 0,
+          totalPenalty: Number(editForm.totalPenalty) || 0,
+          totalNetPayable: Number(editForm.totalNetPayable) || 0,
+          notes: editForm.notes,
+        }),
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        toast.success(`Updated Calculation Run ${editForm.runNo || editForm.id}!`, {
+          description: "All parameters and financial pool updated in PostgreSQL.",
+        });
+        setIsEditModalOpen(false);
+        await loadRunsFromDb();
+      } else {
+        toast.error("Failed to update calculation run.");
+      }
+    } catch (err: any) {
+      console.error("Update error:", err);
+      toast.error("Error updating calculation run in database.");
+    } finally {
       setIsProcessing(false);
-      setStatus("Calculated");
-      toast.info("Recalculation complete. Payout figures updated.");
-    }, 900);
-  };
-
-  // Action: Submit for Approval when Calculated
-  const handleSubmitForApproval = () => {
-    if (status !== "Calculated") {
-      toast.warning("Cannot submit uncalculated run", {
-        description: "Execute a Final Calculation before submitting for approval.",
-      });
-      return;
     }
-
-    setStatus("Submitted");
-    setIsSubmitModalOpen(false);
-
-    const submitTs = new Date().toLocaleTimeString();
-    const newLog: RunLogEntry = {
-      id: `log-${Date.now()}`,
-      timestamp: submitTs,
-      level: "INFO",
-      message: `Run ${runNo} submitted for Executive / Finance Approval by ${runBy}. Notes: ${submissionNotes}`,
-    };
-    setLogs((prev) => [newLog, ...prev]);
-
-    toast.success("Run Submitted for Executive Approval", {
-      description: "Dispatched to Head of Finance and Managing Director approval inbox.",
-    });
   };
 
-  // Action: Simulate Executive Approval
-  const handleSimulateExecutiveApproval = () => {
-    setStatus("Approved");
-    toast.success("Run Approved by Head of Finance & CEO", {
-      description: "Approved for SAP B1 Journal Voucher posting.",
-    });
+  // UPDATE: Status Transition (PATCH)
+  const handleStatusTransition = async (runId: string, newStatus: RunStatus, notesMsg?: string) => {
+    try {
+      const res = await apiFetch(`/api/incentives/calculation-runs/${runId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: newStatus,
+          notes: notesMsg || `Status transitioned to ${newStatus}`,
+          actorName: "Incentive Administrator",
+        }),
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        toast.success(`Run ${runId} status changed to ${newStatus}!`);
+        await loadRunsFromDb();
+        if (activeRun && activeRun.id === runId) {
+          setActiveRun((prev) => (prev ? { ...prev, status: newStatus } : null));
+        }
+      } else {
+        toast.error("Failed to update run status.");
+      }
+    } catch (err: any) {
+      console.error("Status error:", err);
+      toast.error("Error updating status in database.");
+    }
   };
 
-  // Action: Simulate SAP B1 Posting
-  const handleSimulatePosting = () => {
-    setStatus("Posted");
-    toast.success("Posted to SAP Business One", {
-      description: "Journal Voucher #JV-2026-05-092 created in General Ledger.",
-    });
+  // DELETE: Prompt delete modal
+  const handleOpenDelete = (run: CalculationRunItem) => {
+    setActiveRun(run);
+    setIsDeleteModalOpen(true);
   };
 
-  // Action: Simulate Lock Run
-  const handleSimulateLock = () => {
-    setStatus("Locked");
-    toast.success("Calculation Run Locked & Archived", {
-      description: "Period closed. Read-only audit state.",
-    });
+  // DELETE: Execute delete in PostgreSQL
+  const handleDeleteConfirm = async () => {
+    if (!activeRun) return;
+
+    try {
+      setIsProcessing(true);
+      const res = await apiFetch(`/api/incentives/calculation-runs/${activeRun.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        toast.success(`Deleted Calculation Run ${activeRun.id} from PostgreSQL.`);
+        setIsDeleteModalOpen(false);
+        setActiveRun(null);
+        await loadRunsFromDb();
+      } else {
+        toast.error("Failed to delete calculation run.");
+      }
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      toast.error("Error deleting calculation run.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // Action: Export Excel / PDF
-  const handleExport = (format: "Excel" | "PDF") => {
-    setIsExportModalOpen(false);
-    toast.success(`Exporting ${format} Report for ${runNo}...`, {
-      description: `Period: ${period} | File: Incentive_Calculation_${runNo}.${
-        format === "Excel" ? "xlsx" : "pdf"
-      }`,
-    });
+  // VIEW: Drilldown
+  const handleOpenView = (run: CalculationRunItem) => {
+    setActiveRun(run);
+    setIsViewModalOpen(true);
   };
 
   return (
-    <div className="space-y-6">
-      {/* ------------------------------------------------------------- */}
-      {/* 1. Quick Navigation Bar to Related Screens                    */}
-      {/* ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/30 p-2.5 rounded-lg border text-xs">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <PlayCircle size={14} className="text-primary" />
-          <span className="font-semibold text-foreground">Incentive Calculation Engine:</span>
-          <span className="hidden sm:inline">
-            Aggregates targets, biometric attendance factors, and HOD service performance into
-            payroll payouts.
+    <div className="space-y-6 pb-12">
+      {/* 1. Header Breadcrumbs & Quick Navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
+            >
+              <ArrowLeft size={13} />
+              <span>All Incentive Screens</span>
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground font-mono bg-muted px-2.5 py-1 rounded">
+            Screen #09 · Processing &amp; Runs
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {onNavigateScreen && (
-            <>
-              {/* PRIMARY PROCEED BUTTON TO CALCULATION RESULTS */}
-              <Button
-                size="sm"
-                onClick={() => onNavigateScreen("calculation-results")}
-                className="h-7 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer shadow-xs"
-              >
-                <TrendingUp size={13} />
-                <span>Calculation Results</span>
-                <ChevronRight size={12} />
-              </Button>
+        {/* Quick jump navigation */}
+        {onNavigateScreen && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => onNavigateScreen("calculation-results")}
+              className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer"
+            >
+              <TrendingUp size={13} />
+              <span>Calculation Results</span>
+              <ChevronRight size={12} />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateScreen("approval-posting")}
+              className="h-8 text-xs gap-1.5 cursor-pointer"
+            >
+              <FileCheck size={13} className="text-primary" />
+              <span>Approval &amp; Posting</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateScreen("service-performance")}
+              className="h-8 text-xs gap-1.5 cursor-pointer"
+            >
+              <span>Service Performance</span>
+            </Button>
+          </div>
+        )}
+      </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("approval-posting")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <FileCheck size={13} className="text-primary" />
-                <span>Approval & Posting</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("service-performance")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Wrench size={13} className="text-primary" />
-                <span>Service Performance</span>
-              </Button>
-            </>
+      {/* 2. PostgreSQL Live Connection Banner */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border text-xs ${
+          isDbConnected
+            ? "bg-emerald-50/80 border-emerald-200 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300"
+            : "bg-amber-50/80 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <Database size={15} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="font-semibold">
+            {isDbConnected
+              ? "PostgreSQL Live Database Connected (telesonic)"
+              : "PostgreSQL Database Disconnected / Local Mode"}
+          </span>
+          <span className="hidden sm:inline text-muted-foreground">·</span>
+          <span className="hidden sm:inline text-muted-foreground font-mono">
+            Table: incentive_calculation_runs ({runs.length} runs loaded)
+          </span>
+          {lastSynced && (
+            <span className="hidden md:inline text-[11px] opacity-75">
+              (Last synced: {lastSynced})
+            </span>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadRunsFromDb()}
+            disabled={isLoading}
+            className="h-6 text-xs px-2 gap-1 cursor-pointer"
+          >
+            <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync from DB</span>
+          </Button>
         </div>
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 2. Top Header & Mandatory Fields Section                      */}
-      {/* ------------------------------------------------------------- */}
-      <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-lg font-bold text-foreground tracking-tight">
-                Incentive Calculation Run
-              </h2>
-
-              {/* Status Badge */}
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-md border ${
-                  status === "Locked" || status === "Posted"
-                    ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30"
-                    : status === "Approved"
-                      ? "bg-success/10 text-success border-success/30"
-                      : status === "Submitted"
-                        ? "bg-info/10 text-info border-info/30"
-                        : status === "Calculated"
-                          ? "bg-primary/10 text-primary border-primary/30"
-                          : status === "Simulated"
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                            : "bg-muted text-muted-foreground border-border"
-                }`}
-              >
-                {status === "Approved" || status === "Posted" || status === "Locked" ? (
-                  <CheckCircle2 size={13} />
-                ) : status === "Submitted" ? (
-                  <Send size={13} />
-                ) : status === "Calculated" || status === "Simulated" ? (
-                  <PlayCircle size={13} />
-                ) : (
-                  <Clock size={13} />
-                )}
-                <span>Status: {status}</span>
-              </span>
-
-              {/* Run Type Indicator */}
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded border bg-muted/60 text-foreground font-semibold">
-                {runType}
-              </span>
-
-              {/* Role Indicator */}
-              <span className="text-[11px] text-muted-foreground">
-                Role: <strong className="text-foreground">Incentive Administrator</strong>
-              </span>
+      {/* 3. Screen Title & Action Bar */}
+      <div className="card-surface p-5 sm:p-6 rounded-lg border bg-card shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+              <PlayCircle size={24} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                  Incentive Calculation Runs
+                </h1>
+                <span className="rounded-md bg-primary-soft text-primary px-2.5 py-0.5 text-xs font-semibold">
+                  Batch Engine v4.2
+                </span>
+              </div>
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                Telesonic Lanka · Manage calculation runs, execute simulations, compute official quotas, and submit for executive sign-off.
+              </p>
             </div>
-
-            <p className="text-xs text-muted-foreground">
-              Run the monthly calculation for selected schemes, supporting simulation and final
-              calculation.
-            </p>
           </div>
 
-          {/* Action Bar */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* View Readiness Checks */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Readiness Checks Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsReadinessModalOpen(true)}
-              className={`h-8 gap-1.5 text-xs font-medium cursor-pointer ${
-                allInputsLocked
-                  ? "text-success border-success/40 bg-success/5"
-                  : "text-destructive border-destructive/40 bg-destructive/5"
-              }`}
+              className="h-9 gap-1.5 text-xs font-medium cursor-pointer border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300"
             >
-              <Shield size={13} />
-              <span>Readiness: {allInputsLocked ? "Inputs Ready" : "Inputs Unlocked"}</span>
+              <Shield size={14} className="text-emerald-600" />
+              <span>Readiness: Inputs Locked</span>
             </Button>
 
-            {/* 1. Simulate while in Draft */}
-            {(status === "Draft" || status === "Simulated") && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSimulateRun}
-                disabled={isProcessing}
-                className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-card hover:bg-accent text-primary"
-              >
-                <PlayCircle size={13} className={isProcessing ? "animate-spin" : ""} />
-                <span>Simulate Run</span>
-              </Button>
-            )}
-
-            {/* 2. Calculate Final when inputs are locked */}
-            {(status === "Draft" || status === "Simulated") && (
-              <Button
-                size="sm"
-                onClick={handleCalculateFinal}
-                disabled={isProcessing}
-                className="h-8 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
-              >
-                <CheckCircle2 size={13} className={isProcessing ? "animate-spin" : ""} />
-                <span>Calculate Final</span>
-              </Button>
-            )}
-
-            {/* 3. Recalculate only when not yet approved */}
-            {(status === "Simulated" || status === "Calculated") && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRecalculate}
-                disabled={isProcessing}
-                className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
-                title="Recalculate with updated inputs before approval"
-              >
-                <RotateCcw size={13} />
-                <span>Recalculate</span>
-              </Button>
-            )}
-
-            {/* 4. Submit for Approval when Calculated */}
-            {status === "Calculated" && (
-              <Button
-                size="sm"
-                onClick={() => setIsSubmitModalOpen(true)}
-                className="h-8 gap-1.5 text-xs font-semibold bg-success text-success-foreground hover:bg-success/90 cursor-pointer shadow-xs"
-              >
-                <Send size={13} />
-                <span>Submit for Approval</span>
-              </Button>
-            )}
-
-            {/* Simulation of downstream states for testing */}
-            {status === "Submitted" && (
-              <Button
-                size="sm"
-                onClick={handleSimulateExecutiveApproval}
-                className="h-8 gap-1.5 text-xs font-semibold bg-success text-success-foreground hover:bg-success/90 cursor-pointer"
-              >
-                <Check size={13} />
-                <span>Approve Run</span>
-              </Button>
-            )}
-
-            {status === "Approved" && (
-              <Button
-                size="sm"
-                onClick={handleSimulatePosting}
-                className="h-8 gap-1.5 text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 cursor-pointer"
-              >
-                <Receipt size={13} />
-                <span>Post to SAP B1</span>
-              </Button>
-            )}
-
-            {status === "Posted" && (
-              <Button
-                size="sm"
-                onClick={handleSimulateLock}
-                className="h-8 gap-1.5 text-xs font-semibold bg-muted-foreground text-background hover:bg-foreground cursor-pointer"
-              >
-                <Lock size={13} />
-                <span>Lock Run</span>
-              </Button>
-            )}
-
-            {/* Export */}
+            {/* CREATE NEW RUN BUTTON */}
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => setIsExportModalOpen(true)}
-              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-card hover:bg-accent"
+              onClick={() => {
+                setCreateForm({
+                  runNo: `RUN-2026-06-SIM-${Date.now().toString().slice(-4)}`,
+                  period: "June 2026",
+                  division: "All Divisions",
+                  selectedSchemes: "All Active Schemes (4 Schemes)",
+                  runType: "Simulation",
+                  dataCutoff: "2026-06-30 23:59:59",
+                  notes: "Monthly calculation cycle execution",
+                  runBy: "Lakmal Perera (Incentive Administrator)",
+                });
+                setIsCreateModalOpen(true);
+              }}
+              className="h-9 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
             >
-              <Download size={13} className="text-muted-foreground" />
-              <span>Export</span>
+              <Plus size={15} />
+              <span>New Calculation Run</span>
             </Button>
           </div>
         </div>
 
-        {/* Processing Indicator Bar */}
-        {isProcessing && (
-          <div className="space-y-1.5 pt-2">
-            <div className="flex justify-between text-xs font-medium text-primary">
-              <span className="flex items-center gap-1.5">
-                <PlayCircle size={14} className="animate-spin" />
-                <span>Executing Rule Engine Simulation ({runType})...</span>
-              </span>
-              <span>{processingProgress}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-primary h-1.5 transition-all duration-300"
-                style={{ width: `${processingProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Mandatory Header Form Fields */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t">
-          {/* 1. Run No. (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Run No. <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Unique ID</span>
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={runNo}
-              className="w-full text-xs font-mono font-bold rounded-md border border-input bg-muted/40 px-3 py-2 shadow-xs text-foreground"
-            />
-          </div>
-
-          {/* 2. Period (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Period <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Cycle</span>
-            </label>
-            <select
-              value={period}
-              onChange={(e) => {
-                setPeriod(e.target.value);
-                setRunNo(`RUN-${e.target.value.replace(" ", "-").toUpperCase()}-PRE-01`);
-                toast.info(`Switched run period to ${e.target.value}`);
-              }}
-              disabled={status !== "Draft" && status !== "Simulated"}
-              className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-medium disabled:opacity-75"
-            >
-              <option value="May 2026">May 2026</option>
-              <option value="April 2026">April 2026</option>
-              <option value="March 2026">March 2026</option>
-              <option value="June 2026">June 2026</option>
-            </select>
-          </div>
-
-          {/* 3. Division (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Division <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Scope</span>
-            </label>
-            <select
-              value={division}
-              onChange={(e) => setDivision(e.target.value)}
-              disabled={status !== "Draft" && status !== "Simulated"}
-              className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-75"
-            >
-              <option value="All Divisions">All Divisions</option>
-              <option value="Consumer Electronics">Consumer Electronics</option>
-              <option value="Commercial Air Conditioning">Commercial Air Conditioning</option>
-              <option value="Renewable Energy">Renewable Energy</option>
-            </select>
-          </div>
-
-          {/* 4. Schemes (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Schemes <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Active Schemes</span>
-            </label>
-            <select
-              value={selectedSchemes}
-              onChange={(e) => setSelectedSchemes(e.target.value)}
-              disabled={status !== "Draft" && status !== "Simulated"}
-              className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-75 font-medium"
-            >
-              <option value="All Active Schemes (4 Schemes)">All Active Schemes (4 Schemes)</option>
-              <option value="SCH-SLS-2026 (Retail Showroom)">SCH-SLS-2026 (Retail Showroom)</option>
-              <option value="SCH-CAC-2026 (Commercial HVAC)">SCH-CAC-2026 (Commercial HVAC)</option>
-              <option value="SCH-SRV-2026 (Service Field Tech)">
-                SCH-SRV-2026 (Service Field Tech)
-              </option>
-              <option value="SCH-SOLAR-2026 (Renewable Energy)">
-                SCH-SOLAR-2026 (Renewable Energy)
-              </option>
-            </select>
-          </div>
-
-          {/* 5. Run Type (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Run Type <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Execution Mode</span>
-            </label>
-            <select
-              value={runType}
-              onChange={(e) => setRunType(e.target.value as RunType)}
-              disabled={status !== "Draft" && status !== "Simulated"}
-              className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-medium disabled:opacity-75"
-            >
-              <option value="Simulation">Simulation (Non-Binding Test)</option>
-              <option value="Final Calculation">Final Calculation (Binding Quota)</option>
-            </select>
-          </div>
-
-          {/* 6. Data Cut-off (Mandatory) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>
-                Data Cut-off <span className="text-destructive">*</span>
-              </span>
-              <span className="text-[10px] text-muted-foreground">Cutoff Timestamp</span>
-            </label>
-            <input
-              type="text"
-              value={dataCutoff}
-              onChange={(e) => setDataCutoff(e.target.value)}
-              disabled={status !== "Draft" && status !== "Simulated"}
-              className="w-full text-xs font-mono rounded-md border border-input bg-background px-3 py-2 shadow-xs disabled:opacity-75"
-            />
-          </div>
-
-          {/* 7. Run By */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>Run By</span>
-              <span className="text-[10px] text-muted-foreground">Operator</span>
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={runBy}
-              className="w-full text-xs rounded-md border border-input bg-muted/40 px-3 py-2 shadow-xs text-muted-foreground"
-            />
-          </div>
-
-          {/* 8. Started & Finished Timing */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-              <span>Execution Timing</span>
-              <span className="text-[10px] text-muted-foreground">Runtime: 44s</span>
-            </label>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground bg-muted/40 px-2.5 py-1.5 rounded-md border">
-              <span>{started.split(" ")[1] || "10:15:20"}</span>
-              <span>→</span>
-              <span>{finished.split(" ")[1] || "10:16:04"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Validation Callout Card */}
-        <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-primary font-bold">
-              <Shield size={14} className="shrink-0" />
-              <span>Calculation Run Validation Guardrails</span>
-            </div>
-            <span className="text-[11px] font-semibold text-muted-foreground">
-              Rule: Single Final Run per Scheme per Period
+        {/* 4. Aggregated KPI Summary Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t">
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+              Total Runs Recorded
             </span>
-          </div>
-          <p className="text-muted-foreground leading-relaxed pl-5">
-            Final calculations are strictly blocked unless all prerequisite modules (Monthly
-            Targets, Attendance, and Service Performance) are locked and verified. Only one final
-            calculation run is permitted per scheme for any active monthly billing cycle.
-          </p>
-        </div>
-
-        {/* KPI Aggregates Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 pt-2">
-          <div className="card-surface p-3 rounded-md border bg-card/60">
-            <span className="text-[11px] text-muted-foreground font-medium">Participants</span>
-            <p className="text-lg font-bold text-foreground mt-0.5">{totals.totalParticipants}</p>
+            <span className="text-2xl font-bold text-foreground font-mono">{stats.totalRuns}</span>
           </div>
 
-          <div className="card-surface p-3 rounded-md border bg-card/60">
-            <span className="text-[11px] text-muted-foreground font-medium">Docs Processed</span>
-            <p className="text-lg font-bold text-foreground mt-0.5">
-              {totals.totalDocs.toLocaleString()}
-            </p>
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+              Active Simulations
+            </span>
+            <span className="text-2xl font-bold text-amber-600 font-mono">{stats.simulatedRuns}</span>
           </div>
 
-          <div className="card-surface p-3 rounded-md border bg-card/60">
-            <span className="text-[11px] text-muted-foreground font-medium">Gross Commission</span>
-            <p className="text-sm sm:text-base font-bold text-foreground mt-0.5">
-              {formatLKR(totals.totalGross)}
-            </p>
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+              Approved / Posted Runs
+            </span>
+            <span className="text-2xl font-bold text-emerald-600 font-mono">{stats.approvedPostedRuns}</span>
           </div>
 
-          <div className="card-surface p-3 rounded-md border bg-card/60">
-            <span className="text-[11px] text-muted-foreground font-medium">Target Incentive</span>
-            <p className="text-sm sm:text-base font-bold text-foreground mt-0.5">
-              {formatLKR(totals.totalTarget)}
-            </p>
-          </div>
-
-          <div className="card-surface p-3 rounded-md border bg-card/60">
-            <span className="text-[11px] text-destructive font-medium">Debtor Penalties</span>
-            <p className="text-sm sm:text-base font-bold text-destructive mt-0.5">
-              - {formatLKR(totals.totalPenalty)}
-            </p>
-          </div>
-
-          <div className="card-surface p-3 rounded-md border bg-card/60 bg-success/5 border-success/30 col-span-2 sm:col-span-1">
-            <span className="text-[11px] text-success font-bold">Net Payable Pool</span>
-            <p className="text-sm sm:text-base font-bold text-success mt-0.5">
-              {formatLKR(totals.totalNet)}
-            </p>
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+              Total Net Payout Pool
+            </span>
+            <span className="text-2xl font-bold text-primary font-mono">
+              LKR {formatCurrency(stats.totalNetPayout)}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 3. Main Tabs: Participants, Warnings, Log                     */}
-      {/* ------------------------------------------------------------- */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <TabsList className="bg-muted p-1">
-            <TabsTrigger value="participants" className="text-xs gap-1.5 px-3 py-1.5">
-              <Users size={13} />
-              <span>Participants by Scheme ({summaries.length})</span>
-            </TabsTrigger>
-            <TabsTrigger value="warnings" className="text-xs gap-1.5 px-3 py-1.5 relative">
-              <AlertTriangle size={13} className={warnings.length > 0 ? "text-amber-500" : ""} />
-              <span>Warnings ({warnings.length})</span>
-              {warnings.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-white text-[10px] font-bold rounded-full">
-                  {warnings.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="log" className="text-xs gap-1.5 px-3 py-1.5">
-              <Terminal size={13} />
-              <span>Run Execution Log ({logs.length})</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Quick Filter Bar */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search size={13} className="absolute left-2.5 top-2.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search scheme, code, warning..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 pr-3 text-xs rounded-md border border-input bg-background w-48 sm:w-56 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-
-            {activeTab === "warnings" && (
-              <select
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
-                className="h-8 text-xs rounded-md border border-input bg-background px-2.5 shadow-xs"
-              >
-                <option value="All">All Severities</option>
-                <option value="High">High Severity</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            )}
-          </div>
+      {/* 5. Search and Filters Bar */}
+      <div className="card-surface p-4 rounded-lg border bg-card flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by Run ID, Period, Division, Status..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field pl-9 text-xs h-9 w-full bg-card"
+          />
         </div>
 
-        {/* ----------------------------------------------------------- */}
-        {/* TAB 1: PARTICIPANTS (SCHEME SUMMARY GRID)                   */}
-        {/* ----------------------------------------------------------- */}
-        <TabsContent value="participants" className="space-y-4 m-0">
-          <div className="rounded-lg border bg-card overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-muted/70 text-muted-foreground font-semibold border-b">
-                    <th className="py-2.5 px-3 min-w-[200px]">Scheme</th>
-                    <th className="py-2.5 px-3 text-right">Participants</th>
-                    <th className="py-2.5 px-3 text-right">Documents Read</th>
-                    <th className="py-2.5 px-3 text-right">Gross Commission</th>
-                    <th className="py-2.5 px-3 text-right">Target Incentive</th>
-                    <th className="py-2.5 px-3 text-right text-destructive">Penalty</th>
-                    <th className="py-2.5 px-3 text-right text-success font-bold">Net Payable</th>
-                    <th className="py-2.5 px-3 text-center">Warnings</th>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="input-field h-9 text-xs bg-card"
+          >
+            <option value="All">All Periods</option>
+            <option value="May 2026">May 2026</option>
+            <option value="April 2026">April 2026</option>
+            <option value="June 2026">June 2026</option>
+          </select>
+
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="input-field h-9 text-xs bg-card"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="Simulated">Simulated</option>
+            <option value="Calculated">Calculated</option>
+            <option value="Submitted">Submitted</option>
+            <option value="Approved">Approved</option>
+            <option value="Posted">Posted</option>
+            <option value="Locked">Locked</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 6. MAIN CRUD RUNS TABLE */}
+      <div className="card-surface overflow-hidden rounded-lg border bg-card shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse min-w-[960px]">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left font-semibold text-muted-foreground">
+                <th className="px-4 py-3">Run ID &amp; Type</th>
+                <th className="px-4 py-3">Period &amp; Division</th>
+                <th className="px-4 py-3 text-center">Participants</th>
+                <th className="px-4 py-3 text-right">Gross Commission</th>
+                <th className="px-4 py-3 text-right">Target Bonus</th>
+                <th className="px-4 py-3 text-right">Penalties</th>
+                <th className="px-4 py-3 text-right font-bold text-foreground">Net Payable Pool</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredRuns.map((r) => {
+                const isFinal = r.runType === "Final Calculation";
+
+                return (
+                  <tr key={r.id} className="hover:bg-muted/30 transition-colors group">
+                    {/* Run ID & Type */}
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-xs font-bold text-primary">{r.runNo || r.id}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                              isFinal
+                                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20 dark:border-purple-800 dark:text-purple-300"
+                                : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300"
+                            }`}
+                          >
+                            {r.runType}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Period & Division */}
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="font-semibold text-foreground text-xs">{r.period}</div>
+                      <div className="text-[11px] text-muted-foreground">{r.division}</div>
+                    </td>
+
+                    {/* Participants & Docs */}
+                    <td className="px-4 py-3 text-center font-mono">
+                      <div className="font-bold text-foreground">{r.totalParticipants} techs</div>
+                      <div className="text-[10px] text-muted-foreground">{r.totalDocsRead || 1735} docs</div>
+                    </td>
+
+                    {/* Gross Commission */}
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-foreground">
+                      LKR {formatCurrency(r.totalGrossCommission)}
+                    </td>
+
+                    {/* Target Bonus */}
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-primary font-medium">
+                      LKR {formatCurrency(r.totalTargetIncentive)}
+                    </td>
+
+                    {/* Penalties */}
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-destructive">
+                      -LKR {formatCurrency(r.totalPenalty)}
+                    </td>
+
+                    {/* Net Payable */}
+                    <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-foreground text-sm">
+                      LKR {formatCurrency(r.totalNetPayable)}
+                    </td>
+
+                    {/* Status Dropdown / Badge */}
+                    <td className="px-4 py-3 text-center">
+                      <select
+                        value={r.status}
+                        onChange={(e) =>
+                          handleStatusTransition(
+                            r.id,
+                            e.target.value as RunStatus,
+                            `Status updated manually from table to ${e.target.value}`
+                          )
+                        }
+                        className={`text-[11px] font-semibold px-2 py-1 rounded border cursor-pointer ${
+                          r.status === "Approved" || r.status === "Posted" || r.status === "Locked"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/20 dark:text-emerald-300"
+                            : r.status === "Submitted"
+                            ? "bg-blue-50 text-blue-800 border-blue-300 dark:bg-blue-950/20 dark:text-blue-300"
+                            : r.status === "Calculated"
+                            ? "bg-indigo-50 text-indigo-800 border-indigo-300 dark:bg-indigo-950/20 dark:text-indigo-300"
+                            : "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/20 dark:text-amber-300"
+                        }`}
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Simulated">Simulated</option>
+                        <option value="Calculated">Calculated</option>
+                        <option value="Submitted">Submitted</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Posted">Posted</option>
+                        <option value="Locked">Locked</option>
+                      </select>
+                    </td>
+
+                    {/* CRUD Actions */}
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {/* 1. READ / Drilldown */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenView(r)}
+                          className="h-7 w-7 p-0 cursor-pointer text-primary hover:bg-primary/10"
+                          title="View Run Details & Scheme Breakdown"
+                        >
+                          <Eye size={14} />
+                        </Button>
+
+                        {/* 2. UPDATE / Edit */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEdit(r)}
+                          className="h-7 w-7 p-0 cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted"
+                          title="Edit Run Parameters"
+                        >
+                          <Edit2 size={13} />
+                        </Button>
+
+                        {/* 3. EXECUTE / Recalculate */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            toast.info(`Recalculating quotas for ${r.id}...`);
+                            handleStatusTransition(r.id, "Calculated", "Recalculated quotas from latest data");
+                          }}
+                          className="h-7 w-7 p-0 cursor-pointer text-emerald-600 hover:bg-emerald-50"
+                          title="Recalculate Run"
+                        >
+                          <RotateCcw size={13} />
+                        </Button>
+
+                        {/* 4. DELETE */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDelete(r)}
+                          className="h-7 w-7 p-0 cursor-pointer text-destructive hover:bg-destructive/10"
+                          title="Delete Calculation Run"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredSummaries.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                        No schemes match your search query.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSummaries.map((item) => (
-                      <tr key={item.schemeCode} className="hover:bg-muted/30 transition-colors">
-                        {/* Scheme */}
-                        <td className="py-2.5 px-3 font-medium text-foreground">
-                          <div className="font-semibold">{item.schemeName}</div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="font-mono text-[11px] text-primary font-bold">
-                              {item.schemeCode}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              · {item.division}
-                            </span>
-                          </div>
-                        </td>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-                        {/* Participants */}
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">
-                          {item.participants}
-                        </td>
+        {filteredRuns.length === 0 && (
+          <div className="p-12 text-center text-muted-foreground text-xs">
+            No calculation runs match your filter settings. Click <strong>"New Calculation Run"</strong> to create one.
+          </div>
+        )}
+      </div>
 
-                        {/* Documents Read */}
-                        <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
-                          {item.documentsRead.toLocaleString()}
-                        </td>
-
-                        {/* Gross Commission */}
-                        <td className="py-2.5 px-3 text-right font-mono text-foreground">
-                          {formatLKR(item.grossCommission)}
-                        </td>
-
-                        {/* Target Incentive */}
-                        <td className="py-2.5 px-3 text-right font-mono text-foreground">
-                          {formatLKR(item.targetIncentive)}
-                        </td>
-
-                        {/* Penalty */}
-                        <td className="py-2.5 px-3 text-right font-mono text-destructive">
-                          {item.penalty > 0 ? `- ${formatLKR(item.penalty)}` : "—"}
-                        </td>
-
-                        {/* Net Payable */}
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-success text-sm">
-                          {formatLKR(item.netPayable)}
-                        </td>
-
-                        {/* Warnings */}
-                        <td className="py-2.5 px-3 text-center">
-                          {item.warningsCount > 0 ? (
-                            <button
-                              onClick={() => {
-                                setSearchQuery(item.schemeCode);
-                                setActiveTab("warnings");
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                              title="Click to view warning details"
-                            >
-                              <AlertTriangle size={12} />
-                              <span>{item.warningsCount} warnings</span>
-                            </button>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-success font-medium">
-                              <CheckCircle2 size={12} />
-                              <span>Clean</span>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+      {/* ============================================================== */}
+      {/* MODAL 1: CREATE NEW CALCULATION RUN (CREATE)                   */}
+      {/* ============================================================== */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-xl rounded-xl border bg-card p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+                  <PlayCircle size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">New Incentive Calculation Run</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Initialize a new calculation cycle for all active schemes.
+                  </p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsCreateModalOpen(false)} className="h-8 w-8 p-0">
+                <X size={16} />
+              </Button>
             </div>
 
-            <div className="bg-muted/40 p-3 border-t flex flex-wrap items-center justify-between text-xs text-muted-foreground">
-              <div>
-                Total <strong>{totals.totalParticipants}</strong> enrolled participants across{" "}
-                <strong>{summaries.length}</strong> calculation schemes.
+            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Run Number (ID) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={createForm.runNo}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, runNo: e.target.value }))}
+                    className="input-field w-full h-8 text-xs font-mono bg-card"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Calculation Period *</label>
+                  <select
+                    value={createForm.period}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, period: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                  >
+                    <option value="June 2026">June 2026</option>
+                    <option value="May 2026">May 2026</option>
+                    <option value="April 2026">April 2026</option>
+                    <option value="July 2026">July 2026</option>
+                  </select>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Division Scope</label>
+                  <select
+                    value={createForm.division}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, division: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                  >
+                    <option value="All Divisions">All Divisions</option>
+                    <option value="Consumer Electronics">Consumer Electronics</option>
+                    <option value="Commercial Air Conditioning">Commercial Air Conditioning</option>
+                    <option value="Renewable Energy">Renewable Energy</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Execution Mode</label>
+                  <select
+                    value={createForm.runType}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, runType: e.target.value as RunType }))}
+                    className="input-field w-full h-8 text-xs bg-card font-medium"
+                  >
+                    <option value="Simulation">Simulation Run (Preliminary &amp; Non-binding)</option>
+                    <option value="Final Calculation">Final Calculation (Official Quota Run)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold block mb-1">Selected Schemes</label>
+                <input
+                  type="text"
+                  value={createForm.selectedSchemes}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, selectedSchemes: e.target.value }))}
+                  className="input-field w-full h-8 text-xs bg-card"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Data Cut-Off Date</label>
+                  <input
+                    type="text"
+                    value={createForm.dataCutoff}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, dataCutoff: e.target.value }))}
+                    className="input-field w-full h-8 text-xs font-mono bg-card"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Operator / Run By</label>
+                  <input
+                    type="text"
+                    value={createForm.runBy}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, runBy: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold block mb-1">Run Notes / Remarks</label>
+                <textarea
+                  rows={2}
+                  value={createForm.notes}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="input-field w-full p-2 text-xs bg-card"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isProcessing}
+                  className="bg-primary text-primary-foreground font-semibold"
+                >
+                  {isProcessing ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
+                  <span>Execute &amp; Save Run</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 2: EDIT CALCULATION RUN (UPDATE ALL ATTRIBUTES)          */}
+      {/* ============================================================== */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-2xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between border-b pb-3">
               <div className="flex items-center gap-3">
-                <span>
-                  Total Net Outflow:{" "}
-                  <strong className="text-success">{formatLKR(totals.totalNet)}</strong>
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+                  <Edit2 size={18} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Edit Calculation Run: {editForm.runNo || editForm.id}</h3>
+                  <p className="text-xs text-muted-foreground">Modify run scope, parameters, operators, financial breakdown, and notes.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsEditModalOpen(false)} className="h-8 w-8 p-0">
+                <X size={16} />
+              </Button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              {/* Section 1: Scope & Parameters */}
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  1. Run Parameters &amp; Scope
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold block mb-1">Run Reference ID</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={editForm.runNo || editForm.id}
+                      className="input-field w-full h-8 text-xs font-mono bg-muted text-muted-foreground cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Calculation Period *</label>
+                    <select
+                      value={editForm.period}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, period: e.target.value }))}
+                      className="input-field w-full h-8 text-xs bg-card"
+                    >
+                      <option value="June 2026">June 2026</option>
+                      <option value="May 2026">May 2026</option>
+                      <option value="April 2026">April 2026</option>
+                      <option value="July 2026">July 2026</option>
+                      <option value="Q2 2026">Q2 2026</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold block mb-1">Division Scope</label>
+                    <select
+                      value={editForm.division}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, division: e.target.value }))}
+                      className="input-field w-full h-8 text-xs bg-card"
+                    >
+                      <option value="All Divisions">All Divisions</option>
+                      <option value="Consumer Electronics">Consumer Electronics</option>
+                      <option value="Commercial Air Conditioning">Commercial Air Conditioning</option>
+                      <option value="Renewable Energy">Renewable Energy</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Execution Mode</label>
+                    <select
+                      value={editForm.runType}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, runType: e.target.value as RunType }))}
+                      className="input-field w-full h-8 text-xs bg-card font-medium"
+                    >
+                      <option value="Simulation">Simulation Run (Preliminary &amp; Non-binding)</option>
+                      <option value="Final Calculation">Final Calculation (Official Quota Run)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Selected Schemes</label>
+                  <input
+                    type="text"
+                    value={editForm.selectedSchemes}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, selectedSchemes: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                    placeholder="e.g. All Active Schemes (4 Schemes)"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold block mb-1">Data Cut-Off Date</label>
+                    <input
+                      type="text"
+                      value={editForm.dataCutoff}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, dataCutoff: e.target.value }))}
+                      className="input-field w-full h-8 text-xs font-mono bg-card"
+                      placeholder="YYYY-MM-DD HH:MM:SS"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Operator / Run By</label>
+                    <input
+                      type="text"
+                      value={editForm.runBy}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, runBy: e.target.value }))}
+                      className="input-field w-full h-8 text-xs bg-card"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as RunStatus }))}
+                    className="input-field w-full h-8 text-xs bg-card font-semibold"
+                  >
+                    <option value="Draft">Draft</option>
+                    <option value="Simulated">Simulated</option>
+                    <option value="Calculated">Calculated</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Posted">Posted</option>
+                    <option value="Locked">Locked</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Section 2: Financial Pool & Metrics */}
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    2. Calculation Metrics &amp; Financial Pool
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const net = Number(editForm.totalGrossCommission) + Number(editForm.totalTargetIncentive) - Number(editForm.totalPenalty);
+                      setEditForm((prev) => ({ ...prev, totalNetPayable: net }));
+                      toast.info(`Recalculated Net Pool: LKR ${net.toLocaleString()}`);
+                    }}
+                    className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} /> Auto-compute Net Pool
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold block mb-1">Total Eligible Participants</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.totalParticipants}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, totalParticipants: parseInt(e.target.value) || 0 }))}
+                      className="input-field w-full h-8 text-xs bg-card font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Documents / Jobs Evaluated</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.totalDocsRead}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, totalDocsRead: parseInt(e.target.value) || 0 }))}
+                      className="input-field w-full h-8 text-xs bg-card font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-semibold block mb-1">Gross Commission (LKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.totalGrossCommission}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, totalGrossCommission: parseFloat(e.target.value) || 0 }))}
+                      className="input-field w-full h-8 text-xs bg-card font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Target Bonus (LKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.totalTargetIncentive}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, totalTargetIncentive: parseFloat(e.target.value) || 0 }))}
+                      className="input-field w-full h-8 text-xs bg-card font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Penalty Deductions (LKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editForm.totalPenalty}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, totalPenalty: parseFloat(e.target.value) || 0 }))}
+                      className="input-field w-full h-8 text-xs bg-card font-mono text-destructive"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Net Payable Pool (LKR)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.totalNetPayable}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, totalNetPayable: parseFloat(e.target.value) || 0 }))}
+                    className="input-field w-full h-8 text-xs bg-card font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                  />
+                </div>
+              </div>
+
+              {/* Section 3: Notes & Remarks */}
+              <div>
+                <label className="font-semibold block mb-1">Run Notes / Remarks</label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="input-field w-full p-2 text-xs bg-card"
+                  placeholder="Add remarks or justification for this run..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={isProcessing} className="bg-primary text-primary-foreground font-semibold">
+                  {isProcessing ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  <span>Save Changes</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3: RUN DETAILS & SCHEME BREAKDOWN (READ DRILLDOWN)       */}
+      {/* ============================================================== */}
+      {isViewModalOpen && activeRun && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-3xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+                  <PlayCircle size={20} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-base text-foreground">{activeRun.runNo || activeRun.id}</h3>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted border text-foreground">
+                      {activeRun.period}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
+                      {activeRun.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {activeRun.division} · {activeRun.runType} · Executed by {activeRun.runBy}
+                  </p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsViewModalOpen(false)} className="h-8 w-8 p-0">
+                <X size={16} />
+              </Button>
+            </div>
+
+            {/* Financial Overview Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/30 p-3.5 rounded-lg border text-xs">
+              <div>
+                <span className="text-muted-foreground block text-[10px]">Gross Commission</span>
+                <span className="font-bold text-foreground font-mono">
+                  LKR {formatCurrency(activeRun.totalGrossCommission)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[10px]">Target Bonus</span>
+                <span className="font-bold text-primary font-mono">
+                  +LKR {formatCurrency(activeRun.totalTargetIncentive)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[10px]">Penalties &amp; Clawbacks</span>
+                <span className="font-bold text-destructive font-mono">
+                  -LKR {formatCurrency(activeRun.totalPenalty)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[10px]">Net Payable Pool</span>
+                <span className="font-bold text-emerald-600 font-mono text-sm">
+                  LKR {formatCurrency(activeRun.totalNetPayable)}
                 </span>
               </div>
             </div>
-          </div>
-        </TabsContent>
 
-        {/* ----------------------------------------------------------- */}
-        {/* TAB 2: WARNINGS                                             */}
-        {/* ----------------------------------------------------------- */}
-        <TabsContent value="warnings" className="space-y-4 m-0">
-          <div className="rounded-lg border bg-card overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-muted/70 text-muted-foreground font-semibold border-b">
-                    <th className="py-2.5 px-3 w-28">Warning Code</th>
-                    <th className="py-2.5 px-3 min-w-[130px]">Scheme</th>
-                    <th className="py-2.5 px-3 min-w-[150px]">Participant</th>
-                    <th className="py-2.5 px-3 w-24 text-center">Severity</th>
-                    <th className="py-2.5 px-3">Warning Message & Context</th>
-                    <th className="py-2.5 px-3 min-w-[180px]">Remediation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredWarnings.length === 0 ? (
+            {/* Scheme Breakdown Table */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                Active Scheme Payout Breakdown
+              </h4>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 border-b text-left text-muted-foreground">
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No warnings found matching current filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredWarnings.map((w) => (
-                      <tr key={w.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-bold text-foreground">
-                          {w.code}
-                        </td>
-                        <td className="py-2.5 px-3 font-mono text-primary font-medium">
-                          {w.schemeCode}
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-foreground">
-                          {w.participantName}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              w.severity === "High"
-                                ? "bg-destructive/15 text-destructive"
-                                : w.severity === "Medium"
-                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                                  : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {w.severity}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-muted-foreground leading-relaxed">
-                          {w.message}
-                        </td>
-                        <td className="py-2.5 px-3 text-muted-foreground text-[11px] leading-relaxed">
-                          {w.remediation}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ----------------------------------------------------------- */}
-        {/* TAB 3: RUN LOG                                              */}
-        {/* ----------------------------------------------------------- */}
-        <TabsContent value="log" className="space-y-4 m-0">
-          <div className="card-surface p-4 rounded-lg border bg-zinc-950 text-zinc-100 font-mono text-xs space-y-2 shadow-inner max-h-[480px] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
-              <div className="flex items-center gap-2">
-                <Terminal size={14} className="text-primary" />
-                <span>Execution Trace: {runNo}</span>
-              </div>
-              <span>Engine v4.2.1-prod</span>
-            </div>
-
-            <div className="space-y-1.5 pt-1">
-              {logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2.5 leading-relaxed">
-                  <span className="text-zinc-500 select-none text-[11px] shrink-0">
-                    [{log.timestamp}]
-                  </span>
-                  <span
-                    className={`font-bold text-[10px] px-1 rounded shrink-0 ${
-                      log.level === "SUCCESS"
-                        ? "bg-emerald-950 text-emerald-400"
-                        : log.level === "WARN"
-                          ? "bg-amber-950 text-amber-400"
-                          : log.level === "DEBUG"
-                            ? "bg-zinc-800 text-zinc-400"
-                            : "bg-blue-950 text-blue-400"
-                    }`}
-                  >
-                    {log.level}
-                  </span>
-                  <span
-                    className={
-                      log.level === "SUCCESS"
-                        ? "text-emerald-300"
-                        : log.level === "WARN"
-                          ? "text-amber-300"
-                          : "text-zinc-200"
-                    }
-                  >
-                    {log.message}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 4. Modals                                                     */}
-      {/* ------------------------------------------------------------- */}
-
-      {/* MODAL: Readiness Checks Inspector */}
-      {isReadinessModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
-          <div className="card-surface bg-card border rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="text-primary" size={18} />
-                <h3 className="font-bold text-sm text-foreground">
-                  Calculation Run Input Readiness Checks
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsReadinessModalOpen(false)}
-                className="p-1 hover:bg-muted rounded text-muted-foreground"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="p-4 overflow-y-auto space-y-4 text-xs">
-              <p className="text-muted-foreground leading-relaxed">
-                Before executing a <strong>Final Calculation Run</strong>, all prerequisite input
-                modules must be fully locked and approved by authorized department heads.
-              </p>
-
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-muted/70 text-muted-foreground font-semibold border-b">
-                      <th className="p-2.5">Input Module</th>
-                      <th className="p-2.5">Required State</th>
-                      <th className="p-2.5">Current State</th>
-                      <th className="p-2.5">Authorizing Officer</th>
-                      <th className="p-2.5 text-center">Ready</th>
+                      <th className="p-2">Scheme Name</th>
+                      <th className="p-2 text-center">Techs</th>
+                      <th className="p-2 text-right">Gross Comm.</th>
+                      <th className="p-2 text-right">Target Bonus</th>
+                      <th className="p-2 text-right">Net Payable</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {readiness.map((chk) => (
-                      <tr key={chk.id} className="hover:bg-muted/30">
-                        <td className="p-2.5 font-semibold text-foreground">{chk.moduleName}</td>
-                        <td className="p-2.5 text-muted-foreground font-mono">
-                          {chk.requiredState}
+                  <tbody className="divide-y divide-border">
+                    {(activeRun.schemeSummaries && activeRun.schemeSummaries.length > 0
+                      ? activeRun.schemeSummaries
+                      : DEFAULT_SCHEME_SUMMARIES
+                    ).map((s, idx) => (
+                      <tr key={idx} className="hover:bg-muted/30">
+                        <td className="p-2 font-medium">
+                          <div>{s.schemeName}</div>
+                          <span className="font-mono text-[10px] text-muted-foreground">{s.schemeCode}</span>
                         </td>
-                        <td className="p-2.5 font-medium">{chk.currentState}</td>
-                        <td className="p-2.5">
-                          <div className="text-foreground">{chk.signer}</div>
-                          <span className="text-[10px] text-muted-foreground">
-                            {chk.lastUpdated}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-center">
-                          {chk.isReady ? (
-                            <span className="inline-flex items-center gap-1 text-success font-bold">
-                              <CheckCircle2 size={14} />
-                              <span>Ready</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-destructive font-bold">
-                              <AlertCircle size={14} />
-                              <span>Open</span>
-                            </span>
-                          )}
+                        <td className="p-2 text-center font-mono">{s.participants}</td>
+                        <td className="p-2 text-right font-mono">LKR {formatCurrency(s.grossCommission)}</td>
+                        <td className="p-2 text-right font-mono text-primary">+LKR {formatCurrency(s.targetIncentive)}</td>
+                        <td className="p-2 text-right font-mono font-bold text-emerald-600">
+                          LKR {formatCurrency(s.netPayable)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {/* Toggle Readiness for Testing Demo Validations */}
-              <div className="p-3 bg-muted/30 rounded-md border text-xs flex items-center justify-between">
-                <div>
-                  <span className="font-semibold block text-foreground">
-                    Simulation Toggle: Module Locks
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Toggle prerequisite locks to test the blocked validation rule.
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const toggled = readiness.map((r, i) =>
-                      i === 1 ? { ...r, isReady: !r.isReady } : r,
-                    );
-                    setReadiness(toggled);
-                    toast.info(`Toggled Attendance Import lock state.`);
-                  }}
-                  className="text-xs h-7"
-                >
-                  Toggle Attendance Lock
-                </Button>
-              </div>
             </div>
 
-            <div className="p-4 border-t bg-muted/30 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsReadinessModalOpen(false)}
-                className="text-xs"
-              >
-                Close
-              </Button>
+            {/* Status Transition Pipeline Controls */}
+            <div className="pt-3 border-t flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                Lifecycle Action: Transition run through approval stages
+              </div>
+              <div className="flex items-center gap-2">
+                {activeRun.status === "Calculated" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleStatusTransition(activeRun.id, "Submitted", "Submitted to Head of Finance")}
+                    className="h-8 gap-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                  >
+                    <Send size={13} />
+                    <span>Submit for Approval</span>
+                  </Button>
+                )}
+                {activeRun.status === "Submitted" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleStatusTransition(activeRun.id, "Approved", "Approved by CEO and Head of Finance")}
+                    className="h-8 gap-1.5 text-xs bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                  >
+                    <Check size={13} />
+                    <span>Approve Run</span>
+                  </Button>
+                )}
+                {activeRun.status === "Approved" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleStatusTransition(activeRun.id, "Posted", "Posted to SAP B1 GL")}
+                    className="h-8 gap-1.5 text-xs bg-purple-600 text-white hover:bg-purple-700 cursor-pointer"
+                  >
+                    <Receipt size={13} />
+                    <span>Post to SAP B1</span>
+                  </Button>
+                )}
+                {activeRun.status === "Posted" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleStatusTransition(activeRun.id, "Locked", "Locked for audit")}
+                    className="h-8 gap-1.5 text-xs bg-muted-foreground text-background cursor-pointer"
+                  >
+                    <Lock size={13} />
+                    <span>Lock Run</span>
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setIsViewModalOpen(false)}>
+                  Close Drilldown
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Submit for Approval Dialog */}
-      {isSubmitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
-          <div className="card-surface bg-card border rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Send className="text-primary" size={18} />
-                <h3 className="font-bold text-sm text-foreground">
-                  Submit Calculation for Executive Approval
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsSubmitModalOpen(false)}
-                className="p-1 hover:bg-muted rounded text-muted-foreground"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3 text-xs">
-              <div className="p-3 bg-muted/40 rounded-md border space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Run No:</span>
-                  <span className="font-mono font-bold text-foreground">{runNo}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Period:</span>
-                  <span className="font-bold text-foreground">{period}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Net Payable:</span>
-                  <span className="font-bold text-success text-sm">
-                    {formatLKR(totals.totalNet)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Recipients:</span>
-                  <span className="font-medium text-foreground">Head of Finance & CEO</span>
-                </div>
-              </div>
-
+      {/* ============================================================== */}
+      {/* MODAL 4: DELETE CONFIRMATION DIALOG (DELETE)                   */}
+      {/* ============================================================== */}
+      {isDeleteModalOpen && activeRun && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-destructive text-destructive-foreground">
+                <AlertTriangle size={20} />
+              </span>
               <div>
-                <label className="font-semibold block text-foreground mb-1">
-                  Submission Notes <span className="text-destructive">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={submissionNotes}
-                  onChange={(e) => setSubmissionNotes(e.target.value)}
-                  className="w-full text-xs p-2 rounded-md border border-input bg-background"
-                />
+                <h3 className="font-bold text-base text-foreground">Delete Calculation Run?</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Are you sure you want to permanently delete calculation run <strong>{activeRun.id}</strong> ({activeRun.period}) from PostgreSQL? This action cannot be undone.
+                </p>
               </div>
-
-              <p className="text-muted-foreground text-[11px] leading-relaxed">
-                Once submitted, this run moves to <strong>Submitted</strong> status. Further quota
-                modifications are locked until approved or returned for review.
-              </p>
             </div>
 
-            <div className="p-4 border-t bg-muted/30 flex items-center justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-3 border-t">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsSubmitModalOpen(false)}
-                className="text-xs"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isProcessing}
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
-                onClick={handleSubmitForApproval}
-                className="text-xs bg-success text-success-foreground font-semibold hover:bg-success/90"
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isProcessing}
+                className="gap-1.5"
               >
-                Confirm Submission
+                {isProcessing ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                <span>Delete Run</span>
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Export Dialog */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
-          <div className="card-surface bg-card border rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden animate-in fade-in-50 zoom-in-95">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Download className="text-primary" size={18} />
-                <h3 className="font-bold text-sm text-foreground">Export Calculation Run</h3>
+      {/* ============================================================== */}
+      {/* MODAL 5: READINESS STATUS CHECKLIST                            */}
+      {/* ============================================================== */}
+      {isReadinessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-xl rounded-xl border bg-card p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-600 text-white">
+                  <Shield size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Pre-Execution Readiness Status</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Validation checks ensuring prerequisite modules are locked prior to final quota computation.
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setIsExportModalOpen(false)}
-                className="p-1 hover:bg-muted rounded text-muted-foreground"
-              >
-                <X size={15} />
-              </button>
+              <Button variant="ghost" size="sm" onClick={() => setIsReadinessModalOpen(false)} className="h-8 w-8 p-0">
+                <X size={16} />
+              </Button>
             </div>
 
-            <div className="p-4 space-y-3 text-xs">
-              <p className="text-muted-foreground">
-                Export calculation run summary for {runNo} ({period}):
-              </p>
-
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleExport("Excel")}
-                  className="w-full justify-start gap-2 h-10 text-xs"
-                >
-                  <FileSpreadsheet size={15} className="text-success" />
-                  <div className="text-left">
-                    <div className="font-semibold">Excel Run Schedule (.xlsx)</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Full participant lines, gross, penalties, and net payable
+            <div className="space-y-2.5">
+              {DEFAULT_READINESS.map((chk) => (
+                <div key={chk.id} className="p-3 rounded-lg border bg-muted/40 flex items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                      <span>{chk.moduleName}</span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      Required: {chk.requiredState} · Signer: {chk.signer}
                     </div>
                   </div>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => handleExport("PDF")}
-                  className="w-full justify-start gap-2 h-10 text-xs"
-                >
-                  <Printer size={15} className="text-primary" />
-                  <div className="text-left">
-                    <div className="font-semibold">Executive Run Summary (.pdf)</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Approval ready report for Finance & Director sign-off
-                    </div>
-                  </div>
-                </Button>
-              </div>
+                  <span className="font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 px-2.5 py-1 rounded text-[11px]">
+                    {chk.currentState}
+                  </span>
+                </div>
+              ))}
             </div>
 
-            <div className="p-4 border-t bg-muted/30 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsExportModalOpen(false)}
-                className="text-xs"
-              >
+            <div className="flex justify-end pt-3 border-t">
+              <Button size="sm" onClick={() => setIsReadinessModalOpen(false)}>
                 Close
               </Button>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Layers,
   Search,
@@ -37,10 +37,14 @@ import {
   TrendingUp,
   Target,
   Users,
+  Database,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
 
 export type MatrixStatus = "Draft" | "Approved";
 
@@ -333,6 +337,145 @@ export function CommissionRateMatrixView({
     val: string;
   } | null>(null);
 
+  // PostgreSQL Database & Async States
+  const [matrixId, setMatrixId] = useState<string>("mat-solar-q4");
+  const [matrixName, setMatrixName] = useState<string>("Commercial Solar Inverter & ESS Matrix");
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [availableSchemes, setAvailableSchemes] = useState<Array<{ schemeCode: string; schemeName: string }>>([
+    { schemeCode: "SCH-2025-SOLAR-01", schemeName: "Commercial Solar" },
+    { schemeCode: "SCH-MOB-2026", schemeName: "sales scheama" },
+    { schemeCode: "SCH-MOB-2027", schemeName: "chathuni" },
+  ]);
+
+  // Add Dimension Row Modal State
+  const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
+  const [newRowForm, setNewRowForm] = useState({
+    capacityBand: "< 5 kW",
+    itemType: "",
+    cashImmediate: 3.5,
+    creditLt15: 3.0,
+    creditLt30: 2.5,
+    creditLte45: 2.0,
+    creditGt45: 1.0,
+  });
+
+  // Load Commission Rate Matrix from PostgreSQL
+  const loadMatrixFromDb = async (silent: boolean = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/rate-matrices");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.matrices && data.matrices.length > 0) {
+          const mat = data.matrices[0];
+          setMatrixId(mat.id);
+          setMatrixName(mat.matrixName);
+          setSelectedScheme(mat.schemeCode);
+          setSelectedVersion(mat.version);
+          setRowDimension(mat.rowDimension);
+          setColumnDimension(mat.columnDimension);
+          setRateUnit(mat.rateUnit);
+          setCurrency(mat.currency);
+          setStatus(mat.status);
+          if (mat.bands && mat.bands.length > 0) setBands(mat.bands);
+          if (mat.matrixData && mat.matrixData.length > 0) setMatrixData(mat.matrixData);
+          if (mat.history && mat.history.length > 0) setHistory(mat.history);
+          setIsDbConnected(true);
+          if (!silent) {
+            toast.success("Synchronized with PostgreSQL database.", {
+              description: `Loaded matrix ${mat.matrixName} (${mat.version}) successfully.`,
+            });
+          }
+        }
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err) {
+      console.error("Failed to load rate matrix from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMatrixFromDb(true);
+
+    // Also load available schemes from DB
+    apiFetch("/api/incentives/schemes")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.schemes && data.schemes.length > 0) {
+          setAvailableSchemes(
+            data.schemes.map((s: any) => ({
+              schemeCode: s.schemeCode,
+              schemeName: s.schemeName,
+            })),
+          );
+        }
+      })
+      .catch((err) => console.error("Could not fetch schemes:", err));
+  }, []);
+
+  const handleAddRow = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRowForm.itemType.trim()) {
+      toast.error("Validation Failed: Item Type is required.");
+      return;
+    }
+
+    const exists = matrixData.some(
+      (r) =>
+        r.capacityBand.trim().toLowerCase() === newRowForm.capacityBand.trim().toLowerCase() &&
+        r.itemType.trim().toLowerCase() === newRowForm.itemType.trim().toLowerCase(),
+    );
+    if (exists) {
+      toast.error(`Combination "${newRowForm.capacityBand} - ${newRowForm.itemType}" already exists.`);
+      return;
+    }
+
+    const newCellRow: RateMatrixCell = {
+      capacityBand: newRowForm.capacityBand.trim(),
+      itemType: newRowForm.itemType.trim(),
+      cashImmediate: Number(newRowForm.cashImmediate),
+      creditLt15: Number(newRowForm.creditLt15),
+      creditLt30: Number(newRowForm.creditLt30),
+      creditLte45: Number(newRowForm.creditLte45),
+      creditGt45: Number(newRowForm.creditGt45),
+    };
+
+    setMatrixData((prev) => [...prev, newCellRow]);
+    setShowAddRowModal(false);
+    setNewRowForm({
+      capacityBand: "< 5 kW",
+      itemType: "",
+      cashImmediate: 3.5,
+      creditLt15: 3.0,
+      creditLt30: 2.5,
+      creditLte45: 2.0,
+      creditGt45: 1.0,
+    });
+    toast.success(`Added dimension row "${newCellRow.capacityBand} - ${newCellRow.itemType}".`, {
+      description: "Click 'Save to PostgreSQL' to persist this to the database.",
+    });
+  };
+
+  const handleDeleteRow = (index: number) => {
+    if (status === "Approved") {
+      toast.warning("Cannot delete rows while in Approved status. Switch to Draft first.");
+      return;
+    }
+    const target = matrixData[index];
+    if (!target) return;
+    const updated = matrixData.filter((_, i) => i !== index);
+    setMatrixData(updated);
+    toast.success(`Removed row "${target.capacityBand} - ${target.itemType}".`, {
+      description: "Click 'Save to PostgreSQL' to update the database.",
+    });
+  };
+
   // --------------------------------------------------------------------------
   // Validations:
   // 1. Bands must not overlap
@@ -420,8 +563,8 @@ export function CommissionRateMatrixView({
   // Actions:
   // --------------------------------------------------------------------------
 
-  // Save draft version
-  const handleSaveDraft = () => {
+  // Save draft version to PostgreSQL
+  const handleSaveDraft = async () => {
     if (status !== "Draft") {
       toast.warning("Matrix is currently in Approved status.", {
         description: "Create a new draft version to make and persist edits.",
@@ -449,13 +592,51 @@ export function CommissionRateMatrixView({
     };
 
     setHistory([newLog, ...history]);
-    toast.success("Draft Commission Rate Matrix saved successfully.", {
-      description: `Version ${selectedVersion} draft updated with ${completenessValidation.validCells} rate values.`,
-    });
+
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/rate-matrices/${matrixId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schemeCode: selectedScheme,
+          matrixName: matrixName || "Commission Rate Matrix",
+          version: selectedVersion,
+          rowDimension,
+          columnDimension,
+          rateUnit,
+          currency,
+          status: "Draft",
+          bands,
+          matrixData,
+          modifiedBy: "Incentive Administrator",
+          changeNote: `Manual save for rate matrix (${selectedVersion}) with ${matrixData.length} rows.`,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.matrix) {
+          if (data.matrix.history) setHistory(data.matrix.history);
+          setIsDbConnected(true);
+        }
+        toast.success(`Commission Rate Matrix (${selectedVersion}) saved to PostgreSQL!`, {
+          description: `Persisted ${matrixData.length} dimension rows and ${bands.length} credit bands to database.`,
+        });
+      } else {
+        toast.error("Failed to save matrix to PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Save matrix error:", err);
+      toast.error("Network or database error while saving matrix.");
+      setIsDbConnected(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Status Action: Approve or Create New Draft
-  const handleApproveMatrix = () => {
+  // Status Action: Approve or Create New Draft in PostgreSQL
+  const handleApproveMatrix = async () => {
     if (bandOverlapError) {
       toast.error("Approval blocked: Bands overlap error.", {
         description: bandOverlapError,
@@ -486,9 +667,30 @@ export function CommissionRateMatrixView({
     };
     setHistory([approveLog, ...history]);
 
-    toast.success(`Commission Rate Matrix ${selectedVersion} Approved!`, {
-      description: "Rates locked and authorized for calculation runs and posting.",
-    });
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/rate-matrices/${matrixId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Approved",
+          author: "Marcus Wong",
+          role: "Finance Director",
+          details: `Formally certified and approved Commission Rate Matrix ${selectedVersion}.`,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.matrix?.history) setHistory(data.matrix.history);
+        toast.success(`Commission Rate Matrix ${selectedVersion} Approved in PostgreSQL!`, {
+          description: "Rates locked and authorized for calculation runs and posting.",
+        });
+      }
+    } catch (err) {
+      console.error("Approve error:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCreateNewDraftVersion = () => {
@@ -711,21 +913,43 @@ export function CommissionRateMatrixView({
 
   return (
     <div className="space-y-6">
-      {/* Simulation Banner Notice */}
-      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-muted-foreground flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Info size={16} className="text-primary shrink-0" />
-          <span>
-            <strong>Frontend Simulation Mode:</strong> Commission rates and payment-term bands are
-            managed in active local application state. Changes do not write directly to SAP Business
-            One until staged via calculation runs.
+      {/* PostgreSQL Status & Sync Banner */}
+      <div className="bg-card border rounded-lg p-3 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+          />
+          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="text-muted-foreground">
+            Database Engine:{" "}
+            <strong className="text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
+            </strong>{" "}
+            — Commission rates, payment-term bands, and audit logs are synchronized with PostgreSQL.
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Interactive Mock Engine
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              isDbConnected
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            }`}
+          >
+            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
           </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadMatrixFromDb(false)}
+            disabled={isLoading}
+            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Reload from PostgreSQL"
+          >
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync</span>
+          </Button>
         </div>
       </div>
 
@@ -850,16 +1074,17 @@ export function CommissionRateMatrixView({
               <span>Import Excel</span>
             </Button>
 
-            {/* Save Draft */}
+            {/* Save to PostgreSQL */}
             {status === "Draft" && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleSaveDraft}
-                className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background text-primary border-primary/30 hover:bg-primary/5"
+                disabled={isSaving}
+                className="h-9 gap-1.5 text-xs font-semibold cursor-pointer bg-background text-primary border-primary/40 hover:bg-primary/5 shadow-xs"
               >
-                <Save size={14} />
-                <span>Save Draft</span>
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
               </Button>
             )}
 
@@ -900,9 +1125,11 @@ export function CommissionRateMatrixView({
                 onChange={(e) => setSelectedScheme(e.target.value)}
                 className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium"
               >
-                <option value="SCH-2025-SOLAR-01">SCH-2025-SOLAR-01 (Commercial Solar)</option>
-                <option value="SCH-2025-RETAIL-02">SCH-2025-RETAIL-02 (Residential Solar)</option>
-                <option value="SCH-2025-IND-03">SCH-2025-IND-03 (High-Voltage Storage)</option>
+                {availableSchemes.map((s) => (
+                  <option key={s.schemeCode} value={s.schemeCode}>
+                    {s.schemeCode} ({s.schemeName})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1172,6 +1399,17 @@ export function CommissionRateMatrixView({
                   Reset
                 </Button>
               )}
+
+              {status === "Draft" && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowAddRowModal(true)}
+                  className="h-7 text-xs px-2.5 gap-1.5 bg-primary text-primary-foreground cursor-pointer shrink-0"
+                >
+                  <Plus size={13} />
+                  <span>Add Row</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1259,12 +1497,13 @@ export function CommissionRateMatrixView({
                         </span>
                       </div>
                     </th>
+                    <th className="py-3 px-3 w-[60px] text-center border-l">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredMatrix.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         No product dimension records match your search criteria.
                       </td>
                     </tr>

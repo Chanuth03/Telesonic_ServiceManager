@@ -1,10 +1,11 @@
+import { useMemo } from "react";
 import { ArrowRight, Calendar, Building2, User } from "lucide-react";
 import {
   AVAILABLE_PERIODS,
-  AVAILABLE_DIVISIONS,
   type IncentiveFilterState,
   type IncentiveParticipant,
 } from "@/lib/incentive-data";
+import { useIncentiveDivisions } from "@/lib/use-divisions";
 
 interface IncentiveFiltersProps {
   filters: IncentiveFilterState;
@@ -17,6 +18,10 @@ export function IncentiveFilters({
   onChangeFilters,
   participants,
 }: IncentiveFiltersProps) {
+  // Dynamic Divisions from Division Master PostgreSQL
+  const { divisionNames } = useIncentiveDivisions();
+  const availableDivisions = useMemo(() => ["All Divisions", ...divisionNames], [divisionNames]);
+
   return (
     <div className="card-surface p-5 mb-6 space-y-4">
       {/* Row 1: Period & Division */}
@@ -54,7 +59,7 @@ export function IncentiveFilters({
               onChange={(e) => onChangeFilters({ division: e.target.value })}
               className="input-field font-medium border-primary/40 focus:border-primary text-foreground"
             >
-              {AVAILABLE_DIVISIONS.map((d) => (
+              {availableDivisions.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
