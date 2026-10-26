@@ -589,20 +589,84 @@ export const initialStockCountItems: StockCountItem[] = [
   },
 ];
 
+export type MobileStoreEvent = "jobs" | "stock" | "notifications" | "hydrate";
+
+export type MobileSyncAction =
+  | "UPDATE_STATUS"
+  | "ADD_LABOUR"
+  | "ADD_PART"
+  | "SUBMIT_INSPECTION"
+  | "SUBMIT_HOLD"
+  | "COMPLETE_JOB"
+  | "GENERIC_UPDATE";
+
+export type MobilePersistEvent =
+  | { kind: "job"; job: MobileJob; action: MobileSyncAction }
+  | { kind: "stock"; items: StockCountItem[] }
+  | { kind: "notifications"; items: MobileNotification[] };
+
 // REACTIVE STORE STATE
 let jobsStore: MobileJob[] = [...initialMobileJobs];
 let notificationsStore: MobileNotification[] = [...initialNotifications];
 let stockCountStore: StockCountItem[] = [...initialStockCountItems];
+let mutationEpoch = 0;
 
-const listeners = new Set<() => void>();
+const listeners = new Set<(event?: MobileStoreEvent) => void>();
+const persistListeners = new Set<(event: MobilePersistEvent) => void>();
 
-function notifyAll() {
-  listeners.forEach((cb) => cb());
+function notifyAll(event: MobileStoreEvent = "jobs") {
+  listeners.forEach((cb) => cb(event));
 }
 
-export function subscribeMobileJobs(cb: () => void): () => void {
+function emitPersist(event: MobilePersistEvent) {
+  mutationEpoch += 1;
+  persistListeners.forEach((cb) => {
+    try {
+      cb(event);
+    } catch (err) {
+      console.error("[Mobile] Failed to queue offline save:", err);
+    }
+  });
+}
+
+function queueJob(id: string, action: MobileSyncAction) {
+  const job = jobsStore.find((item) => item.id === id);
+  notifyAll("jobs");
+  if (job) emitPersist({ kind: "job", job, action });
+  return job;
+}
+
+export function getMobileMutationEpoch(): number {
+  return mutationEpoch;
+}
+
+export function subscribeMobileJobs(cb: (event?: MobileStoreEvent) => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
+}
+
+export function subscribeMobilePersist(cb: (event: MobilePersistEvent) => void): () => void {
+  persistListeners.add(cb);
+  return () => persistListeners.delete(cb);
+}
+
+/** Replace screen memory from the on-device database without queueing another sync. */
+export function hydrateMobileStores(data: {
+  jobs?: MobileJob[];
+  notifications?: MobileNotification[];
+  stock?: StockCountItem[];
+}) {
+  if (data.jobs) jobsStore = data.jobs.map((job) => ({ ...job }));
+  if (data.notifications) notificationsStore = data.notifications.map((item) => ({ ...item }));
+  if (data.stock) stockCountStore = data.stock.map((item) => ({ ...item }));
+  notifyAll("hydrate");
+}
+
+export function resetMobileMemoryStores() {
+  jobsStore = initialMobileJobs.map((job) => ({ ...job }));
+  notificationsStore = initialNotifications.map((item) => ({ ...item }));
+  stockCountStore = initialStockCountItems.map((item) => ({ ...item }));
+  notifyAll("hydrate");
 }
 
 // JOB READ / UPDATE API
@@ -642,8 +706,7 @@ export function updateMobileJobStatus(
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "UPDATE_STATUS");
 }
 
 // O1-SCR-MOB-04: TRAVEL / CHECK-IN
@@ -672,8 +735,7 @@ export function updateMobileJobTravel(
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "GENERIC_UPDATE");
 }
 
 // O1-SCR-MOB-06: PARTS USED & RETURNED
@@ -684,8 +746,7 @@ export function updateJobPartsList(id: string, parts: PartItem[]): MobileJob | u
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "ADD_PART");
 }
 
 // O1-SCR-MOB-07: LABOUR LOGS
@@ -697,8 +758,7 @@ export function addJobLabourLog(id: string, log: LabourLog): MobileJob | undefin
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "ADD_LABOUR");
 }
 
 // O1-SCR-MOB-08: PHOTOS
@@ -710,8 +770,7 @@ export function addJobPhoto(id: string, photo: JobPhoto): MobileJob | undefined 
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "GENERIC_UPDATE");
 }
 
 export function deleteJobPhoto(id: string, photoId: string): MobileJob | undefined {
@@ -722,8 +781,7 @@ export function deleteJobPhoto(id: string, photoId: string): MobileJob | undefin
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "GENERIC_UPDATE");
 }
 
 // O1-SCR-MOB-09: COMPLETION & SIGNATURE
@@ -738,8 +796,7 @@ export function completeMobileJob(id: string, completion: JobCompletion): Mobile
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "COMPLETE_JOB");
 }
 
 // O1-SCR-MOB-11: SITE INSPECTION
@@ -753,8 +810,7 @@ export function saveJobInspection(
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "SUBMIT_INSPECTION");
 }
 
 // O1-SCR-MOB-13: HOLD REQUEST
@@ -773,8 +829,7 @@ export function submitJobHoldRequest(
     }
     return j;
   });
-  notifyAll();
-  return getMobileJobById(id);
+  return queueJob(id, "SUBMIT_HOLD");
 }
 
 // O1-SCR-MOB-14: NOTIFICATIONS
@@ -784,7 +839,8 @@ export function getMobileNotifications(): MobileNotification[] {
 
 export function markNotificationRead(id: string) {
   notificationsStore = notificationsStore.map((n) => (n.id === id ? { ...n, read: true } : n));
-  notifyAll();
+  notifyAll("notifications");
+  emitPersist({ kind: "notifications", items: getMobileNotifications() });
 }
 
 export function markMobileNotificationAsRead(id: string): MobileNotification[] {
@@ -794,7 +850,8 @@ export function markMobileNotificationAsRead(id: string): MobileNotification[] {
 
 export function markAllNotificationsRead() {
   notificationsStore = notificationsStore.map((n) => ({ ...n, read: true }));
-  notifyAll();
+  notifyAll("notifications");
+  emitPersist({ kind: "notifications", items: getMobileNotifications() });
 }
 
 export function markAllMobileNotificationsAsRead(): MobileNotification[] {
@@ -804,7 +861,8 @@ export function markAllMobileNotificationsAsRead(): MobileNotification[] {
 
 export function deleteMobileNotification(id: string): MobileNotification[] {
   notificationsStore = notificationsStore.filter((n) => n.id !== id);
-  notifyAll();
+  notifyAll("notifications");
+  emitPersist({ kind: "notifications", items: getMobileNotifications() });
   return getMobileNotifications();
 }
 
@@ -817,5 +875,6 @@ export function updateStockCountItem(sku: string, countedQty: number, varianceRe
   stockCountStore = stockCountStore.map((item) =>
     item.sku === sku ? { ...item, countedQty, varianceReason } : item,
   );
-  notifyAll();
+  notifyAll("stock");
+  emitPersist({ kind: "stock", items: stockCountStore.map((item) => ({ ...item })) });
 }

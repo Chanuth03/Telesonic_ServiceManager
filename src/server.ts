@@ -45,11 +45,15 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 import { handleApiRequest } from "./lib/api-handler";
+import { handleMobileSyncRequest } from "./lib/postgres-sync";
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const url = new URL(request.url);
+      if (url.pathname === "/api/sync") {
+        return handleMobileSyncRequest(request);
+      }
       if (url.pathname.startsWith("/api/")) {
         return handleApiRequest(request);
       }
