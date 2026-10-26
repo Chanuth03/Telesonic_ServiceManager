@@ -787,11 +787,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                             }`}
                           >
                             <span>{col.label}</span>
-                            {col.isB1 && (
-                              <span className="text-[10px] font-mono text-sky-700 dark:text-sky-300">
-                                ⇄B1
-                              </span>
-                            )}
                           </div>
                         </th>
                       ))}

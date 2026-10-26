@@ -8,6 +8,7 @@ interface MasterExportModalProps {
   meta: MasterScreenMeta;
   activeTab: MasterTabDef;
   formData: Record<string, unknown>;
+  savedRecords?: Array<Record<string, unknown>>;
 }
 
 export const MasterExportModal: React.FC<MasterExportModalProps> = ({
@@ -16,6 +17,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
   meta,
   activeTab,
   formData,
+  savedRecords = [],
 }) => {
   const [activeFormat, setActiveFormat] = React.useState<"pdf" | "excel">("pdf");
   const [downloaded, setDownloaded] = React.useState(false);
@@ -176,7 +178,7 @@ export const MasterExportModal: React.FC<MasterExportModalProps> = ({
         <tr>${activeTab.columns.map((c) => `<th class="${c.align === "right" ? "right" : ""}">${c.label}</th>`).join("")}</tr>
       </thead>
       <tbody>
-        ${exportRows.map((r) => `<tr>${exportColumns.map((c) => `<td class="${(c as any).align === "right" ? "right" : ""}">${r[c.key] ?? "—"}</td>`).join("")}</tr>`).join("")}
+        ${exportRows.map((r: any) => `<tr>${exportColumns.map((c) => `<td class="${(c as any).align === "right" ? "right" : ""}">${r[c.key] ?? "—"}</td>`).join("")}</tr>`).join("")}
       </tbody>
     </table>
     <div class="footer">

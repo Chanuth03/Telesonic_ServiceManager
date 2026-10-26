@@ -6,18 +6,38 @@
 
 import { PrismaClient } from "@prisma/client";
 
+// Extended Prisma interface to ensure VS Code TypeScript Server recognizes
+// dynamically generated models (customer, contactPerson, site, item, masterRecord)
+// even when tsserver caches prior @prisma/client declarations.
+export type TelesonicPrismaClient = PrismaClient & {
+  customer: any;
+  contactPerson: any;
+  site: any;
+  item: any;
+  serialRegister: any;
+  equipment: any;
+  otherBrandEquipment: any;
+  equipmentSystem: any;
+  technician: any;
+  subcontractor: any;
+  serviceRoleMaster: any;
+  serviceTypeMaster: any;
+  masterRecord: any;
+  [key: string]: any;
+};
+
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: TelesonicPrismaClient | undefined;
 };
 
 const isDev = typeof process !== "undefined" && process.env["NODE_ENV"] === "development";
 const isNotProd = typeof process !== "undefined" && process.env["NODE_ENV"] !== "production";
 
-export const prisma =
+export const prisma: TelesonicPrismaClient =
   globalForPrisma.prisma ??
-  new PrismaClient({
+  (new PrismaClient({
     log: isDev ? ["warn", "error"] : ["error"],
-  });
+  }) as TelesonicPrismaClient);
 
 if (isNotProd) globalForPrisma.prisma = prisma;
 

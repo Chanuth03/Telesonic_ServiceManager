@@ -1,0 +1,97 @@
+
+// ==========================================
+// Batch 1 Models (MST-08 to MST-12)
+// ==========================================
+
+model EquipmentSystem {
+  id                Int       @id @default(autoincrement())
+  systemId          String    @unique // e.g. "SYS-VRF-COL-009"
+  customerId        Int?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String?
+  siteId            Int?
+  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName          String?
+  location          String?
+  equipmentCategory String
+  status            String    @default("Active")
+  installedDate     String?
+  commissionedDate  String?
+  warrantyStart     String?
+  warrantyEnd       String?
+  contract          String?
+  project           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@map("equipment_systems")
+}
+
+model Technician {
+  id             Int      @id @default(autoincrement())
+  employeeId     String   @unique // e.g. "EMP-0412"
+  name           String
+  position       String?
+  department     String?
+  branch         String?
+  mobile         String?
+  technicianType String?  @default("Direct In-House Staff")
+  team           String?
+  certifications String?
+  status         String   @default("Active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("technicians")
+}
+
+model Subcontractor {
+  id                Int      @id @default(autoincrement())
+  vendorCode        String   @unique // e.g. "V-4410"
+  vendorName        String
+  subcontractorType String
+  territory         String
+  paymentTerms      String?
+  rating            Float?   @default(8.0)
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("subcontractors")
+}
+
+model ServiceRoleMaster {
+  id                    Int      @id @default(autoincrement())
+  roleCode              String   @unique // e.g. "ROLE-LEAD-TECH"
+  roleName              String
+  internalSubcontractor String?  @default("Both Internal and Subcontractor")
+  incentiveEligible     String   @default("Yes")
+  incentiveBasisRef     String?
+  multiplePerCall       String?  @default("No")
+  active                String   @default("Yes")
+  status                String   @default("Active")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("service_roles")
+}
+
+model ServiceTypeMaster {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique // e.g. "SVC-PREV-MAINT"
+  description       String
+  listType          String
+  defaultPriority   String?  @default("P2 - Normal Schedule")
+  checklistTemplate String?
+  slaRule           String?
+  chargeableDefault String?  @default("No")
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("service_types")
+}
+

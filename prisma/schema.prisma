@@ -11,57 +11,57 @@ datasource db {
 }
 
 model Job {
-  id              String        @id
+  id              String    @id
   customerName    String
   customerContact String?
   town            String
   window          String
-  priority        String        // "Critical" | "High" | "Normal" | "Low"
+  priority        String // "Critical" | "High" | "Normal" | "Low"
   role            String
-  status          String        // "Assigned" | "Accepted" | "In Progress" | "On Hold" | "Completed" | "Declined"
+  status          String // "Assigned" | "Accepted" | "In Progress" | "On Hold" | "Completed" | "Declined"
   category        String
   siteName        String?
   siteAddress     String
   technicianName  String
   scheduledDate   String
-  syncStatus      String        @default("synced") // "synced" | "pending"
+  syncStatus      String    @default("synced") // "synced" | "pending"
   syncedAt        DateTime?
-  version         Int           @default(1)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  labourLogs      LabourLog[]
-  partsUsed       PartUsed[]
-  inspections     Inspection[]
-  holdRequests    HoldRequest[]
+  labourLogs   LabourLog[]
+  partsUsed    PartUsed[]
+  inspections  Inspection[]
+  holdRequests HoldRequest[]
 
   @@map("jobs")
 }
 
 model ServiceRequest {
-  id              String        @id
-  title           String
-  callType        String
-  customerName    String
-  status          String
-  priority        String
-  assignedTo      String?
-  scheduledDate   String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id            String   @id
+  title         String
+  callType      String
+  customerName  String
+  status        String
+  priority      String
+  assignedTo    String?
+  scheduledDate String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("service_requests")
 }
 
 model SyncLog {
-  id          String    @id @default(cuid())
-  batchId     String
-  role        String
-  deviceId    String
-  itemCount   Int
-  status      String    // "SUCCESS" | "PARTIAL" | "FAILED"
-  details     String?
-  syncedAt    DateTime  @default(now())
+  id        String   @id @default(cuid())
+  batchId   String
+  role      String
+  deviceId  String
+  itemCount Int
+  status    String // "SUCCESS" | "PARTIAL" | "FAILED"
+  details   String?
+  syncedAt  DateTime @default(now())
 
   @@map("sync_logs")
 }
@@ -73,7 +73,7 @@ model LabourLog {
   technicianName      String
   date                String
   hours               Float
-  rateType            String   // "Regular" | "Overtime" | "Weekend/Holiday"
+  rateType            String // "Regular" | "Overtime" | "Weekend/Holiday"
   activityDescription String
   createdAt           DateTime @default(now())
 
@@ -81,14 +81,14 @@ model LabourLog {
 }
 
 model PartUsed {
-  id             String   @id @default(cuid())
-  jobId          String
-  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  partCode       String
-  name           String
-  qtyUsed        Int
-  unitPrice      Float
-  createdAt      DateTime @default(now())
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  partCode  String
+  name      String
+  qtyUsed   Int
+  unitPrice Float
+  createdAt DateTime @default(now())
 
   @@map("parts_used")
 }
@@ -99,7 +99,7 @@ model Inspection {
   job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   inspectedAt    DateTime @default(now())
   technicianName String
-  overallStatus  String   // "Pass" | "Fail" | "Conditional Pass"
+  overallStatus  String // "Pass" | "Fail" | "Conditional Pass"
   generalNotes   String?
 
   @@map("inspections")
@@ -113,7 +113,7 @@ model HoldRequest {
   notes               String
   estimatedDelayHours Float
   requestedAt         DateTime @default(now())
-  status              String   // "Submitted" | "Approved" | "Pending Review"
+  status              String // "Submitted" | "Approved" | "Pending Review"
 
   @@map("hold_requests")
 }
@@ -122,8 +122,8 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
-  password  String   // Bcrypt hashed password
-  role      String   // System Role Code (e.g. ADMIN, TECHNICIAN, COORDINATOR)
+  password  String // Bcrypt hashed password
+  role      String // System Role Code (e.g. ADMIN, TECHNICIAN, COORDINATOR)
   phone     String?
   status    String   @default("Active") // "Active" | "Inactive"
   createdAt DateTime @default(now())
@@ -132,16 +132,641 @@ model User {
   @@map("users")
 }
 
-
 model SystemRole {
   id          Int      @id @default(autoincrement())
   code        String   @unique
   name        String
   description String?
-  permissions String?  // comma separated or JSON string
+  permissions String? // comma separated or JSON string
   status      String   @default("Active") // "Active" | "Inactive"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@map("system_roles")
+}
+
+// Generic Master Record model for all Master Screens (MST-01 to MST-31)
+// Stores all screen-specific attributes in JSON while supporting fast indexed queries by screenCode & recordKey
+model MasterRecord {
+  id         Int      @id @default(autoincrement())
+  screenCode String // e.g. "MST-11", "MST-12", "MST-13", etc.
+  recordKey  String // primary identifier (e.g. roleCode, code, reasonCode)
+  data       Json // complete record data object matching MasterFieldDef
+  status     String   @default("Active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([screenCode, recordKey])
+  @@index([screenCode])
+  @@map("master_records")
+}
+
+// Dedicated Customer Master Model (MST-01 / O1-SCR-MST-01)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Customer {
+  id                 Int      @id @default(autoincrement())
+  customerCode       String   @unique
+  customerName       String
+  customerGroup      String // "Corporate Commercial" | "Retail Franchise" | etc.
+  territory          String? // "Western - Colombo Central" | etc.
+  mobile             String
+  nicBrNo            String?
+  customerType       String // "Corporate Enterprise" | "Small Business" | "Direct Consumer"
+  grade              String? // "Tier 1 - Platinum VIP" | etc.
+  firstChannel       String? // "Field Sales Rep" | "Web Portal" | etc.
+  preferredChannel   String? // "Dedicated Hotline" | "WhatsApp / SMS" | "Email Dispatch"
+  customerOrigin     String?  @default("Telesonic-sold") // "Telesonic-sold" | "Non-Telesonic" | "Mixed"
+  relationshipStatus String?  @default("Active") // "Free Service" | "Warranty Service" | "Agreement/AMC" | "Ad Hoc"
+  paymentHold        String?  @default("No") // "No" | "Yes (Overdue Lock)"
+  balanceLkr         Float?   @default(0.0)
+  status             String   @default("Active") // "Active" | "Inactive"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  contacts             ContactPerson[]
+  sites                Site[]
+  serialRegisters      SerialRegister[]
+  equipment            Equipment[]
+  otherBrandEquipments OtherBrandEquipment[]
+  equipmentSystems     EquipmentSystem[]
+
+  @@map("customers")
+}
+
+// Dedicated Contact Person Master Model (MST-02 / O1-SCR-MST-02)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Key: customerId referencing customers(id)
+model ContactPerson {
+  id           Int      @id @default(autoincrement())
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerCode String? // Snapshot / display (e.g. C-30512)
+  contactName  String
+  position     String? // "Facilities Manager", etc.
+  mobile       String
+  email        String?
+  site         String? // Associated site name / ID
+  active       String   @default("Yes") // "Yes" | "No"
+  validFrom    String? // Date string "YYYY-MM-DD"
+  status       String   @default("Active") // "Active" | "Inactive"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([customerId])
+  @@map("contact_persons")
+}
+
+// Dedicated Site and Location Master Model (MST-03 / O1-SCR-MST-03)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Key: customerId referencing customers(id)
+model Site {
+  serials              SerialRegister[]
+  id                   Int                   @id @default(autoincrement())
+  customerId           Int
+  customer             Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerCode         String? // Snapshot (e.g. C-30512)
+  customerName         String? // Snapshot (e.g. Jayasuriya Textiles)
+  siteCode             String                @unique // e.g. "SITE-COL-0091"
+  siteName             String
+  building             String?
+  floor                String?
+  room                 String?
+  addressLine1         String
+  cityTown             String
+  district             String
+  province             String
+  landmark             String?
+  gpsLatLong           String?
+  siteContact          String?
+  status               String                @default("Active") // "Active" | "Inactive"
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  equipment            Equipment[]
+  otherBrandEquipments OtherBrandEquipment[]
+  equipmentSystems     EquipmentSystem[]
+
+  @@index([customerId])
+  @@map("sites")
+}
+
+// Dedicated Item / Brand / Model / Equipment Category Master Model (MST-04 / O1-SCR-MST-04)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Item {
+  id                      Int              @id @default(autoincrement())
+  itemCode                String           @unique
+  itemName                String
+  itemGroup               String // "Finished Equipment" | "Service Spare Parts" | "Consumables" | "Accessories"
+  brand                   String // "Carrier" | "Midea" | "Toshiba" | "Bosch" | "Isuzu Industrial"
+  model                   String? // Model No.
+  equipmentCategory       String // e.g. "Air Conditioning Commercial"
+  componentRole           String? // "Complete Unit" | "Indoor Unit" | "Outdoor Unit" | "Compressor" | etc.
+  serviceable             String           @default("Yes") // "Yes" | "No"
+  warrantyMonths          Int?             @default(12)
+  componentWarrantyMonths Int?             @default(6)
+  serialManaged           String           @default("Yes") // "Yes" | "No"
+  status                  String           @default("Active") // "Active" | "Inactive"
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  serialRegisters         SerialRegister[]
+
+  @@map("items")
+}
+
+// Dedicated Serial Number Register and Lifecycle Master Model (MST-05 / O1-SCR-MST-05)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Keys: itemId (Item), customerId (Customer, optional), siteId (Site, optional)
+model SerialRegister {
+  id             Int         @id @default(autoincrement())
+  serialNo       String      @unique // e.g. "BSH-CTRL-00872"
+  itemId         Int?
+  item           Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemCode       String? // Snapshot (e.g. "SP-COMP-18K")
+  itemName       String? // Snapshot (e.g. "SP-COMP-18K Compressor Scroll")
+  status         String      @default("Available") // "Available" | "Delivered" | "Installed" | "Replaced" | "Returned" | "Scrapped"
+  warehouse      String? // "VAN-KSILVA (Field Stock)", "Central Stores", etc.
+  customerId     Int?
+  customer       Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String? // Snapshot
+  siteId         Int?
+  site           Site?       @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName       String? // Snapshot
+  systemId       String? // e.g. "CNT-2026-07"
+  componentRole  String? // "Main Compressor Unit", "Indoor Evaporator", "Control Panel"
+  warrantyStart  String? // Date "YYYY-MM-DD"
+  replacesSerial String? // e.g. "BSH-CTRL-00412"
+  replacedBy     String? // e.g. "BSH-CTRL-00999"
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  equipment      Equipment[]
+
+  @@index([itemId])
+  @@index([customerId])
+  @@index([siteId])
+  @@map("serials")
+}
+
+// Dedicated Equipment / Installed Base Master Model (MST-06 / O1-SCR-MST-06)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Equipment {
+  id               Int             @id @default(autoincrement())
+  equipmentId      String          @unique // e.g. "EQ-018834"
+  customerId       Int?
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName     String? // Snapshot
+  siteId           Int?
+  site             Site?           @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName         String? // Snapshot
+  itemCategory     String
+  brand            String
+  model            String?
+  serialId         Int?
+  serial           SerialRegister? @relation(fields: [serialId], references: [id], onDelete: SetNull)
+  serialNo         String? // Snapshot
+  origin           String          @default("Telesonic-originated")
+  serviceProvider  String          @default("Telesonic In-House SRE")
+  installedDate    String?
+  commissionedDate String?
+  warrantyTo       String?
+  relationship     String?         @default("Active Under Warranty")
+  systemId         String?
+  meterReading     Float?          @default(0)
+  status           String          @default("Installed")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@index([serialId])
+  @@map("equipments")
+}
+
+// Dedicated Other-Brand Equipment Master Model (MST-07 / O1-SCR-MST-07)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model OtherBrandEquipment {
+  id                Int       @id @default(autoincrement())
+  equipmentId       String    @unique // e.g. "EQ-OTH-99104"
+  customerId        Int?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String? // Snapshot
+  siteId            Int?
+  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName          String? // Snapshot
+  equipmentCategory String
+  brand             String
+  model             String
+  serial            String?
+  serialUnknown     String    @default("No")
+  previousSupplier  String?
+  takeoverDate      String?
+  takeoverCondition String?
+  status            String    @default("Active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@map("other_brand_equipments")
+}
+
+// ==========================================
+// Batch 1 Models (MST-08 to MST-12)
+// ==========================================
+
+model EquipmentSystem {
+  id                Int       @id @default(autoincrement())
+  systemId          String    @unique // e.g. "SYS-VRF-COL-009"
+  customerId        Int?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String?
+  siteId            Int?
+  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName          String?
+  location          String?
+  equipmentCategory String
+  status            String    @default("Active")
+  installedDate     String?
+  commissionedDate  String?
+  warrantyStart     String?
+  warrantyEnd       String?
+  contract          String?
+  project           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@map("equipment_systems")
+}
+
+model Technician {
+  id             Int      @id @default(autoincrement())
+  employeeId     String   @unique // e.g. "EMP-0412"
+  name           String
+  position       String?
+  department     String?
+  branch         String?
+  mobile         String?
+  technicianType String?  @default("Direct In-House Staff")
+  team           String?
+  certifications String?
+  normalRate     Float?   @default(0.0)
+  overtimeRate   Float?   @default(0.0)
+  status         String   @default("Active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("technicians")
+}
+
+model Subcontractor {
+  id                Int      @id @default(autoincrement())
+  vendorCode        String   @unique // e.g. "V-4410"
+  vendorName        String
+  subcontractorType String
+  territory         String
+  paymentTerms      String?
+  rating            Float?   @default(8.0)
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("subcontractors")
+}
+
+model ServiceRoleMaster {
+  id                    Int      @id @default(autoincrement())
+  roleCode              String   @unique // e.g. "ROLE-LEAD-TECH"
+  roleName              String
+  internalSubcontractor String?  @default("Both Internal and Subcontractor")
+  incentiveEligible     String   @default("Yes")
+  incentiveBasisRef     String?
+  multiplePerCall       String?  @default("No")
+  active                String   @default("Yes")
+  status                String   @default("Active")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("service_roles")
+}
+
+model ServiceTypeMaster {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique // e.g. "SVC-PREV-MAINT"
+  description       String
+  listType          String
+  defaultPriority   String?  @default("P2 - Normal Schedule")
+  checklistTemplate String?
+  slaRule           String?
+  chargeableDefault String?  @default("No")
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("service_types")
+}
+
+model HoldReasonMaster {
+  id              Int      @id @default(autoincrement())
+  reasonCode      String   @unique // e.g. "HLD-PARTS-AWAITED"
+  description     String
+  customerWording String
+  excludeFromSla  String?  @default("Yes (Clock Paused)")
+  maxHoldDays     Int?     @default(14)
+  active          String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("hold_reasons")
+}
+
+model RepeatReasonMaster {
+  id                  Int      @id @default(autoincrement())
+  reasonCode          String   @unique // e.g. "RPT-INCORRECT-DIAG"
+  description         String
+  countsAsPoorService String?  @default("Yes")
+  detectionPeriodDays Int      @default(30)
+  appliesToCategory   String?
+  active              String   @default("Yes")
+  status              String   @default("Active")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("repeat_reasons")
+}
+
+model SlaRuleMaster {
+  id              Int      @id @default(autoincrement())
+  ruleCode        String   @unique // e.g. "SLA-P0-METRO"
+  serviceType     String
+  priority        String
+  area            String?
+  resourceType    String?
+  responseHours   Float
+  resolutionHours Float
+  warningPct      Float?   @default(75.0)
+  calendar        String
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("sla_rules")
+}
+
+model ChecklistTemplateMaster {
+  id                Int      @id @default(autoincrement())
+  templateCode      String   @unique // e.g. "CHK-PM-AC-COMM"
+  name              String
+  equipmentCategory String
+  serviceType       String
+  version           Int?     @default(1)
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("checklist_templates")
+}
+
+model WarrantyRuleMaster {
+  id                   Int      @id @default(autoincrement())
+  ruleCode             String   @unique // e.g. "WAR-CARRIER-COMM-01"
+  equipmentCategory    String
+  componentRole        String?
+  channel              String?
+  startBasis           String
+  months               Int
+  labourCovered        String?  @default("Yes")
+  replacementTreatment String?  @default("Repair in Workshop")
+  status               String   @default("Active")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("warranty_rules")
+}
+
+model FreeServicePlanMaster {
+  id                Int      @id @default(autoincrement())
+  planCode          String   @unique // e.g. "FSP-AC-COMM-3V"
+  division          String
+  equipmentCategory String
+  visits            Int
+  intervalBasis     String
+  intervalValue     Int
+  startBasis        String
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("free_service_plans")
+}
+
+model ContractTemplateMaster {
+  id            Int      @id @default(autoincrement())
+  template      String   @unique // e.g. "AMC-COMP-2026-PREM"
+  contractKind  String
+  visitsPerYear Int?     @default(4)
+  coverage      String?  @default("24/7 Priority Emergency Coverage")
+  responseHours Int?     @default(4)
+  billingBasis  String?  @default("Quarterly in Advance")
+  status        String   @default("Active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("contract_templates")
+}
+
+model RelationshipStageMaster {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // e.g. "STG-ACTIVE-AMC"
+  description String
+  listType    String
+  appliesTo   String   @default("All Customer Accounts")
+  active      String   @default("Yes")
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("relationship_stages")
+}
+
+model ReminderRuleMaster {
+  id               Int      @id @default(autoincrement())
+  ruleCode         String   @unique // e.g. "REM-AMC-RENEW-30"
+  reminderType     String
+  customerCategory String?  @default("All Customers")
+  leadDays         Int
+  maxReminders     Int      @default(3)
+  intervalDays     Int      @default(7)
+  channel          String   @default("SMS + WhatsApp")
+  consentRequired  String?  @default("Yes")
+  status           String   @default("Active")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("reminder_rules")
+}
+
+model NotificationTemplateMaster {
+  id         Int      @id @default(autoincrement())
+  templateId String   @unique // e.g. "NTF-SMS-APPT-CONFIRM"
+  name       String
+  channel    String
+  language   String?  @default("English")
+  subject    String?
+  body       String
+  active     String   @default("Yes")
+  status     String   @default("Active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("notification_templates")
+}
+
+model ProjectBudgetMaster {
+  id             Int       @id @default(autoincrement())
+  projectCode    String    @unique // e.g. "PRJ-CAC-2026-014"
+  projectName    String
+  customer       String
+  projectManager String
+  startDate      DateTime?
+  endDate        DateTime?
+  budgetVersion  Int?      @default(1)
+  versionStatus  String?   @default("Draft")
+  status         String    @default("Active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("project_budgets")
+}
+
+model CostElementMappingMaster {
+  id              Int      @id @default(autoincrement())
+  costElement     String   @unique // e.g. "Subcontractor Labor"
+  description     String
+  glAccount       String
+  revenueCost     String?  @default("Expense")
+  requiresCallRef String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("cost_element_mappings")
+}
+
+model LabourRateMaster {
+  id              Int       @id @default(autoincrement())
+  rateCode        String    @unique // e.g. "RATE-2026-TECH-LEAD"
+  technicianType  String
+  normalRate      Float
+  overtimeRate    Float?    @default(0.0)
+  subcontractRate Float?    @default(0.0)
+  validFrom       DateTime?
+  status          String    @default("Active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("labour_rates")
+}
+
+model FranchiseWarehouseMaster {
+  id             Int      @id @default(autoincrement())
+  franchiseBp    String   @unique // e.g. "BP-FRAN-021"
+  franchiseName  String
+  warehouse      String
+  stockOwnership String   @default("Telesonic Consignment Stock")
+  region         String?
+  countFrequency String?  @default("Monthly Physical Audit")
+  auditor        String?
+  active         String   @default("Yes")
+  status         String   @default("Active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("franchise_warehouses")
+}
+
+model DeviationReasonMaster {
+  id                       Int      @id @default(autoincrement())
+  reasonCode               String   @unique // e.g. "VAR-DAMAGED-IN-TRANSIT"
+  description              String
+  recoverableFromFranchise String?  @default("No (Telesonic Absorption)")
+  qtyThreshold             Int?     @default(1)
+  valueThresholdLkr        Float?   @default(0.0)
+  escalationRecipients     String?
+  status                   String   @default("Active")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("deviation_reasons")
+}
+
+model ExportPermissionMaster {
+  id                Int      @id @default(autoincrement())
+  role              String
+  reportGrid        String
+  excel             String?  @default("Yes")
+  pdf               String?  @default("Yes")
+  restrictedColumns String?
+  rowLimit          Int?     @default(5000)
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([role, reportGrid])
+  @@map("export_permissions")
+}
+
+model GoogleMeetSettingMaster {
+  id              Int      @id @default(autoincrement())
+  workspaceDomain String   @unique // e.g. "telesonic.lk"
+  organiserAccount String
+  authMethod      String   @default("Google Cloud Service Account JWT")
+  defaultDuration Int?     @default(45)
+  inviteCustomer  String?  @default("Yes")
+  inviteFranchise String?  @default("Yes")
+  retryCount      Int?     @default(3)
+  enabled         String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("google_meet_settings")
+}
+
+model EquipmentCategoryAttributeMaster {
+  id                   Int      @id @default(autoincrement())
+  categoryCode         String   @unique // e.g. "CAT-AC-SPLIT-COMM"
+  categoryName         String
+  industryGroup        String?
+  multiComponent       String?  @default("No")
+  meterType            String?  @default("None")
+  defaultIntervalBasis String?  @default("Months (Calendar)")
+  defaultInterval      Int?     @default(3)
+  checklistSet         String?
+  warrantyRule         String?
+  status               String   @default("Active")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("equipment_category_attributes")
+}
+
+model ToolVehicleAssetMaster {
+  id              Int       @id @default(autoincrement())
+  assetId         String    @unique // e.g. "SYS-TOOL-00412"
+  type            String
+  description     String
+  holder          String?
+  vehicleRegNo    String?
+  meterKm         Int?
+  licenceExpiry   DateTime?
+  insuranceExpiry DateTime?
+  status          String    @default("Available in Stores")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("tool_vehicle_assets")
 }

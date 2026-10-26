@@ -32,24 +32,25 @@ export const MasterField: React.FC<MasterFieldProps> = ({ field, value, onChange
             </span>
           )}
         </label>
-        {field.isB1 && (
-          <span
-            className="inline-flex items-center gap-0.5 px-1 py-0.2 text-[10px] font-mono font-medium rounded-xs bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-300 dark:border-sky-800"
-            title="SAP B1 Integration Point: Synchronized with SAP Business One"
-          >
-            ⇄B1
-          </span>
-        )}
       </div>
 
-            {(field.type as string) === "multiselect" ? (
+      {(field.type as string) === "multiselect" ? (
         (() => {
           const currentSelected: string[] = Array.isArray(value)
             ? (value as string[])
             : typeof value === "string" && value.trim()
               ? value.startsWith("[")
-                ? (() => { try { return JSON.parse(value); } catch { return value.split(",").map(s => s.trim()); } })()
-                : value.split(",").map((s) => s.trim()).filter(Boolean)
+                ? (() => {
+                    try {
+                      return JSON.parse(value);
+                    } catch {
+                      return value.split(",").map((s) => s.trim());
+                    }
+                  })()
+                : value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
               : [];
 
           const toggleOption = (opt: string) => {
@@ -92,15 +93,22 @@ export const MasterField: React.FC<MasterFieldProps> = ({ field, value, onChange
                             : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary" : "bg-muted-foreground/30"}`}
+                      />
                       <span>{opt}</span>
                     </button>
                   );
                 })}
               </div>
               <div className="text-[10px] text-muted-foreground font-mono flex items-center justify-between">
-                <span>Selected: {currentSelected.length === 0 ? "None" : currentSelected.join(", ")}</span>
-                <span className="text-[10px] text-primary underline cursor-pointer" onClick={() => onChange("ALL")}>
+                <span>
+                  Selected: {currentSelected.length === 0 ? "None" : currentSelected.join(", ")}
+                </span>
+                <span
+                  className="text-[10px] text-primary underline cursor-pointer"
+                  onClick={() => onChange("ALL")}
+                >
                   Select All
                 </span>
               </div>
