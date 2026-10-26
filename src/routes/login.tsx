@@ -29,7 +29,9 @@ function LoginPage() {
   const handleDownloadApp = () => {
     // If accessed on a mobile phone or directly requested, redirect to the mobile app installation page
     const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      userAgent,
+    );
 
     if (isMobileDevice) {
       // Direct mobile device redirection to mobile installation / mobile workspace
@@ -120,9 +122,7 @@ function LoginPage() {
           </p>
           <div className="mt-8 grid max-w-sm grid-cols-3 gap-4 border-t border-sidebar-border pt-6">
             <div>
-              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">
-                99.8%
-              </div>
+              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">99.8%</div>
               <div className="text-xs text-sidebar-muted">SLA compliance</div>
             </div>
             <div>
@@ -184,8 +184,9 @@ function LoginPage() {
                 <Smartphone size={18} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-foreground leading-tight">Field Technician?</p>
-                <p className="text-[11px] text-muted-foreground truncate">Get the dedicated mobile app</p>
+                <p className="text-xs font-semibold text-foreground leading-tight">
+                  Get the mobile app
+                </p>
               </div>
             </div>
             <button

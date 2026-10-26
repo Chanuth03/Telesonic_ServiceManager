@@ -51,32 +51,28 @@ const TECH_PROFILE: UserProfile = {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("auth_user");
-      if (savedUser) {
-        try {
-          return JSON.parse(savedUser);
-        } catch {}
-      }
-    }
-    return ADMIN_PROFILE;
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile>(ADMIN_PROFILE);
+  const [role, setRoleState] = useState<UserRole>("ADMIN");
 
-  const [role, setRoleState] = useState<UserRole>(() => {
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("auth_user");
-      if (savedUser) {
-        try {
-          const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.role) return parsed.role;
-        } catch {}
-      }
-      const saved = localStorage.getItem("app_user_role");
-      if (saved) return saved;
+  // Load from localStorage only after mounting on the client to avoid SSR hydration mismatch
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedUser = localStorage.getItem("auth_user");
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed) {
+          setCurrentUser(parsed);
+          if (parsed.role) setRoleState(parsed.role);
+          return;
+        }
+      } catch {}
     }
-    return "ADMIN";
-  });
+    const savedRole = localStorage.getItem("app_user_role");
+    if (savedRole) {
+      setRoleState(savedRole);
+    }
+  }, []);
 
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);
