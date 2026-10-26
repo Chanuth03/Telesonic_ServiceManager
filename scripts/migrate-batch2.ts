@@ -1,0 +1,95 @@
+import { prisma } from '../src/lib/prisma';
+
+async function main() {
+  // MST-13: hold_reasons
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS hold_reasons (
+      id SERIAL PRIMARY KEY,
+      "reasonCode" VARCHAR(100) UNIQUE NOT NULL,
+      description TEXT NOT NULL,
+      "customerWording" TEXT NOT NULL,
+      "excludeFromSla" VARCHAR(50) DEFAULT 'Yes (Clock Paused)',
+      "maxHoldDays" INTEGER DEFAULT 14,
+      active VARCHAR(10) DEFAULT 'Yes',
+      status VARCHAR(50) DEFAULT 'Active',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // MST-14: repeat_reasons
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS repeat_reasons (
+      id SERIAL PRIMARY KEY,
+      "reasonCode" VARCHAR(100) UNIQUE NOT NULL,
+      description TEXT NOT NULL,
+      "countsAsPoorService" VARCHAR(10) DEFAULT 'Yes',
+      "detectionPeriodDays" INTEGER NOT NULL DEFAULT 30,
+      "appliesToCategory" VARCHAR(150),
+      active VARCHAR(10) DEFAULT 'Yes',
+      status VARCHAR(50) DEFAULT 'Active',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // MST-15: sla_rules
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS sla_rules (
+      id SERIAL PRIMARY KEY,
+      "ruleCode" VARCHAR(100) UNIQUE NOT NULL,
+      "serviceType" VARCHAR(150) NOT NULL,
+      priority VARCHAR(50) NOT NULL,
+      area VARCHAR(100),
+      "resourceType" VARCHAR(100),
+      "responseHours" DOUBLE PRECISION NOT NULL,
+      "resolutionHours" DOUBLE PRECISION NOT NULL,
+      "warningPct" DOUBLE PRECISION DEFAULT 75.0,
+      calendar VARCHAR(100) NOT NULL,
+      status VARCHAR(50) DEFAULT 'Active',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // MST-16: checklist_templates
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS checklist_templates (
+      id SERIAL PRIMARY KEY,
+      "templateCode" VARCHAR(100) UNIQUE NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      "equipmentCategory" VARCHAR(150) NOT NULL,
+      "serviceType" VARCHAR(150) NOT NULL,
+      version INTEGER DEFAULT 1,
+      active VARCHAR(10) DEFAULT 'Yes',
+      status VARCHAR(50) DEFAULT 'Active',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // MST-17: warranty_rules
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS warranty_rules (
+      id SERIAL PRIMARY KEY,
+      "ruleCode" VARCHAR(100) UNIQUE NOT NULL,
+      "equipmentCategory" VARCHAR(150) NOT NULL,
+      "componentRole" VARCHAR(100),
+      channel VARCHAR(100),
+      "startBasis" VARCHAR(100) NOT NULL,
+      months INTEGER NOT NULL,
+      "labourCovered" VARCHAR(50) DEFAULT 'Yes',
+      "replacementTreatment" VARCHAR(100) DEFAULT 'Repair in Workshop',
+      status VARCHAR(50) DEFAULT 'Active',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  console.log('Batch 2 tables (hold_reasons, repeat_reasons, sla_rules, checklist_templates, warranty_rules) created successfully!');
+}
+
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());
+

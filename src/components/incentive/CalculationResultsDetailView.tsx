@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   FileSpreadsheet,
   Search,
@@ -29,10 +29,19 @@ import {
   Building2,
   X,
   Check,
+  Database,
+  RefreshCw,
+  Save,
+  Plus,
+  Trash2,
+  History,
+  CheckCheck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/incentive-data";
+import { apiFetch } from "@/lib/api-client";
 
 export interface ParticipantCalculationResult {
   id: string;
@@ -58,9 +67,35 @@ export interface ParticipantCalculationResult {
   status: "Calculated" | "Verified" | "Held" | "Approved";
   jobCount: number;
   overdueInvoiceCount: number;
+  notes?: string;
 }
 
-const INITIAL_RESULTS: ParticipantCalculationResult[] = [
+export interface CalculationResultBatch {
+  id: string;
+  period: string;
+  runDate: string;
+  status: "Calculated" | "Verified" | "Held" | "Approved";
+  runType: string;
+  totalParticipants: number;
+  grossCommissionLkr: number;
+  targetIncentiveLkr: number;
+  penaltyClawbackLkr: number;
+  netPayableLkr: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  participantResults: ParticipantCalculationResult[];
+  auditLogs: {
+    id: string;
+    timestamp: string;
+    user: string;
+    role: string;
+    action: string;
+    details: string;
+  }[];
+}
+
+const INITIAL_FALLBACK_RESULTS: ParticipantCalculationResult[] = [
   {
     id: "calc-01",
     technicianCode: "TECH-101",
@@ -247,11 +282,117 @@ export function CalculationResultsDetailView({
   onNavigateScreen,
   onBack,
 }: CalculationResultsDetailViewProps) {
-  const [results, setResults] = useState<ParticipantCalculationResult[]>(INITIAL_RESULTS);
+  // DB & Batch States
+  const [batches, setBatches] = useState<CalculationResultBatch[]>([]);
+  const [activeBatchId, setActiveBatchId] = useState<string>("RUN-2026-05-MTD-04");
+  const [results, setResults] = useState<ParticipantCalculationResult[]>(INITIAL_FALLBACK_RESULTS);
+  const [auditLogs, setAuditLogs] = useState<CalculationResultBatch["auditLogs"]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(false);
+  const [lastSynced, setLastSynced] = useState<string>("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+
+  // Filters & Modals
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [selectedResult, setSelectedResult] = useState<ParticipantCalculationResult | null>(null);
+  const [isBatchesModalOpen, setIsBatchesModalOpen] = useState(false);
+  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+
+  // New Participant Form State
+  const [newForm, setNewForm] = useState({
+    technicianCode: "",
+    technicianName: "",
+    role: "Field Technician",
+    division: "Consumer Electronics",
+    schemeCode: "SCH-CE-FIELD",
+    schemeName: "Consumer AV & Smart Appliances Tiered Incentive",
+    targetVolume: 30,
+    actualVolume: 32,
+    targetTurnover: 750000,
+    actualTurnover: 800000,
+    slabTier: "Tier 2 (100% - 110%)",
+    slabMultiplier: 1.05,
+    grossCommission: 65000,
+    targetIncentive: 40000,
+    attendanceFactor: 1.0,
+    penaltyClawback: 0,
+    jobCount: 32,
+    overdueInvoiceCount: 0,
+    status: "Calculated" as ParticipantCalculationResult["status"],
+  });
+
+  // Current selected batch object
+  const activeBatch = useMemo(() => {
+    return batches.find((b) => b.id === activeBatchId) || {
+      id: activeBatchId,
+      period: "May 2026",
+      runDate: new Date().toISOString().slice(0, 10),
+      status: "Verified" as const,
+      runType: "MTD Simulation Run",
+      totalParticipants: results.length,
+      grossCommissionLkr: 621000,
+      targetIncentiveLkr: 363700,
+      penaltyClawbackLkr: 83200,
+      netPayableLkr: 901500,
+      notes: "Telesonic Lanka monthly calculation run",
+      participantResults: results,
+      auditLogs: [],
+    };
+  }, [batches, activeBatchId, results]);
+
+  // Load Calculation Batches from PostgreSQL
+  const loadCalculationBatches = useCallback(async (preferredBatchId?: string) => {
+    try {
+      setIsLoading(true);
+      const res = await apiFetch("/api/incentives/calculation-results");
+      const data = await res.json();
+
+      if (data && data.success && Array.isArray(data.batches) && data.batches.length > 0) {
+        setBatches(data.batches);
+        setIsDbConnected(true);
+        setLastSynced(new Date().toLocaleTimeString());
+
+        // Determine which batch to display
+        const targetId = preferredBatchId || activeBatchId || data.batches[0].id;
+        const found = data.batches.find((b: any) => b.id === targetId) || data.batches[0];
+
+        setActiveBatchId(found.id);
+        if (found.participantResults && found.participantResults.length > 0) {
+          setResults(found.participantResults);
+        }
+        setAuditLogs(found.auditLogs || []);
+        setHasUnsavedChanges(false);
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err: any) {
+      console.warn("Could not connect to PostgreSQL calculation API, keeping local data:", err);
+      setIsDbConnected(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeBatchId]);
+
+  useEffect(() => {
+    loadCalculationBatches();
+  }, [loadCalculationBatches]);
+
+  // Handle switching active batch
+  const handleBatchSelect = (batchId: string) => {
+    const selected = batches.find((b) => b.id === batchId);
+    if (selected) {
+      setActiveBatchId(selected.id);
+      setResults(selected.participantResults || []);
+      setAuditLogs(selected.auditLogs || []);
+      setHasUnsavedChanges(false);
+      toast.info(`Switched to Calculation Batch: ${selected.id}`, {
+        description: `Period: ${selected.period} · ${selected.participantResults.length} participants`,
+      });
+    }
+  };
 
   // Filters
   const filteredResults = useMemo(() => {
@@ -272,15 +413,16 @@ export function CalculationResultsDetailView({
     return filteredResults.reduce(
       (acc, r) => ({
         count: acc.count + 1,
-        gross: acc.gross + r.grossCommission,
-        targetBonus: acc.targetBonus + r.targetIncentive,
-        penalties: acc.penalties + r.penaltyClawback,
-        net: acc.net + r.netPayable,
+        gross: acc.gross + (Number(r.grossCommission) || 0),
+        targetBonus: acc.targetBonus + (Number(r.targetIncentive) || 0),
+        penalties: acc.penalties + (Number(r.penaltyClawback) || 0),
+        net: acc.net + (Number(r.netPayable) || 0),
       }),
       { count: 0, gross: 0, targetBonus: 0, penalties: 0, net: 0 },
     );
   }, [filteredResults]);
 
+  // Export CSV
   const handleExportCsv = () => {
     const headers = [
       "Technician Code",
@@ -321,7 +463,7 @@ export function CalculationResultsDetailView({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Incentive_Calculation_Results_May_2026.csv`);
+    link.setAttribute("download", `Incentive_Calculation_Results_${activeBatch.period.replace(/\s+/g, "_")}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -335,9 +477,203 @@ export function CalculationResultsDetailView({
     window.print();
   };
 
-  const handleStatusChange = (id: string, newStatus: ParticipantCalculationResult["status"]) => {
-    setResults((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
-    toast.success(`Participant status updated to ${newStatus}.`);
+  // Participant Status Change (Persisted to PostgreSQL)
+  const handleStatusChange = async (id: string, newStatus: ParticipantCalculationResult["status"]) => {
+    // 1. Optimistic update
+    setResults((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+    );
+    setHasUnsavedChanges(true);
+
+    try {
+      // 2. Persist to API
+      const res = await apiFetch(
+        `/api/incentives/calculation-results/${activeBatchId}/participants/${id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: newStatus,
+            actorName: "Incentive Supervisor",
+            notes: `Status changed to ${newStatus} directly from Calculation Results View`,
+          }),
+        }
+      );
+      const data = await res.json();
+
+      if (data && data.success) {
+        toast.success(`Participant status updated to ${newStatus} in PostgreSQL.`);
+        setHasUnsavedChanges(false);
+      } else {
+        toast.info(`Status updated locally to ${newStatus}.`);
+      }
+    } catch (err: any) {
+      console.warn("Status change saved locally (API fallback):", err);
+      toast.info(`Status updated locally to ${newStatus}.`);
+    }
+  };
+
+  // Delete Individual Participant Result
+  const handleDeleteParticipant = async (resultId: string, techName: string) => {
+    if (!confirm(`Are you sure you want to remove ${techName} from calculation batch ${activeBatchId}?`)) {
+      return;
+    }
+
+    try {
+      const res = await apiFetch(
+        `/api/incentives/calculation-results/${activeBatchId}/participants/${resultId}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+
+      if (data && data.success) {
+        setResults((prev) => prev.filter((r) => r.id !== resultId));
+        toast.success(`Removed ${techName} from calculation batch.`);
+      } else {
+        setResults((prev) => prev.filter((r) => r.id !== resultId));
+        toast.info(`Removed ${techName} locally.`);
+      }
+    } catch (err: any) {
+      setResults((prev) => prev.filter((r) => r.id !== resultId));
+      toast.info(`Removed ${techName} locally.`);
+    }
+  };
+
+  // Save All Changes to PostgreSQL
+  const handleSaveToPostgreSql = async () => {
+    try {
+      setIsSaving(true);
+      const grossComm = results.reduce((acc, r) => acc + (Number(r.grossCommission) || 0), 0);
+      const targetInc = results.reduce((acc, r) => acc + (Number(r.targetIncentive) || 0), 0);
+      const penaltyClaw = results.reduce((acc, r) => acc + (Number(r.penaltyClawback) || 0), 0);
+      const netPay = results.reduce((acc, r) => acc + (Number(r.netPayable) || 0), 0);
+
+      const payload = {
+        period: activeBatch.period,
+        status: activeBatch.status,
+        runType: activeBatch.runType,
+        totalParticipants: results.length,
+        grossCommissionLkr: grossComm,
+        targetIncentiveLkr: targetInc,
+        penaltyClawbackLkr: penaltyClaw,
+        netPayableLkr: netPay,
+        notes: activeBatch.notes || "Updated from Calculation Results Detail View",
+        participantResults: results,
+      };
+
+      const res = await apiFetch(
+        `/api/incentives/calculation-results/${activeBatchId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await res.json();
+
+      if (data && data.success) {
+        toast.success("Successfully persisted calculation results to PostgreSQL!", {
+          description: `Batch ${activeBatchId} · ${results.length} participants synced.`,
+        });
+        setHasUnsavedChanges(false);
+        await loadCalculationBatches(activeBatchId);
+      } else {
+        toast.warning("Could not sync with PostgreSQL backend; changes kept locally.");
+      }
+    } catch (err: any) {
+      console.error("Save error:", err);
+      toast.error("Error saving calculation results to database.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add Participant Submit Handler
+  const handleAddParticipantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newForm.technicianCode.trim() || !newForm.technicianName.trim()) {
+      toast.error("Technician Code and Name are required.");
+      return;
+    }
+
+    const volPct =
+      newForm.targetVolume > 0
+        ? Math.round((newForm.actualVolume / newForm.targetVolume) * 100)
+        : 100;
+    const turnoverPct =
+      newForm.targetTurnover > 0
+        ? Math.round((newForm.actualTurnover / newForm.targetTurnover) * 100)
+        : 100;
+
+    // Formula: (gross + targetInc) * attendance - penalty
+    const computedNet = Math.max(
+      0,
+      Math.round(
+        (newForm.grossCommission + newForm.targetIncentive) * newForm.attendanceFactor -
+          newForm.penaltyClawback
+      )
+    );
+
+    const newParticipant: ParticipantCalculationResult = {
+      id: `calc-${Date.now().toString().slice(-6)}`,
+      technicianCode: newForm.technicianCode.trim().toUpperCase(),
+      technicianName: newForm.technicianName.trim(),
+      role: newForm.role,
+      division: newForm.division,
+      schemeCode: newForm.schemeCode,
+      schemeName: newForm.schemeName,
+      targetVolume: Number(newForm.targetVolume) || 0,
+      actualVolume: Number(newForm.actualVolume) || 0,
+      volumePct: volPct,
+      targetTurnover: Number(newForm.targetTurnover) || 0,
+      actualTurnover: Number(newForm.actualTurnover) || 0,
+      turnoverPct: turnoverPct,
+      slabTier: newForm.slabTier,
+      slabMultiplier: Number(newForm.slabMultiplier) || 1.0,
+      grossCommission: Number(newForm.grossCommission) || 0,
+      targetIncentive: Number(newForm.targetIncentive) || 0,
+      attendanceFactor: Number(newForm.attendanceFactor) || 1.0,
+      penaltyClawback: Number(newForm.penaltyClawback) || 0,
+      netPayable: computedNet,
+      status: newForm.status,
+      jobCount: Number(newForm.jobCount) || 0,
+      overdueInvoiceCount: Number(newForm.overdueInvoiceCount) || 0,
+    };
+
+    const updated = [...results, newParticipant];
+    setResults(updated);
+    setIsAddParticipantOpen(false);
+    setHasUnsavedChanges(true);
+
+    toast.success(`Added ${newParticipant.technicianName} to calculation batch.`);
+
+    // Automatically sync to PostgreSQL
+    try {
+      const grossComm = updated.reduce((acc, r) => acc + (Number(r.grossCommission) || 0), 0);
+      const targetInc = updated.reduce((acc, r) => acc + (Number(r.targetIncentive) || 0), 0);
+      const penaltyClaw = updated.reduce((acc, r) => acc + (Number(r.penaltyClawback) || 0), 0);
+      const netPay = updated.reduce((acc, r) => acc + (Number(r.netPayable) || 0), 0);
+
+      await apiFetch(`/api/incentives/calculation-results/${activeBatchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period: activeBatch.period,
+          status: activeBatch.status,
+          runType: activeBatch.runType,
+          totalParticipants: updated.length,
+          grossCommissionLkr: grossComm,
+          targetIncentiveLkr: targetInc,
+          penaltyClawbackLkr: penaltyClaw,
+          netPayableLkr: netPay,
+          participantResults: updated,
+        }),
+      });
+      setHasUnsavedChanges(false);
+      await loadCalculationBatches(activeBatchId);
+    } catch (err: any) {
+      console.warn("Failed background auto-sync:", err);
+    }
   };
 
   return (
@@ -387,6 +723,52 @@ export function CalculationResultsDetailView({
         )}
       </div>
 
+      {/* PostgreSQL Live Connection Status Banner */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border text-xs ${
+          isDbConnected
+            ? "bg-emerald-50/80 border-emerald-200 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300"
+            : "bg-amber-50/80 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <Database size={15} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
+          <span className="font-semibold">
+            {isDbConnected
+              ? "PostgreSQL Live Database Connected (telesonic)"
+              : "PostgreSQL Database Disconnected / Using Offline Fallback"}
+          </span>
+          <span className="hidden sm:inline text-muted-foreground">·</span>
+          <span className="hidden sm:inline text-muted-foreground font-mono">
+            Table: calculation_result_batches &amp; calculation_participant_results
+          </span>
+          {lastSynced && (
+            <span className="hidden md:inline text-[11px] opacity-75">
+              (Last synced: {lastSynced})
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <span className="text-amber-600 font-semibold text-[11px] flex items-center gap-1">
+              <AlertCircle size={12} />
+              Unsaved changes
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadCalculationBatches(activeBatchId)}
+            disabled={isLoading}
+            className="h-6 text-xs px-2 gap-1"
+          >
+            <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
+            <span>Sync from DB</span>
+          </Button>
+        </div>
+      </div>
+
       {/* Screen Title & Batch Context Banner */}
       <div className="card-surface p-5 sm:p-6 rounded-lg border bg-card shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -395,12 +777,24 @@ export function CalculationResultsDetailView({
               <FileSpreadsheet size={24} />
             </span>
             <div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                   Calculation Results Detail View
                 </h1>
-                <span className="rounded-md bg-success-soft text-success px-2 py-0.5 text-xs font-semibold">
-                  Batch #RUN-2026-05-MTD-04
+                <span className="rounded-md bg-success-soft text-success px-2 py-0.5 text-xs font-semibold font-mono">
+                  Batch #{activeBatch.id}
+                </span>
+                <span className="rounded-md bg-primary-soft text-primary px-2 py-0.5 text-xs font-medium">
+                  {activeBatch.period}
+                </span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                  activeBatch.status === "Approved"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : activeBatch.status === "Verified"
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-amber-100 text-amber-800"
+                }`}>
+                  {activeBatch.status}
                 </span>
               </div>
               <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
@@ -411,6 +805,53 @@ export function CalculationResultsDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Period / Batch Selector */}
+            {batches.length > 0 && (
+              <select
+                value={activeBatchId}
+                onChange={(e) => handleBatchSelect(e.target.value)}
+                className="input-field h-8 text-xs bg-card font-medium"
+              >
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.period} ({b.id}) - {b.status}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBatchesModalOpen(true)}
+              className="gap-1.5 text-xs h-8"
+              title="View all calculation batches and audit history"
+            >
+              <History size={13} />
+              <span>Batches ({batches.length})</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddParticipantOpen(true)}
+              className="gap-1.5 text-xs h-8"
+            >
+              <Plus size={13} />
+              <span>Add Participant</span>
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSaveToPostgreSql}
+              disabled={isSaving}
+              className="gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              <span>Save to DB</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -427,7 +868,7 @@ export function CalculationResultsDetailView({
               className="gap-1.5 text-xs h-8"
             >
               <Printer size={13} />
-              <span>Print Statements</span>
+              <span>Print</span>
             </Button>
           </div>
         </div>
@@ -527,7 +968,7 @@ export function CalculationResultsDetailView({
       {/* Main Results Table */}
       <div className="card-surface overflow-hidden rounded-lg border bg-card shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse min-w-[980px]">
+          <table className="w-full text-xs border-collapse min-w-[1020px]">
             <thead>
               <tr className="border-b bg-muted/50 text-left font-semibold text-muted-foreground">
                 <th className="px-3.5 py-3">Technician / Code</th>
@@ -539,7 +980,7 @@ export function CalculationResultsDetailView({
                 <th className="px-3.5 py-3 text-right">Penalty</th>
                 <th className="px-3.5 py-3 text-right font-bold text-foreground">Net Payable</th>
                 <th className="px-3.5 py-3 text-center">Status</th>
-                <th className="px-3.5 py-3 text-center">Drilldown</th>
+                <th className="px-3.5 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -630,15 +1071,26 @@ export function CalculationResultsDetailView({
                     </td>
 
                     <td className="px-3.5 py-3 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedResult(r)}
-                        className="h-7 w-7 p-0 cursor-pointer"
-                        title="View Detailed Computation Drilldown"
-                      >
-                        <Eye size={13} className="text-primary" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedResult(r)}
+                          className="h-7 w-7 p-0 cursor-pointer"
+                          title="View Detailed Computation Drilldown"
+                        >
+                          <Eye size={13} className="text-primary" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteParticipant(r.id, r.technicianName)}
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive cursor-pointer"
+                          title="Remove participant from batch"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -698,7 +1150,7 @@ export function CalculationResultsDetailView({
               <div>
                 <span className="text-muted-foreground block text-[11px]">Attendance Factor</span>
                 <span className="font-semibold text-foreground">
-                  {selectedResult.attendanceFactor * 100}% (Prorated)
+                  {Math.round(selectedResult.attendanceFactor * 100)}% (Prorated)
                 </span>
               </div>
             </div>
@@ -764,6 +1216,328 @@ export function CalculationResultsDetailView({
                 Close Drilldown
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batches History Modal */}
+      {isBatchesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-3xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+                  <History size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">
+                    Calculation Batches in PostgreSQL
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Manage historical calculation runs, review audit trails, or load another batch.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsBatchesModalOpen(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X size={16} />
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {batches.map((b) => (
+                <div
+                  key={b.id}
+                  className={`p-4 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
+                    b.id === activeBatchId
+                      ? "bg-primary/5 border-primary/40 shadow-xs"
+                      : "bg-card hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-foreground">{b.period}</span>
+                      <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {b.id}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          b.status === "Approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : b.status === "Verified"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                      <span>Participants: {b.totalParticipants}</span>
+                      <span>Net Pool: LKR {formatCurrency(b.netPayableLkr)}</span>
+                      <span>Run Date: {b.runDate}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {b.id === activeBatchId ? (
+                      <span className="text-xs font-semibold text-primary px-3 py-1 bg-primary/10 rounded-md flex items-center gap-1">
+                        <Check size={13} /> Active
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          handleBatchSelect(b.id);
+                          setIsBatchesModalOpen(false);
+                        }}
+                        className="text-xs h-8"
+                      >
+                        Load Batch
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Audit Trail for Active Batch */}
+            {auditLogs.length > 0 && (
+              <div className="pt-4 border-t space-y-2">
+                <h4 className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                  Audit Trail for {activeBatchId}
+                </h4>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {auditLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-2 rounded bg-muted/40 border text-xs flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">{log.action}</span>
+                        <span className="text-muted-foreground">· {log.details}</span>
+                      </div>
+                      <div className="text-right text-[11px] text-muted-foreground font-mono shrink-0">
+                        {log.user} ({log.timestamp})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t">
+              <Button size="sm" onClick={() => setIsBatchesModalOpen(false)} className="text-xs">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Participant Modal */}
+      {isAddParticipantOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative w-full max-w-xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+                  <Plus size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">
+                    Add Participant to Calculation
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Add a new technician calculation line directly into {activeBatchId}.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAddParticipantOpen(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X size={16} />
+              </Button>
+            </div>
+
+            <form onSubmit={handleAddParticipantSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Technician Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. TECH-108"
+                    value={newForm.technicianCode}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, technicianCode: e.target.value }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Technician Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Malinda Wickrama"
+                    value={newForm.technicianName}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, technicianName: e.target.value }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Division</label>
+                  <select
+                    value={newForm.division}
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, division: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                  >
+                    <option value="Consumer Electronics">Consumer Electronics</option>
+                    <option value="Biomedical Engineering">Biomedical Engineering</option>
+                    <option value="Telecommunications & Networks">Telecommunications & Networks</option>
+                    <option value="Enterprise IT Solutions">Enterprise IT Solutions</option>
+                    <option value="Industrial Automation">Industrial Automation</option>
+                    <option value="Power Systems & Generators">Power Systems & Generators</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Role</label>
+                  <input
+                    type="text"
+                    value={newForm.role}
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, role: e.target.value }))}
+                    className="input-field w-full h-8 text-xs bg-card"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Target Volume</label>
+                  <input
+                    type="number"
+                    value={newForm.targetVolume}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, targetVolume: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Actual Volume</label>
+                  <input
+                    type="number"
+                    value={newForm.actualVolume}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, actualVolume: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Target Turnover (LKR)</label>
+                  <input
+                    type="number"
+                    value={newForm.targetTurnover}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, targetTurnover: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Actual Turnover (LKR)</label>
+                  <input
+                    type="number"
+                    value={newForm.actualTurnover}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, actualTurnover: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Gross Comm. (LKR)</label>
+                  <input
+                    type="number"
+                    value={newForm.grossCommission}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, grossCommission: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Target Bonus (LKR)</label>
+                  <input
+                    type="number"
+                    value={newForm.targetIncentive}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, targetIncentive: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Penalty (LKR)</label>
+                  <input
+                    type="number"
+                    value={newForm.penaltyClawback}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, penaltyClawback: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Attendance Factor</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    max="1.0"
+                    min="0"
+                    value={newForm.attendanceFactor}
+                    onChange={(e) =>
+                      setNewForm((prev) => ({ ...prev, attendanceFactor: Number(e.target.value) }))
+                    }
+                    className="input-field w-full h-8 text-xs bg-card font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAddParticipantOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" className="bg-primary text-primary-foreground">
+                  Add to Batch
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

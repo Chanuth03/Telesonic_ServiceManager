@@ -1,0 +1,33 @@
+
+// Dedicated Serial Number Register and Lifecycle Master Model (MST-05 / O1-SCR-MST-05)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Keys: itemId (Item), customerId (Customer, optional), siteId (Site, optional)
+model SerialRegister {
+  id              Int       @id @default(autoincrement())
+  serialNo        String    @unique // e.g. "BSH-CTRL-00872"
+  itemId          Int?
+  item            Item?     @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemCode        String?   // Snapshot (e.g. "SP-COMP-18K")
+  itemName        String?   // Snapshot (e.g. "SP-COMP-18K Compressor Scroll")
+  status          String    @default("Available") // "Available" | "Delivered" | "Installed" | "Replaced" | "Returned" | "Scrapped"
+  warehouse       String?   // "VAN-KSILVA (Field Stock)", "Central Stores", etc.
+  customerId      Int?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName    String?   // Snapshot
+  siteId          Int?
+  site            Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName        String?   // Snapshot
+  systemId        String?   // e.g. "CNT-2026-07"
+  componentRole   String?   // "Main Compressor Unit", "Indoor Evaporator", "Control Panel"
+  warrantyStart   String?   // Date "YYYY-MM-DD"
+  replacesSerial  String?   // e.g. "BSH-CTRL-00412"
+  replacedBy      String?   // e.g. "BSH-CTRL-00999"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([itemId])
+  @@index([customerId])
+  @@index([siteId])
+  @@map("serials")
+}
+

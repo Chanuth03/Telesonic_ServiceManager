@@ -1,29 +1,51 @@
 /**
  * Universal API Client
  *
- * Safely executes /api/* requests against the server or dispatches directly
- * to the PostgreSQL (via Prisma) handler when offline or in dev without monkey-patching window.fetch.
+ * Safely executes /api/* requests against the server.
+ * Uses native fetch in browser. Only dynamically imports Node server handler during SSR,
+ * ensuring database drivers (pg, net, tls) never leak into the browser client bundle.
  */
 
-import { handleApiRequest } from "./api-handler";
-
-export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
-  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+export async function apiFetch(
+  url: string,
+  init?: RequestInit,
+  options?: { networkOnly?: boolean },
+): Promise<Response> {
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3001";
   const fullUrl = url.startsWith("http") ? url : `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
 
-  // If in browser and online, attempt native fetch first
+  // Browser environment: always use native window.fetch
   if (typeof window !== "undefined") {
     try {
       const res = await window.fetch(fullUrl, init);
       if (res.status !== 404) {
         return res;
       }
-    } catch {
-      // If network fails (e.g. offline, simulated offline, dev server proxy), fallback to local Prisma handler
+      if (options?.networkOnly) {
+        throw new Error("Main database was not reachable");
+      }
+      return res;
+    } catch (error) {
+      if (options?.networkOnly) {
+        throw error instanceof Error ? error : new Error("Main database was not reachable");
+      }
+      // Offline fallback: if fetch fails (e.g. offline) in browser, dynamically load handler if supported
+      try {
+        const { handleApiRequest } = await import("./api-handler");
+        const req = new Request(fullUrl, init);
+        return await handleApiRequest(req);
+      } catch {
+        throw error instanceof Error ? error : new Error("Network request failed");
+      }
     }
   }
 
-  // Direct local dispatch against the PostgreSQL (via Prisma) handler
+  if (options?.networkOnly) {
+    throw new Error("Main database was not reachable");
+  }
+
+  // Server-side (Node.js SSR): dynamically import API handler
+  const { handleApiRequest } = await import("./api-handler");
   const req = new Request(fullUrl, init);
   return await handleApiRequest(req);
 }

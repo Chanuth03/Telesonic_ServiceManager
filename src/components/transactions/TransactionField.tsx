@@ -28,14 +28,6 @@ export const TransactionField: React.FC<TransactionFieldProps> = ({
             </span>
           )}
         </label>
-        {field.isB1 && (
-          <span
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-mono font-medium rounded bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-300 dark:border-sky-800"
-            title="SAP B1 Integration: Real-time Synchronized with SAP Business One"
-          >
-            ⇄B1
-          </span>
-        )}
       </div>
 
       {field.type === "select" ? (

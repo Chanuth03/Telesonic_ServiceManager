@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [notif, setNotif] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [theme, setTheme] = useState("indigo");
-  const { role } = useRole();
+  const { role, user } = useRole();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
@@ -158,10 +158,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 }}
                 className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 hover:bg-muted"
               >
-                <Avatar name="Nimal Perera" className="h-8 w-8" />
+                <Avatar name={user?.name || "User"} className="h-8 w-8" />
                 <span className="hidden text-left text-sm leading-tight sm:block">
-                  <span className="block font-semibold">Nimal Perera</span>
-                  <span className="text-xs text-muted-foreground">Service Manager</span>
+                  <span className="block font-semibold">{user?.name || "User"}</span>
+                  <span className="text-xs text-muted-foreground">{user?.role || "Service Manager"}</span>
                 </span>
                 <ChevronDown size={14} className="text-muted-foreground" />
               </Button>

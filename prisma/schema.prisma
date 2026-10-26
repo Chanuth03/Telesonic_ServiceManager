@@ -11,57 +11,57 @@ datasource db {
 }
 
 model Job {
-  id              String        @id
+  id              String    @id
   customerName    String
   customerContact String?
   town            String
   window          String
-  priority        String        // "Critical" | "High" | "Normal" | "Low"
+  priority        String // "Critical" | "High" | "Normal" | "Low"
   role            String
-  status          String        // "Assigned" | "Accepted" | "In Progress" | "On Hold" | "Completed" | "Declined"
+  status          String // "Assigned" | "Accepted" | "In Progress" | "On Hold" | "Completed" | "Declined"
   category        String
   siteName        String?
   siteAddress     String
   technicianName  String
   scheduledDate   String
-  syncStatus      String        @default("synced") // "synced" | "pending"
+  syncStatus      String    @default("synced") // "synced" | "pending"
   syncedAt        DateTime?
-  version         Int           @default(1)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  labourLogs      LabourLog[]
-  partsUsed       PartUsed[]
-  inspections     Inspection[]
-  holdRequests    HoldRequest[]
+  labourLogs   LabourLog[]
+  partsUsed    PartUsed[]
+  inspections  Inspection[]
+  holdRequests HoldRequest[]
 
   @@map("jobs")
 }
 
 model ServiceRequest {
-  id              String        @id
-  title           String
-  callType        String
-  customerName    String
-  status          String
-  priority        String
-  assignedTo      String?
-  scheduledDate   String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id            String   @id
+  title         String
+  callType      String
+  customerName  String
+  status        String
+  priority      String
+  assignedTo    String?
+  scheduledDate String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("service_requests")
 }
 
 model SyncLog {
-  id          String    @id @default(cuid())
-  batchId     String
-  role        String
-  deviceId    String
-  itemCount   Int
-  status      String    // "SUCCESS" | "PARTIAL" | "FAILED"
-  details     String?
-  syncedAt    DateTime  @default(now())
+  id        String   @id @default(cuid())
+  batchId   String
+  role      String
+  deviceId  String
+  itemCount Int
+  status    String // "SUCCESS" | "PARTIAL" | "FAILED"
+  details   String?
+  syncedAt  DateTime @default(now())
 
   @@map("sync_logs")
 }
@@ -73,7 +73,7 @@ model LabourLog {
   technicianName      String
   date                String
   hours               Float
-  rateType            String   // "Regular" | "Overtime" | "Weekend/Holiday"
+  rateType            String // "Regular" | "Overtime" | "Weekend/Holiday"
   activityDescription String
   createdAt           DateTime @default(now())
 
@@ -81,14 +81,14 @@ model LabourLog {
 }
 
 model PartUsed {
-  id             String   @id @default(cuid())
-  jobId          String
-  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  partCode       String
-  name           String
-  qtyUsed        Int
-  unitPrice      Float
-  createdAt      DateTime @default(now())
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  partCode  String
+  name      String
+  qtyUsed   Int
+  unitPrice Float
+  createdAt DateTime @default(now())
 
   @@map("parts_used")
 }
@@ -99,7 +99,7 @@ model Inspection {
   job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   inspectedAt    DateTime @default(now())
   technicianName String
-  overallStatus  String   // "Pass" | "Fail" | "Conditional Pass"
+  overallStatus  String // "Pass" | "Fail" | "Conditional Pass"
   generalNotes   String?
 
   @@map("inspections")
@@ -113,20 +113,1723 @@ model HoldRequest {
   notes               String
   estimatedDelayHours Float
   requestedAt         DateTime @default(now())
-  status              String   // "Submitted" | "Approved" | "Pending Review"
+  status              String // "Submitted" | "Approved" | "Pending Review"
 
   @@map("hold_requests")
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
-  password  String   // Bcrypt hashed password
-  role      String   // "ADMIN" | "TECHNICIAN"
+  password  String // Bcrypt hashed password
+  role      String // System Role Code (e.g. ADMIN, TECHNICIAN, COORDINATOR)
   phone     String?
+  status    String   @default("Active") // "Active" | "Inactive"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
 }
+
+model SystemRole {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?
+  permissions String? // comma separated or JSON string
+  status      String   @default("Active") // "Active" | "Inactive"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_roles")
+}
+
+// Generic Master Record model for all Master Screens (MST-01 to MST-31)
+// Stores all screen-specific attributes in JSON while supporting fast indexed queries by screenCode & recordKey
+model MasterRecord {
+  id         Int      @id @default(autoincrement())
+  screenCode String // e.g. "MST-11", "MST-12", "MST-13", etc.
+  recordKey  String // primary identifier (e.g. roleCode, code, reasonCode)
+  data       Json // complete record data object matching MasterFieldDef
+  status     String   @default("Active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([screenCode, recordKey])
+  @@index([screenCode])
+  @@map("master_records")
+}
+
+// Dedicated Customer Master Model (MST-01 / O1-SCR-MST-01)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Customer {
+  id                 Int      @id @default(autoincrement())
+  customerCode       String   @unique
+  customerName       String
+  customerGroup      String // "Corporate Commercial" | "Retail Franchise" | etc.
+  territory          String? // "Western - Colombo Central" | etc.
+  mobile             String
+  nicBrNo            String?
+  customerType       String // "Corporate Enterprise" | "Small Business" | "Direct Consumer"
+  grade              String? // "Tier 1 - Platinum VIP" | etc.
+  firstChannel       String? // "Field Sales Rep" | "Web Portal" | etc.
+  preferredChannel   String? // "Dedicated Hotline" | "WhatsApp / SMS" | "Email Dispatch"
+  customerOrigin     String?  @default("Telesonic-sold") // "Telesonic-sold" | "Non-Telesonic" | "Mixed"
+  relationshipStatus String?  @default("Active") // "Free Service" | "Warranty Service" | "Agreement/AMC" | "Ad Hoc"
+  paymentHold        String?  @default("No") // "No" | "Yes (Overdue Lock)"
+  balanceLkr         Float?   @default(0.0)
+  status             String   @default("Active") // "Active" | "Inactive"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  contacts             ContactPerson[]
+  sites                Site[]
+  serialRegisters      SerialRegister[]
+  equipment            Equipment[]
+  otherBrandEquipments OtherBrandEquipment[]
+  equipmentSystems     EquipmentSystem[]
+
+  @@map("customers")
+}
+
+// Dedicated Contact Person Master Model (MST-02 / O1-SCR-MST-02)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Key: customerId referencing customers(id)
+model ContactPerson {
+  id           Int      @id @default(autoincrement())
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerCode String? // Snapshot / display (e.g. C-30512)
+  contactName  String
+  position     String? // "Facilities Manager", etc.
+  mobile       String
+  email        String?
+  site         String? // Associated site name / ID
+  active       String   @default("Yes") // "Yes" | "No"
+  validFrom    String? // Date string "YYYY-MM-DD"
+  status       String   @default("Active") // "Active" | "Inactive"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([customerId])
+  @@map("contact_persons")
+}
+
+// Dedicated Site and Location Master Model (MST-03 / O1-SCR-MST-03)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Key: customerId referencing customers(id)
+model Site {
+  serials              SerialRegister[]
+  id                   Int                   @id @default(autoincrement())
+  customerId           Int
+  customer             Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerCode         String? // Snapshot (e.g. C-30512)
+  customerName         String? // Snapshot (e.g. Jayasuriya Textiles)
+  siteCode             String                @unique // e.g. "SITE-COL-0091"
+  siteName             String
+  building             String?
+  floor                String?
+  room                 String?
+  addressLine1         String
+  cityTown             String
+  district             String
+  province             String
+  landmark             String?
+  gpsLatLong           String?
+  siteContact          String?
+  status               String                @default("Active") // "Active" | "Inactive"
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  equipment            Equipment[]
+  otherBrandEquipments OtherBrandEquipment[]
+  equipmentSystems     EquipmentSystem[]
+
+  @@index([customerId])
+  @@map("sites")
+}
+
+// Dedicated Item / Brand / Model / Equipment Category Master Model (MST-04 / O1-SCR-MST-04)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Item {
+  id                      Int              @id @default(autoincrement())
+  itemCode                String           @unique
+  itemName                String
+  itemGroup               String // "Finished Equipment" | "Service Spare Parts" | "Consumables" | "Accessories"
+  brand                   String // "Carrier" | "Midea" | "Toshiba" | "Bosch" | "Isuzu Industrial"
+  model                   String? // Model No.
+  equipmentCategory       String // e.g. "Air Conditioning Commercial"
+  componentRole           String? // "Complete Unit" | "Indoor Unit" | "Outdoor Unit" | "Compressor" | etc.
+  serviceable             String           @default("Yes") // "Yes" | "No"
+  warrantyMonths          Int?             @default(12)
+  componentWarrantyMonths Int?             @default(6)
+  serialManaged           String           @default("Yes") // "Yes" | "No"
+  status                  String           @default("Active") // "Active" | "Inactive"
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  serialRegisters         SerialRegister[]
+
+  @@map("items")
+}
+
+// Dedicated Serial Number Register and Lifecycle Master Model (MST-05 / O1-SCR-MST-05)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+// Foreign Keys: itemId (Item), customerId (Customer, optional), siteId (Site, optional)
+model SerialRegister {
+  id             Int         @id @default(autoincrement())
+  serialNo       String      @unique // e.g. "BSH-CTRL-00872"
+  itemId         Int?
+  item           Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemCode       String? // Snapshot (e.g. "SP-COMP-18K")
+  itemName       String? // Snapshot (e.g. "SP-COMP-18K Compressor Scroll")
+  status         String      @default("Available") // "Available" | "Delivered" | "Installed" | "Replaced" | "Returned" | "Scrapped"
+  warehouse      String? // "VAN-KSILVA (Field Stock)", "Central Stores", etc.
+  customerId     Int?
+  customer       Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String? // Snapshot
+  siteId         Int?
+  site           Site?       @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName       String? // Snapshot
+  systemId       String? // e.g. "CNT-2026-07"
+  componentRole  String? // "Main Compressor Unit", "Indoor Evaporator", "Control Panel"
+  warrantyStart  String? // Date "YYYY-MM-DD"
+  replacesSerial String? // e.g. "BSH-CTRL-00412"
+  replacedBy     String? // e.g. "BSH-CTRL-00999"
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  equipment      Equipment[]
+
+  @@index([itemId])
+  @@index([customerId])
+  @@index([siteId])
+  @@map("serials")
+}
+
+// Dedicated Equipment / Installed Base Master Model (MST-06 / O1-SCR-MST-06)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Equipment {
+  id               Int             @id @default(autoincrement())
+  equipmentId      String          @unique // e.g. "EQ-018834"
+  customerId       Int?
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName     String? // Snapshot
+  siteId           Int?
+  site             Site?           @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName         String? // Snapshot
+  itemCategory     String
+  brand            String
+  model            String?
+  serialId         Int?
+  serial           SerialRegister? @relation(fields: [serialId], references: [id], onDelete: SetNull)
+  serialNo         String? // Snapshot
+  origin           String          @default("Telesonic-originated")
+  serviceProvider  String          @default("Telesonic In-House SRE")
+  installedDate    String?
+  commissionedDate String?
+  warrantyTo       String?
+  relationship     String?         @default("Active Under Warranty")
+  systemId         String?
+  meterReading     Float?          @default(0)
+  status           String          @default("Installed")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@index([serialId])
+  @@map("equipments")
+}
+
+// Dedicated Other-Brand Equipment Master Model (MST-07 / O1-SCR-MST-07)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model OtherBrandEquipment {
+  id                Int       @id @default(autoincrement())
+  equipmentId       String    @unique // e.g. "EQ-OTH-99104"
+  customerId        Int?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String? // Snapshot
+  siteId            Int?
+  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName          String? // Snapshot
+  equipmentCategory String
+  brand             String
+  model             String
+  serial            String?
+  serialUnknown     String    @default("No")
+  previousSupplier  String?
+  takeoverDate      String?
+  takeoverCondition String?
+  status            String    @default("Active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@map("other_brand_equipments")
+}
+
+// ==========================================
+// Batch 1 Models (MST-08 to MST-12)
+// ==========================================
+
+model EquipmentSystem {
+  id                Int       @id @default(autoincrement())
+  systemId          String    @unique // e.g. "SYS-VRF-COL-009"
+  customerId        Int?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String?
+  siteId            Int?
+  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName          String?
+  location          String?
+  equipmentCategory String
+  status            String    @default("Active")
+  installedDate     String?
+  commissionedDate  String?
+  warrantyStart     String?
+  warrantyEnd       String?
+  contract          String?
+  project           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@map("equipment_systems")
+}
+
+model Technician {
+  id             Int      @id @default(autoincrement())
+  employeeId     String   @unique // e.g. "EMP-0412"
+  name           String
+  position       String?
+  department     String?
+  branch         String?
+  mobile         String?
+  technicianType String?  @default("Direct In-House Staff")
+  team           String?
+  certifications String?
+  normalRate     Float?   @default(0.0)
+  overtimeRate   Float?   @default(0.0)
+  status         String   @default("Active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("technicians")
+}
+
+model Subcontractor {
+  id                Int      @id @default(autoincrement())
+  vendorCode        String   @unique // e.g. "V-4410"
+  vendorName        String
+  subcontractorType String
+  territory         String
+  paymentTerms      String?
+  rating            Float?   @default(8.0)
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("subcontractors")
+}
+
+model ServiceRoleMaster {
+  id                    Int      @id @default(autoincrement())
+  roleCode              String   @unique // e.g. "ROLE-LEAD-TECH"
+  roleName              String
+  internalSubcontractor String?  @default("Both Internal and Subcontractor")
+  incentiveEligible     String   @default("Yes")
+  incentiveBasisRef     String?
+  multiplePerCall       String?  @default("No")
+  active                String   @default("Yes")
+  status                String   @default("Active")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("service_roles")
+}
+
+model ServiceTypeMaster {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique // e.g. "SVC-PREV-MAINT"
+  description       String
+  listType          String
+  defaultPriority   String?  @default("P2 - Normal Schedule")
+  checklistTemplate String?
+  slaRule           String?
+  chargeableDefault String?  @default("No")
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("service_types")
+}
+
+model HoldReasonMaster {
+  id              Int      @id @default(autoincrement())
+  reasonCode      String   @unique // e.g. "HLD-PARTS-AWAITED"
+  description     String
+  customerWording String
+  excludeFromSla  String?  @default("Yes (Clock Paused)")
+  maxHoldDays     Int?     @default(14)
+  active          String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("hold_reasons")
+}
+
+model RepeatReasonMaster {
+  id                  Int      @id @default(autoincrement())
+  reasonCode          String   @unique // e.g. "RPT-INCORRECT-DIAG"
+  description         String
+  countsAsPoorService String?  @default("Yes")
+  detectionPeriodDays Int      @default(30)
+  appliesToCategory   String?
+  active              String   @default("Yes")
+  status              String   @default("Active")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("repeat_reasons")
+}
+
+model SlaRuleMaster {
+  id              Int      @id @default(autoincrement())
+  ruleCode        String   @unique // e.g. "SLA-P0-METRO"
+  serviceType     String
+  priority        String
+  area            String?
+  resourceType    String?
+  responseHours   Float
+  resolutionHours Float
+  warningPct      Float?   @default(75.0)
+  calendar        String
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("sla_rules")
+}
+
+model ChecklistTemplateMaster {
+  id                Int      @id @default(autoincrement())
+  templateCode      String   @unique // e.g. "CHK-PM-AC-COMM"
+  name              String
+  equipmentCategory String
+  serviceType       String
+  version           Int?     @default(1)
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("checklist_templates")
+}
+
+model WarrantyRuleMaster {
+  id                   Int      @id @default(autoincrement())
+  ruleCode             String   @unique // e.g. "WAR-CARRIER-COMM-01"
+  equipmentCategory    String
+  componentRole        String?
+  channel              String?
+  startBasis           String
+  months               Int
+  labourCovered        String?  @default("Yes")
+  replacementTreatment String?  @default("Repair in Workshop")
+  status               String   @default("Active")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("warranty_rules")
+}
+
+model FreeServicePlanMaster {
+  id                Int      @id @default(autoincrement())
+  planCode          String   @unique // e.g. "FSP-AC-COMM-3V"
+  division          String
+  equipmentCategory String
+  visits            Int
+  intervalBasis     String
+  intervalValue     Int
+  startBasis        String
+  active            String   @default("Yes")
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("free_service_plans")
+}
+
+model ContractTemplateMaster {
+  id            Int      @id @default(autoincrement())
+  template      String   @unique // e.g. "AMC-COMP-2026-PREM"
+  contractKind  String
+  visitsPerYear Int?     @default(4)
+  coverage      String?  @default("24/7 Priority Emergency Coverage")
+  responseHours Int?     @default(4)
+  billingBasis  String?  @default("Quarterly in Advance")
+  status        String   @default("Active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("contract_templates")
+}
+
+model RelationshipStageMaster {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // e.g. "STG-ACTIVE-AMC"
+  description String
+  listType    String
+  appliesTo   String   @default("All Customer Accounts")
+  active      String   @default("Yes")
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("relationship_stages")
+}
+
+model ReminderRuleMaster {
+  id               Int      @id @default(autoincrement())
+  ruleCode         String   @unique // e.g. "REM-AMC-RENEW-30"
+  reminderType     String
+  customerCategory String?  @default("All Customers")
+  leadDays         Int
+  maxReminders     Int      @default(3)
+  intervalDays     Int      @default(7)
+  channel          String   @default("SMS + WhatsApp")
+  consentRequired  String?  @default("Yes")
+  status           String   @default("Active")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("reminder_rules")
+}
+
+model NotificationTemplateMaster {
+  id         Int      @id @default(autoincrement())
+  templateId String   @unique // e.g. "NTF-SMS-APPT-CONFIRM"
+  name       String
+  channel    String
+  language   String?  @default("English")
+  subject    String?
+  body       String
+  active     String   @default("Yes")
+  status     String   @default("Active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("notification_templates")
+}
+
+model ProjectBudgetMaster {
+  id             Int       @id @default(autoincrement())
+  projectCode    String    @unique // e.g. "PRJ-CAC-2026-014"
+  projectName    String
+  customer       String
+  projectManager String
+  startDate      DateTime?
+  endDate        DateTime?
+  budgetVersion  Int?      @default(1)
+  versionStatus  String?   @default("Draft")
+  status         String    @default("Active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("project_budgets")
+}
+
+model CostElementMappingMaster {
+  id              Int      @id @default(autoincrement())
+  costElement     String   @unique // e.g. "Subcontractor Labor"
+  description     String
+  glAccount       String
+  revenueCost     String?  @default("Expense")
+  requiresCallRef String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("cost_element_mappings")
+}
+
+model LabourRateMaster {
+  id              Int       @id @default(autoincrement())
+  rateCode        String    @unique // e.g. "RATE-2026-TECH-LEAD"
+  technicianType  String
+  normalRate      Float
+  overtimeRate    Float?    @default(0.0)
+  subcontractRate Float?    @default(0.0)
+  validFrom       DateTime?
+  status          String    @default("Active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("labour_rates")
+}
+
+model FranchiseWarehouseMaster {
+  id             Int      @id @default(autoincrement())
+  franchiseBp    String   @unique // e.g. "BP-FRAN-021"
+  franchiseName  String
+  warehouse      String
+  stockOwnership String   @default("Telesonic Consignment Stock")
+  region         String?
+  countFrequency String?  @default("Monthly Physical Audit")
+  auditor        String?
+  active         String   @default("Yes")
+  status         String   @default("Active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("franchise_warehouses")
+}
+
+model DeviationReasonMaster {
+  id                       Int      @id @default(autoincrement())
+  reasonCode               String   @unique // e.g. "VAR-DAMAGED-IN-TRANSIT"
+  description              String
+  recoverableFromFranchise String?  @default("No (Telesonic Absorption)")
+  qtyThreshold             Int?     @default(1)
+  valueThresholdLkr        Float?   @default(0.0)
+  escalationRecipients     String?
+  status                   String   @default("Active")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("deviation_reasons")
+}
+
+model ExportPermissionMaster {
+  id                Int      @id @default(autoincrement())
+  role              String
+  reportGrid        String
+  excel             String?  @default("Yes")
+  pdf               String?  @default("Yes")
+  restrictedColumns String?
+  rowLimit          Int?     @default(5000)
+  status            String   @default("Active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([role, reportGrid])
+  @@map("export_permissions")
+}
+
+model GoogleMeetSettingMaster {
+  id              Int      @id @default(autoincrement())
+  workspaceDomain String   @unique // e.g. "telesonic.lk"
+  organiserAccount String
+  authMethod      String   @default("Google Cloud Service Account JWT")
+  defaultDuration Int?     @default(45)
+  inviteCustomer  String?  @default("Yes")
+  inviteFranchise String?  @default("Yes")
+  retryCount      Int?     @default(3)
+  enabled         String   @default("Yes")
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("google_meet_settings")
+}
+
+model EquipmentCategoryAttributeMaster {
+  id                   Int      @id @default(autoincrement())
+  categoryCode         String   @unique // e.g. "CAT-AC-SPLIT-COMM"
+  categoryName         String
+  industryGroup        String?
+  multiComponent       String?  @default("No")
+  meterType            String?  @default("None")
+  defaultIntervalBasis String?  @default("Months (Calendar)")
+  defaultInterval      Int?     @default(3)
+  checklistSet         String?
+  warrantyRule         String?
+  status               String   @default("Active")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("equipment_category_attributes")
+}
+
+model ToolVehicleAssetMaster {
+  id              Int       @id @default(autoincrement())
+  assetId         String    @unique // e.g. "SYS-TOOL-00412"
+  type            String
+  description     String
+  holder          String?
+  vehicleRegNo    String?
+  meterKm         Int?
+  licenceExpiry   DateTime?
+  insuranceExpiry DateTime?
+  status          String    @default("Available in Stores")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("tool_vehicle_assets")
+}
+// ----------------------------------------------------
+// Incentive & Commission Management Models
+// ----------------------------------------------------
+
+model IncentiveScheme {
+  id                 String              @id @default(cuid())
+  schemeCode         String              @unique @map("scheme_code")
+  schemeName         String              @map("scheme_name")
+  division           String
+  schemeType         String              @map("scheme_type")
+  participantRole    String              @map("participant_role")
+  calculationBasis   String              @map("calculation_basis")
+  ageBasis           String              @map("age_basis")
+  payableLagMonths   Int                 @default(1) @map("payable_lag_months")
+  effectiveFrom      DateTime            @map("effective_from")
+  effectiveTo        DateTime            @map("effective_to")
+  status             String              @default("Draft") // "Draft" | "Approved" | "Active" | "Superseded" | "Inactive"
+  version            String              @default("v1.0")
+  description        String?
+  exclusions         Json?
+  posting            Json?
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  rules              SchemeRule[]
+  slabs              SchemeSlab[]
+  rateItems          SchemeRateItem[]
+  versions           SchemeVersion[]
+  history            SchemeHistoryLog[]
+
+  @@map("incentive_schemes")
+}
+
+model SchemeRule {
+  id         String          @id @default(cuid())
+  schemeId   String          @map("scheme_id")
+  scheme     IncentiveScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  rule       String
+  parameter  String
+  value      String
+  source     String
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  @@map("scheme_rules")
+}
+
+model SchemeSlab {
+  id            String          @id @default(cuid())
+  schemeId      String          @map("scheme_id")
+  scheme        IncentiveScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  slabId        String          @map("slab_id")
+  minPercent    Float           @map("min_percent")
+  maxPercent    Float           @map("max_percent")
+  payoutPercent Float           @map("payout_percent")
+  multiplier    Float
+  description   String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@map("scheme_slabs")
+}
+
+model SchemeRateItem {
+  id              String          @id @default(cuid())
+  schemeId        String          @map("scheme_id")
+  scheme          IncentiveScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  category        String
+  productLine     String          @map("product_line")
+  commissionRate  String          @map("commission_rate")
+  paymentTermBand String          @map("payment_term_band")
+  basis           String
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@map("scheme_rate_items")
+}
+
+model SchemeVersion {
+  id             String          @id @default(cuid())
+  schemeId       String          @map("scheme_id")
+  scheme         IncentiveScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  version        String
+  effectiveFrom  DateTime        @map("effective_from")
+  effectiveTo    DateTime        @map("effective_to")
+  status         String
+  createdBy      String          @map("created_by")
+  createdDate    DateTime        @default(now()) @map("created_date")
+  approvedBy     String?         @map("approved_by")
+  approvalDate   DateTime?       @map("approval_date")
+  changeSummary  String          @map("change_summary")
+
+  @@map("scheme_versions")
+}
+
+model SchemeHistoryLog {
+  id         String          @id @default(cuid())
+  schemeId   String          @map("scheme_id")
+  scheme     IncentiveScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  timestamp  DateTime        @default(now())
+  user       String
+  role       String
+  action     String
+  details    String
+
+  @@map("scheme_history_logs")
+}
+
+model CommissionRateMatrix {
+  id              String             @id
+  schemeCode      String             @map("scheme_code")
+  matrixName      String             @map("matrix_name")
+  version         String             @default("v1.0")
+  rowDimension    String             @default("Capacity Band + Item Type") @map("row_dimension")
+  columnDimension String             @default("Payment-term / Credit-age Bands") @map("column_dimension")
+  rateUnit        String             @default("% of Net Invoiced Value") @map("rate_unit")
+  currency        String             @default("USD ($)")
+  status          String             @default("Draft")
+  description     String?
+  createdBy       String             @default("Incentive Administrator") @map("created_by")
+  approvedBy      String?            @map("approved_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  creditBands     MatrixCreditBand[]
+  cells           MatrixCell[]
+  historyLogs     MatrixHistoryLog[]
+
+  @@map("commission_rate_matrices")
+}
+
+model MatrixCreditBand {
+  id            String               @id
+  matrixId      String               @map("matrix_id")
+  matrix        CommissionRateMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  name          String
+  columnKey     String               @map("column_key")
+  minDays       Int                  @map("min_days")
+  maxDays       Int                  @map("max_days")
+  description   String?
+  defaultFactor Float?               @default(1.0) @map("default_factor")
+  sortOrder     Int?                 @default(0) @map("sort_order")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@map("matrix_credit_bands")
+}
+
+model MatrixCell {
+  id            String               @id
+  matrixId      String               @map("matrix_id")
+  matrix        CommissionRateMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  capacityBand  String               @map("capacity_band")
+  itemType      String               @map("item_type")
+  cashImmediate Float?               @map("cash_immediate")
+  creditLt15    Float?               @map("credit_lt15")
+  creditLt30    Float?               @map("credit_lt30")
+  creditLte45   Float?               @map("credit_lte45")
+  creditGt45    Float?               @map("credit_gt45")
+  sortOrder     Int?                 @default(0) @map("sort_order")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@map("matrix_cells")
+}
+
+model MatrixHistoryLog {
+  id            String               @id
+  matrixId      String               @map("matrix_id")
+  matrix        CommissionRateMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  version       String
+  status        String
+  timestamp     DateTime             @default(now())
+  author        String
+  role          String
+  changeSummary String               @map("change_summary")
+  details       String?
+
+  @@map("matrix_history_logs")
+}
+
+model TargetIncentiveSlabTable {
+  id          String                 @id
+  schemeCode  String                 @map("scheme_code")
+  tableName   String                 @map("table_name")
+  targetType  String                 @default("Turnover Target") @map("target_type")
+  slabMethod  String                 @default("Highest Slab Reached (Non-Cumulative)") @map("slab_method")
+  version     String                 @default("v1.0")
+  status      String                 @default("Approved")
+  description String?
+  createdBy   String                 @default("Incentive Administrator") @map("created_by")
+  approvedBy  String?                @map("approved_by")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  tiers       SlabTier[]
+  historyLogs SlabTableHistoryLog[]
+
+  @@map("target_incentive_slab_tables")
+}
+
+model SlabTier {
+  id                    String                   @id
+  tableId               String                   @map("table_id")
+  table                 TargetIncentiveSlabTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  slabTierName          String                   @map("slab_tier_name")
+  minAchievementPercent Float                    @default(0.0) @map("min_achievement_percent")
+  volumeIncentiveLkr    Float                    @default(0.0) @map("volume_incentive_lkr")
+  turnoverIncentiveLkr  Float                    @default(0.0) @map("turnover_incentive_lkr")
+  notes                 String?
+  sortOrder             Int?                     @default(0) @map("sort_order")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+
+  @@map("slab_tiers")
+}
+
+model SlabTableHistoryLog {
+  id            String                   @id
+  tableId       String                   @map("table_id")
+  table         TargetIncentiveSlabTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  version       String
+  status        String
+  timestamp     DateTime                 @default(now())
+  author        String
+  role          String
+  changeSummary String                   @map("change_summary")
+  details       String?
+
+  @@map("slab_table_history_logs")
+}
+
+model MonthlyTargetBatch {
+  id          String                    @id
+  period      String
+  schemeCode  String                    @map("scheme_code")
+  division    String                    @default("All Divisions")
+  targetType  String                    @default("Turnover Target (LKR)") @map("target_type")
+  version     String                    @default("v1.0 Draft")
+  currency    String                    @default("LKR")
+  status      String                    @default("Draft")
+  isLocked    Boolean                   @default(false) @map("is_locked")
+  description String?
+  createdBy   String                    @default("Incentive Administrator") @map("created_by")
+  approvedBy  String?                   @map("approved_by")
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @default(now()) @updatedAt @map("updated_at")
+
+  entries     MonthlyTargetEntry[]
+  historyLogs MonthlyTargetHistoryLog[]
+
+  @@map("monthly_target_batches")
+}
+
+model MonthlyTargetEntry {
+  id               String             @id
+  batchId          String             @map("batch_id")
+  batch            MonthlyTargetBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  participantId    String             @map("participant_id")
+  employeeName     String             @map("employee_name")
+  role             String
+  division         String
+  territory        String
+  schemeCode       String             @map("scheme_code")
+  baseTargetLkr    Float              @default(0.0) @map("base_target_lkr")
+  stretchTargetLkr Float              @default(0.0) @map("stretch_target_lkr")
+  mtdActualLkr     Float              @default(0.0) @map("mtd_actual_lkr")
+  notes            String?
+  sortOrder        Int?               @default(0) @map("sort_order")
+  lastUpdated      String?            @map("last_updated")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  @@map("monthly_target_entries")
+}
+
+model MonthlyTargetHistoryLog {
+  id            String             @id
+  batchId       String             @map("batch_id")
+  batch         MonthlyTargetBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  version       String
+  status        String
+  timestamp     DateTime           @default(now())
+  author        String
+  role          String
+  changeSummary String             @map("change_summary")
+  details       String?
+
+  @@map("monthly_target_history_logs")
+}
+
+model IncentiveParticipant {
+  id                String                        @id
+  name              String
+  salesEmployeeCode String?                       @map("sales_employee_code")
+  division          String
+  segmentChannel    String?                       @map("segment_channel")
+  areaManager       String?                       @map("area_manager")
+  designation       String
+  payrollId         String                        @map("payroll_id")
+  active            Boolean                       @default(true)
+  phone             String?
+  email             String?
+  joinDate          String?                       @map("join_date")
+  createdAt         DateTime                      @default(now()) @map("created_at")
+  updatedAt         DateTime                      @default(now()) @updatedAt @map("updated_at")
+
+  assignments       ParticipantSchemeAssignment[]
+  historyLogs       ParticipantHistoryLog[]
+
+  @@map("incentive_participants")
+}
+
+model ParticipantSchemeAssignment {
+  id                      String               @id
+  participantId           String               @map("participant_id")
+  participant             IncentiveParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  schemeCode              String               @map("scheme_code")
+  schemeName              String?              @map("scheme_name")
+  calculationRole         String               @map("calculation_role")
+  isPrimaryRole           Boolean              @default(true) @map("is_primary_role")
+  effectiveFrom           DateTime             @map("effective_from")
+  effectiveTo             DateTime?            @map("effective_to")
+  targetAllocationPercent Float                @default(100.0) @map("target_allocation_percent")
+  status                  String               @default("Active")
+  notes                   String?
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @default(now()) @updatedAt @map("updated_at")
+
+  @@map("participant_scheme_assignments")
+}
+
+model ParticipantHistoryLog {
+  id            String               @id
+  participantId String               @map("participant_id")
+  participant   IncentiveParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  timestamp     DateTime             @default(now())
+  author        String
+  role          String
+  eventType     String               @map("event_type")
+  schemeCode    String?              @map("scheme_code")
+  previousValue String?              @map("previous_value")
+  newValue      String?              @map("new_value")
+  changeReason  String?              @map("change_reason")
+
+  @@map("participant_history_logs")
+}
+
+model AttendanceImportBatch {
+  id          String                    @id
+  period      String
+  division    String                    @default("Consumer Electronics")
+  source      String                    @default("Biometric Punch Terminal (ZKTeco BioTime)")
+  status      String                    @default("Draft")
+  importedBy  String                    @default("Service Coordinator") @map("imported_by")
+  approvedBy  String?                   @map("approved_by")
+  approvedAt  DateTime?                 @map("approved_at")
+  notes       String?
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @default(now()) @updatedAt @map("updated_at")
+
+  records     AttendanceRecord[]
+  historyLogs AttendanceBatchHistoryLog[]
+
+  @@map("attendance_import_batches")
+}
+
+model AttendanceRecord {
+  id               String                @id
+  batchId          String                @map("batch_id")
+  batch            AttendanceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeCode     String                @map("employee_code")
+  employeeName     String                @map("employee_name")
+  role             String
+  division         String
+  workingDays      Int                   @default(22) @map("working_days")
+  leaveDays        Int                   @default(0) @map("leave_days")
+  absentDays       Int                   @default(0) @map("absent_days")
+  attendanceFactor Float                 @default(1.0) @map("attendance_factor")
+  validationStatus String                @default("Valid") @map("validation_status")
+  errorMessages    Json?                 @map("error_messages")
+  notes            String?
+  sortOrder        Int?                  @default(0) @map("sort_order")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at")
+
+  @@map("attendance_records")
+}
+
+model AttendanceBatchHistoryLog {
+  id        String                @id
+  batchId   String                @map("batch_id")
+  batch     AttendanceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  action    String
+  userName  String                @map("user_name")
+  userRole  String                @map("user_role")
+  details   String?
+  timestamp DateTime              @default(now())
+
+  @@map("attendance_batch_history_logs")
+}
+
+model ServicePerformanceBatch {
+  id           String                             @id
+  period       String
+  division     String                             @default("Consumer Electronics")
+  sourceSystem String                             @default("Servio Service Desk / SAP B1 Service Module") @map("source_system")
+  receivedOn   String                             @map("received_on")
+  status       String                             @default("Draft")
+  lockedBy     String?                            @map("locked_by")
+  lockedAt     DateTime?                          @map("locked_at")
+  notes        String?
+  createdAt    DateTime                           @default(now()) @map("created_at")
+  updatedAt    DateTime                           @default(now()) @updatedAt @map("updated_at")
+
+  techLines    ServicePerformanceTechnicianLine[]
+  jobTickets   ServicePerformanceJobTicket[]
+  auditLogs    ServicePerformanceAuditLog[]
+
+  @@map("service_performance_batches")
+}
+
+model ServicePerformanceTechnicianLine {
+  id            String                  @id
+  batchId       String                  @map("batch_id")
+  batch         ServicePerformanceBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeCode  String                  @map("employee_code")
+  employeeName  String                  @map("employee_name")
+  role          String
+  division      String
+  closedJobs    Int                     @default(0) @map("closed_jobs")
+  hodEligible   Int                     @default(0) @map("hod_eligible")
+  partial       Int                     @default(0)
+  notEligible   Int                     @default(0) @map("not_eligible")
+  excluded      Int                     @default(0)
+  avgQuality    Float                   @default(0.0) @map("avg_quality")
+  avgDiscipline Float                   @default(0.0) @map("avg_discipline")
+  poorRepeats   Int                     @default(0) @map("poor_repeats")
+  reviewStatus  String                  @default("Reviewed") @map("review_status")
+  notes         String?
+  sortOrder     Int?                    @default(0) @map("sort_order")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @default(now()) @updatedAt @map("updated_at")
+
+  @@map("service_performance_technician_lines")
+}
+
+model ServicePerformanceJobTicket {
+  id                 String                  @id
+  batchId            String                  @map("batch_id")
+  batch              ServicePerformanceBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  jobTicketNo        String                  @map("job_ticket_no")
+  employeeCode       String                  @map("employee_code")
+  employeeName       String                  @map("employee_name")
+  customerName       String                  @map("customer_name")
+  equipmentModel     String                  @map("equipment_model")
+  completionDate     String                  @map("completion_date")
+  faultCategory      String                  @map("fault_category")
+  firstTimeFix       Boolean                 @default(true) @map("first_time_fix")
+  qualityScore       Float                   @default(10.0) @map("quality_score")
+  disciplineScore    Float                   @default(10.0) @map("discipline_score")
+  eligibility        String                  @default("HOD Eligible")
+  isPoorRepeat       Boolean                 @default(false) @map("is_poor_repeat")
+  repeatReferenceJob String?                 @map("repeat_reference_job")
+  hodReviewed        Boolean                 @default(true) @map("hod_reviewed")
+  closureStatus      String                  @default("Closed") @map("closure_status")
+  notes              String?
+  sortOrder          Int?                    @default(0) @map("sort_order")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at")
+
+  @@map("service_performance_job_tickets")
+}
+
+model ServicePerformanceAuditLog {
+  id        String                  @id
+  batchId   String                  @map("batch_id")
+  batch     ServicePerformanceBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  timestamp String
+  userName  String                  @map("user_name")
+  userRole  String                  @map("user_role")
+  action    String
+  details   String?
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  @@map("service_performance_audit_logs")
+}
+
+model CalculationResultBatch {
+  id                  String                         @id
+  period              String
+  runDate             String                         @map("run_date")
+  status              String                         @default("Calculated")
+  runType             String                         @default("MTD Simulation") @map("run_type")
+  totalParticipants   Int                            @default(0) @map("total_participants")
+  grossCommissionLkr  Float                          @default(0.0) @map("gross_commission_lkr")
+  targetIncentiveLkr  Float                          @default(0.0) @map("target_incentive_lkr")
+  penaltyClawbackLkr  Float                          @default(0.0) @map("penalty_clawback_lkr")
+  netPayableLkr       Float                          @default(0.0) @map("net_payable_lkr")
+  notes               String?
+  createdAt           DateTime                       @default(now()) @map("created_at")
+  updatedAt           DateTime                       @default(now()) @updatedAt @map("updated_at")
+
+  participantResults  CalculationParticipantResult[]
+  auditLogs           CalculationResultAuditLog[]
+
+  @@map("calculation_result_batches")
+}
+
+model CalculationParticipantResult {
+  id                  String                 @id
+  batchId             String                 @map("batch_id")
+  batch               CalculationResultBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  technicianCode      String                 @map("technician_code")
+  technicianName      String                 @map("technician_name")
+  role                String
+  division            String
+  schemeCode          String                 @map("scheme_code")
+  schemeName          String                 @map("scheme_name")
+  targetVolume        Float                  @default(0.0) @map("target_volume")
+  actualVolume        Float                  @default(0.0) @map("actual_volume")
+  volumePct           Float                  @default(0.0) @map("volume_pct")
+  targetTurnover      Float                  @default(0.0) @map("target_turnover")
+  actualTurnover      Float                  @default(0.0) @map("actual_turnover")
+  turnoverPct         Float                  @default(0.0) @map("turnover_pct")
+  slabTier            String                 @default("Tier 1") @map("slab_tier")
+  slabMultiplier      Float                  @default(1.0) @map("slab_multiplier")
+  grossCommission     Float                  @default(0.0) @map("gross_commission")
+  targetIncentive     Float                  @default(0.0) @map("target_incentive")
+  attendanceFactor    Float                  @default(1.0) @map("attendance_factor")
+  penaltyClawback     Float                  @default(0.0) @map("penalty_clawback")
+  netPayable          Float                  @default(0.0) @map("net_payable")
+  status              String                 @default("Calculated")
+  jobCount            Int                    @default(0) @map("job_count")
+  overdueInvoiceCount Int                    @default(0) @map("overdue_invoice_count")
+  notes               String?
+  sortOrder           Int?                   @default(0) @map("sort_order")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  @@map("calculation_participant_results")
+}
+
+model CalculationResultAuditLog {
+  id        String                 @id
+  batchId   String                 @map("batch_id")
+  batch     CalculationResultBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  timestamp String
+  userName  String                 @map("user_name")
+  userRole  String                 @map("user_role")
+  action    String
+  details   String?
+  createdAt DateTime               @default(now()) @map("created_at")
+
+  @@map("calculation_result_audit_logs")
+}
+
+// -----------------------------------------------------------------------------
+// 28. INCENTIVE CALCULATION RUN ENGINE (INC-SCR-09)
+// -----------------------------------------------------------------------------
+
+model IncentiveCalculationRun {
+  id                   String                         @id
+  runNo                String                         @map("run_no")
+  period               String
+  division             String                         @default("All Divisions")
+  selectedSchemes      String                         @default("All Active Schemes (4 Schemes)") @map("selected_schemes")
+  runType              String                         @default("Simulation") @map("run_type")
+  dataCutoff           String                         @map("data_cutoff")
+  status               String                         @default("Simulated")
+  runBy                String                         @map("run_by")
+  startedAt            String?                        @map("started_at")
+  finishedAt           String?                        @map("finished_at")
+  totalParticipants    Int                            @default(0) @map("total_participants")
+  totalDocsRead        Int                            @default(0) @map("total_docs_read")
+  totalGrossCommission Float                          @default(0.0) @map("total_gross_commission")
+  totalTargetIncentive Float                          @default(0.0) @map("total_target_incentive")
+  totalPenalty         Float                          @default(0.0) @map("total_penalty")
+  totalNetPayable      Float                          @default(0.0) @map("total_net_payable")
+  notes                String?
+  createdAt            DateTime                       @default(now()) @map("created_at")
+  updatedAt            DateTime                       @default(now()) @updatedAt @map("updated_at")
+
+  readinessChecks      CalculationRunReadinessCheck[]
+  schemeSummaries      CalculationRunSchemeSummary[]
+  warnings             CalculationRunWarning[]
+  logs                 CalculationRunLog[]
+
+  @@map("incentive_calculation_runs")
+}
+
+model CalculationRunReadinessCheck {
+  id            String                  @id
+  runId         String                  @map("run_id")
+  run           IncentiveCalculationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  moduleName    String                  @map("module_name")
+  requiredState String                  @map("required_state")
+  currentState  String                  @map("current_state")
+  isReady       Boolean                 @default(true) @map("is_ready")
+  signer        String
+  lastUpdated   String                  @map("last_updated")
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  @@map("calculation_run_readiness_checks")
+}
+
+model CalculationRunSchemeSummary {
+  id              String                  @id
+  runId           String                  @map("run_id")
+  run             IncentiveCalculationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  schemeCode      String                  @map("scheme_code")
+  schemeName      String                  @map("scheme_name")
+  division        String
+  participants    Int                     @default(0)
+  documentsRead   Int                     @default(0) @map("documents_read")
+  grossCommission Float                   @default(0.0) @map("gross_commission")
+  targetIncentive Float                   @default(0.0) @map("target_incentive")
+  penalty         Float                   @default(0.0)
+  netPayable      Float                   @default(0.0) @map("net_payable")
+  warningsCount   Int                     @default(0) @map("warnings_count")
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  @@map("calculation_run_scheme_summaries")
+}
+
+model CalculationRunWarning {
+  id              String                  @id
+  runId           String                  @map("run_id")
+  run             IncentiveCalculationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  code            String
+  schemeCode      String                  @map("scheme_code")
+  participantName String                  @map("participant_name")
+  severity        String                  @default("Medium")
+  message         String
+  remediation     String
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  @@map("calculation_run_warnings")
+}
+
+model CalculationRunLog {
+  id        String                  @id
+  runId     String                  @map("run_id")
+  run       IncentiveCalculationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  timestamp String
+  level     String                  @default("INFO")
+  message   String
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  @@map("calculation_run_logs")
+}
+
+// ====================================================================
+// 36. INCENTIVE MANUAL ADJUSTMENTS & BONUS CLAIMS (INC-SCR-10)
+// ====================================================================
+model IncentiveManualAdjustment {
+  id             String                     @id
+  adjustmentNo   String                     @unique @map("adjustment_no")
+  runNo          String                     @map("run_no")
+  participantId  String                     @map("participant_id")
+  participantName String                    @map("participant_name")
+  division       String
+  schemeCode     String                     @map("scheme_code")
+  schemeName     String                     @map("scheme_name")
+  adjustmentType String                     @default("Addition") @map("adjustment_type") // "Addition" | "Deduction"
+  amount         Float                      @default(0.0)
+  reason         String
+  remarks        String
+  attachment     String?
+  status         String                     @default("Draft") // "Draft" | "Submitted" | "Approved" | "Rejected"
+  requiresCeo    Boolean                    @default(false) @map("requires_ceo")
+  createdBy      String                     @map("created_by")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @default(now()) @updatedAt @map("updated_at")
+
+  approvals      ManualAdjustmentApproval[]
+  history        ManualAdjustmentHistory[]
+
+  @@map("incentive_manual_adjustments")
+}
+
+model ManualAdjustmentApproval {
+  id           String                    @id
+  adjustmentId String                    @map("adjustment_id")
+  adjustment   IncentiveManualAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  stepNumber   Int                       @map("step_number")
+  roleName     String                    @map("role_name")
+  approverName String                    @map("approver_name")
+  decision     String                    @default("Pending") // "Pending" | "Approved" | "Rejected"
+  decidedAt    String?                   @map("decided_at")
+  comments     String?
+  createdAt    DateTime                  @default(now()) @map("created_at")
+
+  @@map("manual_adjustment_approvals")
+}
+
+model ManualAdjustmentHistory {
+  id           String                    @id
+  adjustmentId String                    @map("adjustment_id")
+  adjustment   IncentiveManualAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  action       String
+  performedBy  String                    @map("performed_by")
+  performedAt  String                    @map("performed_at")
+  notes        String?
+  createdAt    DateTime                  @default(now()) @map("created_at")
+
+  @@map("manual_adjustment_history")
+}
+
+// ====================================================================
+// 37. MULTI-LEVEL APPROVAL & POSTING PACKAGES (INC-SCR-11)
+// ====================================================================
+model IncentiveApprovalBatch {
+  id            String                 @id
+  runNo         String                 @unique @map("run_no")
+  period        String
+  division      String
+  totalPayable  Float                  @default(0.0) @map("total_payable")
+  postingMethod String                 @default("Accrual JE + payroll export") @map("posting_method")
+  accrualJe     String?                @map("accrual_je")
+  payrollFile   String?                @map("payroll_file")
+  status        String                 @default("Submitted") // "Submitted" | "Approved" | "Posted" | "Locked" | "Rejected"
+  currentStep   Int                    @default(1) @map("current_step")
+  totalSteps    Int                    @default(4) @map("total_steps")
+  notes         String?
+  submittedBy   String                 @map("submitted_by")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @default(now()) @updatedAt @map("updated_at")
+
+  steps         ApprovalBatchStep[]
+  postingLines  ApprovalPostingLine[]
+  history       ApprovalBatchHistory[]
+
+  @@map("incentive_approval_batches")
+}
+
+model ApprovalBatchStep {
+  id           String                 @id
+  batchId      String                 @map("batch_id")
+  batch        IncentiveApprovalBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  stepNumber   Int                    @map("step_number")
+  roleName     String                 @map("role_name")
+  approverName String                 @map("approver_name")
+  decision     String                 @default("Pending") // "Pending" | "Approved" | "Rejected" | "Skipped"
+  decidedAt    String?                @map("decided_at")
+  comments     String?
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  @@map("approval_batch_steps")
+}
+
+model ApprovalPostingLine {
+  id                 String                 @id
+  batchId            String                 @map("batch_id")
+  batch              IncentiveApprovalBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  lineNo             Int                    @map("line_no")
+  divisionCostCentre String                 @map("division_cost_centre")
+  glExpenseAccount   String                 @map("gl_expense_account")
+  glExpenseName      String                 @map("gl_expense_name")
+  glPayableAccount   String                 @map("gl_payable_account")
+  glPayableName      String                 @map("gl_payable_name")
+  amount             Float                  @default(0.0)
+  dimension          String
+  createdAt          DateTime               @default(now()) @map("created_at")
+
+  @@map("approval_posting_lines")
+}
+
+model ApprovalBatchHistory {
+  id          String                 @id
+  batchId     String                 @map("batch_id")
+  batch       IncentiveApprovalBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  action      String
+  performedBy String                 @map("performed_by")
+  performedAt String                 @map("performed_at")
+  notes       String?
+  createdAt   DateTime               @default(now()) @map("created_at")
+
+  @@map("approval_batch_history")
+}
+
+// ====================================================================
+// 38. GL POSTING & PAYROLL HANDOVER (INC-SCR-12 / GL POSTING)
+// ====================================================================
+model IncentiveGLPostingBatch {
+  id                 String                          @id
+  postingRef         String                          @unique @map("posting_ref")
+  runNo              String                          @map("run_no")
+  period             String
+  division           String
+  postingDate        String                          @map("posting_date")
+  journalEntryNo     String?                         @map("journal_entry_no")
+  totalDebit         Float                           @default(0.0) @map("total_debit")
+  totalCredit        Float                           @default(0.0) @map("total_credit")
+  payrollBatchNo     String?                         @map("payroll_batch_no")
+  payrollFileName    String?                         @map("payroll_file_name")
+  bankFormat         String                          @default("SLIPS / CEFT") @map("bank_format")
+  bankFileName       String?                         @map("bank_file_name")
+  status             String                          @default("Draft") // "Draft" | "Ready to Post" | "Posted" | "Handed Over" | "Reconciled"
+  paymentLagMonths   Int                             @default(3) @map("payment_lag_months")
+  disbursementMonth  String                          @default("July 2026") @map("disbursement_month")
+  notes              String?
+  postedBy           String?                         @map("posted_by")
+  createdBy          String                          @map("created_by")
+  createdAt          DateTime                        @default(now()) @map("created_at")
+  updatedAt          DateTime                        @default(now()) @updatedAt @map("updated_at")
+
+  lines              IncentiveGLPostingLine[]
+  payrollItems       IncentivePayrollHandoverItem[]
+
+  @@map("incentive_gl_posting_batches")
+}
+
+model IncentiveGLPostingLine {
+  id             String                  @id
+  postingBatchId String                  @map("posting_batch_id")
+  batch          IncentiveGLPostingBatch @relation(fields: [postingBatchId], references: [id], onDelete: Cascade)
+  lineNo         Int                     @map("line_no")
+  accountType    String                  @map("account_type") // "Debit" | "Credit"
+  glAccountCode  String                  @map("gl_account_code")
+  glAccountName  String                  @map("gl_account_name")
+  costCentre     String                  @map("cost_centre")
+  amount         Float                   @default(0.0)
+  memo           String?
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  @@map("incentive_gl_posting_lines")
+}
+
+model IncentivePayrollHandoverItem {
+  id              String                  @id
+  postingBatchId  String                  @map("posting_batch_id")
+  batch           IncentiveGLPostingBatch @relation(fields: [postingBatchId], references: [id], onDelete: Cascade)
+  employeeId      String                  @map("employee_id")
+  employeeName    String                  @map("employee_name")
+  designation     String
+  division        String
+  epfNo           String?                 @map("epf_no")
+  bankName        String                  @map("bank_name")
+  bankAccountNo   String                  @map("bank_account_no")
+  grossAmount     Float                   @default(0.0) @map("gross_amount")
+  taxDeduction    Float                   @default(0.0) @map("tax_deduction")
+  netDisbursement Float                   @default(0.0) @map("net_disbursement")
+  paymentStatus   String                  @default("Pending Handover") @map("payment_status")
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  @@map("incentive_payroll_handover_items")
+}
+
+model IncentiveParticipantStatement {
+  id                 String                  @id
+  statementNo        String                  @unique @map("statement_no")
+  participantId      String                  @map("participant_id")
+  salesCode          String?                 @map("sales_code")
+  participantName    String                  @map("participant_name")
+  designation        String
+  division           String
+  period             String
+  runNo              String                  @map("run_no")
+  payableCommission  Float                   @default(0.0) @map("payable_commission")
+  targetIncentive    Float                   @default(0.0) @map("target_incentive")
+  serviceAllowance   Float                   @default(0.0) @map("service_allowance")
+  adjustmentsAmount  Float                   @default(0.0) @map("adjustments_amount")
+  penaltiesClawback  Float                   @default(0.0) @map("penalties_clawback")
+  netPayable         Float                   @default(0.0) @map("net_payable")
+  paymentLagMonths   Int                     @default(3) @map("payment_lag_months")
+  disbursementMonth  String                  @default("July 2026") @map("disbursement_month")
+  bankName           String?                 @map("bank_name")
+  bankAccountNo      String?                 @map("bank_account_no")
+  status             String                  @default("Calculated") // "Draft" | "Calculated" | "Approved" | "Issued" | "Disbursed"
+  issuedAt           String?                 @map("issued_at")
+  preparedBy         String                  @map("prepared_by")
+  verifiedBy         String?                 @map("verified_by")
+  approvedBy         String?                 @map("approved_by")
+  notes              String?
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at")
+
+  lines              IncentiveStatementLine[]
+
+  @@map("incentive_participant_statements")
+}
+
+model IncentiveStatementLine {
+  id               String                         @id
+  statementId      String                         @map("statement_id")
+  statement        IncentiveParticipantStatement  @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  lineNo           Int                            @map("line_no")
+  componentType    String                         @map("component_type")
+  description      String
+  targetValue      Float?                         @map("target_value")
+  achievementValue Float?                         @map("achievement_value")
+  achievementPct   Float?                         @map("achievement_pct")
+  earnedAmount     Float                          @default(0.0) @map("earned_amount")
+  remarks          String?
+  createdAt        DateTime                       @default(now()) @map("created_at")
+
+  @@map("incentive_statement_lines")
+}
+
+model IncentiveDispute {
+  id                 String    @id
+  disputeNo          String    @unique @map("dispute_no")
+  participantId      String    @map("participant_id")
+  salesCode          String?   @map("sales_code")
+  participantName    String    @map("participant_name")
+  designation        String
+  division           String
+  period             String
+  statementRef       String?   @map("statement_ref")
+  category           String
+  priority           String    @default("Medium") // "Critical" | "High" | "Medium" | "Low"
+  claimedAmount      Float     @default(0.0) @map("claimed_amount")
+  approvedAmount     Float     @default(0.0) @map("approved_amount")
+  status             String    @default("New") // "New" | "Under Investigation" | "Approved" | "Resolved" | "Rejected"
+  description        String
+  investigationNotes String?   @map("investigation_notes")
+  resolutionAction   String?   @map("resolution_action")
+  assignedTo         String?   @map("assigned_to")
+  resolvedBy         String?   @map("resolved_by")
+  resolvedAt         String?   @map("resolved_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("incentive_disputes")
+}
+
+model IncentiveDivisionBudget {
+  id                  String    @id
+  period              String
+  division            String
+  targetSales         Float     @default(0.0) @map("target_sales")
+  actualSales         Float     @default(0.0) @map("actual_sales")
+  targetCollections   Float     @default(0.0) @map("target_collections")
+  actualCollections   Float     @default(0.0) @map("actual_collections")
+  budgetAllocation    Float     @default(0.0) @map("budget_allocation")
+  actualIncentiveCost Float     @default(0.0) @map("actual_incentive_cost")
+  costRatioPct        Float     @default(0.0) @map("cost_ratio_pct")
+  varianceAmount      Float     @default(0.0) @map("variance_amount")
+  participantCount    Int       @default(0) @map("participant_count")
+  status              String    @default("On Track") // "On Track" | "Under Budget" | "Budget Exceeded"
+  notes               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("incentive_division_budgets")
+}
+
+model IncentiveDashboardRecord {
+  id                  String    @id
+  participantCode     String    @map("participant_code")
+  displayName         String    @map("display_name")
+  role                String
+  division            String
+  period              String
+  volumePct           Float     @default(0.0) @map("volume_pct")
+  turnoverPct         Float     @default(0.0) @map("turnover_pct")
+  projectedCommission Float     @default(0.0) @map("projected_commission")
+  invoicesOver45Days  Int       @default(0) @map("invoices_over_45_days")
+  penaltyExposure     Float     @default(0.0) @map("penalty_exposure")
+  baseTarget          Float     @default(0.0) @map("base_target")
+  actualAchievement   Float     @default(0.0) @map("actual_achievement")
+  attendanceFactor    Float     @default(1.0) @map("attendance_factor")
+  status              String    @default("Active")
+  notes               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("incentive_dashboard_records")
+}
+
+model IncentiveClawbackPenalty {
+  id                 String    @id
+  participantCode    String    @map("participant_code")
+  participantName    String    @map("participant_name")
+  division           String
+  period             String
+  recordType         String    @map("record_type")
+  tabCategory        String    @default("Penalty") @map("tab_category")
+  invoiceNo          String    @map("invoice_no")
+  customerName       String    @map("customer_name")
+  netValue           Decimal   @default(0.0) @db.Decimal(14, 2) @map("net_value")
+  dueAgeDays         Int       @default(0) @map("due_age_days")
+  bracket            String
+  ratePercent        Decimal   @default(0.0) @db.Decimal(6, 2) @map("rate_percent")
+  penaltyAmount      Decimal   @default(0.0) @db.Decimal(14, 2) @map("penalty_amount")
+  runNo              String    @map("run_no")
+  isRecurring        Boolean   @default(true) @map("is_recurring")
+  settlementStatus   String    @default("Pending") @map("settlement_status")
+  settledAt          DateTime? @map("settled_at")
+  settledBy          String?   @map("settled_by")
+  resolutionRemarks  String?   @map("resolution_remarks")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([participantCode], map: "idx_clawback_part")
+  @@index([period], map: "idx_clawback_period")
+  @@index([recordType], map: "idx_clawback_type")
+  @@index([settlementStatus], map: "idx_clawback_status")
+  @@map("incentive_clawback_penalties")
+}
+
+model IncentiveAuditLog {
+  id                 String    @id
+  timestamp          DateTime  @default(now())
+  entityType         String    @map("entity_type")
+  entityId           String    @map("entity_id")
+  actionType         String    @map("action_type")
+  performedBy        String    @map("performed_by")
+  role               String
+  terminalIp         String    @default("172.16.0.201") @map("terminal_ip")
+  severity           String    @default("INFO")
+  oldValue           String?   @map("old_value")
+  newValue           String?   @map("new_value")
+  diffSummary        String    @map("diff_summary")
+  versionTag         String?   @map("version_tag")
+  verificationStatus String    @default("Verified") @map("verification_status")
+  auditorNotes       String?   @map("auditor_notes")
+  hashChecksum       String    @map("hash_checksum")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([entityType, entityId], map: "idx_audit_entity")
+  @@index([actionType], map: "idx_audit_action")
+  @@index([timestamp], map: "idx_audit_time")
+  @@index([verificationStatus], map: "idx_audit_status")
+  @@map("incentive_audit_logs")
+}
+
+model IncentiveSystemParameter {
+  id             String    @id
+  parameterKey   String    @unique @map("parameter_key")
+  parameterName  String    @map("parameter_name")
+  category       String
+  parameterValue String    @map("parameter_value")
+  unit           String    @default("Days")
+  defaultValue   String    @map("default_value")
+  description    String
+  isEditable     Boolean   @default(true) @map("is_editable")
+  effectiveFrom  String    @default("2026-01-01") @map("effective_from")
+  lastUpdatedBy  String    @default("System Administrator") @map("last_updated_by")
+  lastUpdatedAt  DateTime? @default(now()) @map("last_updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([category], map: "idx_param_category")
+  @@index([parameterKey], map: "idx_param_key")
+  @@map("incentive_system_parameters")
+}
+
+model IncentiveDivision {
+  id             String    @id
+  divisionCode   String    @unique @map("division_code")
+  divisionName   String    @map("division_name")
+  description    String
+  hodName        String    @map("hod_name")
+  hodEmail       String?   @map("hod_email")
+  costCenterCode String    @map("cost_center_code")
+  status         String    @default("Active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([divisionCode], map: "idx_div_code")
+  @@index([status], map: "idx_div_status")
+  @@map("incentive_divisions")
+}
+
+
+

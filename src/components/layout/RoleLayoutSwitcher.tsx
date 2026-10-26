@@ -46,6 +46,23 @@ interface DbStatsType {
   };
 }
 
+// Mapping between desktop module paths and permission codes
+const modulePermissionMap: Record<string, string> = {
+  "/transactions": "TRANSACTIONS",
+  "/masters": "MASTERS",
+  "/service-requests": "SERVICE_REQUESTS",
+  "/dashboard": "DASHBOARD",
+  "/incidents": "INCIDENTS",
+  "/jobs": "JOBS",
+  "/catalog": "CATALOG",
+  "/problems": "PROBLEMS",
+  "/changes": "CHANGES",
+  "/assets": "ASSETS",
+  "/knowledge": "KNOWLEDGE",
+  "/equipment": "EQUIPMENT",
+  "/incentive": "INCENTIVE",
+};
+
 const desktopModules = [
   {
     to: "/transactions",
@@ -124,6 +141,20 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
+  // Filter desktop tiles according to permissions assigned to the user's role
+  const userPerms = (user.permissions && user.permissions.length > 0)
+    ? user.permissions.map((p) => p.toUpperCase().trim())
+    : (user.role.toUpperCase() === "ADMIN" ? ["ALL"] : []);
+
+  const hasAll = userPerms.includes("ALL");
+
+  const visibleModules = desktopModules.filter((mod) => {
+    if (hasAll) return true;
+    const requiredPerm = modulePermissionMap[mod.to];
+    if (!requiredPerm) return true;
+    return userPerms.includes(requiredPerm);
+  });
+
   const fetchPostgresData = async () => {
     setIsLoading(true);
     try {
@@ -160,7 +191,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary text-primary-foreground flex items-center gap-1">
               <Shield className="w-3 h-3" />
-              <span>ROLE: ADMIN</span>
+              <span>ROLE: {user.role || "ADMIN"}</span>
             </span>
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Database className="w-3 h-3 text-emerald-500" />
@@ -312,7 +343,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-foreground">Service Desk Modules</h2>
         <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {desktopModules.map(({ to, label, icon: Icon, tone }) => (
+          {visibleModules.map(({ to, label, icon: Icon, tone }) => (
             <Button
               key={to}
               asChild

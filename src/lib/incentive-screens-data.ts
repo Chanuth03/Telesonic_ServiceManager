@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   History,
   Settings2,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -231,6 +232,16 @@ export const INCENTIVE_SCREENS: IncentiveScreenItem[] = [
     description:
       "Define global payroll cut-off dates, default grace periods, aging threshold settings, and automated recalculation triggers.",
     icon: Settings2,
+    tone: "bg-primary/10 text-primary",
+  },
+  {
+    id: "division-master",
+    screenNumber: 20,
+    title: "Division Master & Operating Units",
+    category: "Master Data",
+    description:
+      "Configure corporate operating divisions, operational scope, HOD leadership, and SAP cost center mappings.",
+    icon: Building2,
     tone: "bg-primary/10 text-primary",
   },
 ];

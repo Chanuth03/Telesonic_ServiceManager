@@ -1,0 +1,446 @@
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Warranty rule deleted" }), { status: 200, headers });
+        } else if (ruleCode) {
+          await delegate.deleteMany({ where: { ruleCode } });
+          return new Response(JSON.stringify({ success: true, message: "Warranty rule deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Rule Code is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+    // =========================================================================
+    // 24. /api/free-service-plans - Dedicated Free Service Plan Master (MST-18)
+    // =========================================================================
+    if (path === "/api/free-service-plans") {
+      const urlParams = new URL(request.url).searchParams;
+      const delegate = (prisma as any).freeServicePlanMaster;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const planCode = urlParams.get("planCode");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const rec = await delegate.findUnique({ where: { id: Number(id) } });
+          if (!rec) return new Response(JSON.stringify({ error: "Plan not found" }), { status: 404, headers });
+          return new Response(JSON.stringify({ success: true, plan: rec }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (planCode) where.planCode = planCode;
+        if (search) {
+          where.OR = [
+            { planCode: { contains: search, mode: "insensitive" } },
+            { division: { contains: search, mode: "insensitive" } },
+            { equipmentCategory: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await delegate.findMany({ where, orderBy: { id: "asc" } });
+        return new Response(JSON.stringify({ success: true, plans: list }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const planCode = String(body.planCode || "").trim();
+        const division = String(body.division || "").trim();
+        const equipmentCategory = String(body.equipmentCategory || "").trim();
+        const visits = body.visits !== undefined && body.visits !== null ? parseInt(String(body.visits), 10) : 3;
+        const intervalBasis = String(body.intervalBasis || "Fixed Months").trim();
+        const intervalValue = body.intervalValue !== undefined && body.intervalValue !== null ? parseInt(String(body.intervalValue), 10) : 4;
+        const startBasis = String(body.startBasis || "Commissioning Date").trim();
+
+        if (!planCode || !division || !equipmentCategory) {
+          return new Response(JSON.stringify({ error: "Plan Code, Division, and Equipment Category are required" }), { status: 400, headers });
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) existing = await delegate.findUnique({ where: { id } });
+        if (!existing) existing = await delegate.findUnique({ where: { planCode } });
+
+        const activeVal = String(body.active || "Yes").trim();
+        const computedStatus = activeVal.toLowerCase() === "no" ? "Inactive" : "Active";
+
+        const payloadData = {
+          planCode,
+          division,
+          equipmentCategory,
+          visits,
+          intervalBasis,
+          intervalValue,
+          startBasis,
+          active: activeVal,
+          status: computedStatus,
+        };
+
+        let saved;
+        if (existing) {
+          saved = await delegate.update({ where: { id: existing.id }, data: payloadData });
+        } else {
+          saved = await delegate.create({ data: payloadData });
+        }
+
+        return new Response(JSON.stringify({ success: true, plan: saved }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const planCode = urlParams.get("planCode");
+
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Plan deleted" }), { status: 200, headers });
+        } else if (planCode) {
+          await delegate.deleteMany({ where: { planCode } });
+          return new Response(JSON.stringify({ success: true, message: "Plan deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Plan Code is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+    // =========================================================================
+    // 25. /api/contract-templates - Dedicated Contract Templates Master (MST-19)
+    // =========================================================================
+    if (path === "/api/contract-templates") {
+      const urlParams = new URL(request.url).searchParams;
+      const delegate = (prisma as any).contractTemplateMaster;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const template = urlParams.get("template");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const rec = await delegate.findUnique({ where: { id: Number(id) } });
+          if (!rec) return new Response(JSON.stringify({ error: "Template not found" }), { status: 404, headers });
+          return new Response(JSON.stringify({ success: true, template: rec }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (template) where.template = template;
+        if (search) {
+          where.OR = [
+            { template: { contains: search, mode: "insensitive" } },
+            { contractKind: { contains: search, mode: "insensitive" } },
+            { coverage: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await delegate.findMany({ where, orderBy: { id: "asc" } });
+        return new Response(JSON.stringify({ success: true, templates: list }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const template = String(body.template || "").trim();
+        const contractKind = String(body.contractKind || "").trim();
+
+        if (!template || !contractKind) {
+          return new Response(JSON.stringify({ error: "Template Code/Title and Contract Kind are required" }), { status: 400, headers });
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) existing = await delegate.findUnique({ where: { id } });
+        if (!existing) existing = await delegate.findUnique({ where: { template } });
+
+        const payloadData = {
+          template,
+          contractKind,
+          visitsPerYear: body.visitsPerYear !== undefined && body.visitsPerYear !== null ? parseInt(String(body.visitsPerYear), 10) : 4,
+          coverage: body.coverage || "24/7 Priority Emergency Coverage",
+          responseHours: body.responseHours !== undefined && body.responseHours !== null ? parseInt(String(body.responseHours), 10) : 4,
+          billingBasis: body.billingBasis || "Quarterly in Advance",
+          status: body.status || "Active",
+        };
+
+        let saved;
+        if (existing) {
+          saved = await delegate.update({ where: { id: existing.id }, data: payloadData });
+        } else {
+          saved = await delegate.create({ data: payloadData });
+        }
+
+        return new Response(JSON.stringify({ success: true, template: saved }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const template = urlParams.get("template");
+
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Template deleted" }), { status: 200, headers });
+        } else if (template) {
+          await delegate.deleteMany({ where: { template } });
+          return new Response(JSON.stringify({ success: true, message: "Template deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Template identifier is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+    // =========================================================================
+    // 26. /api/relationship-stages - Dedicated Relationship Stages / Reasons (MST-20)
+    // =========================================================================
+    if (path === "/api/relationship-stages") {
+      const urlParams = new URL(request.url).searchParams;
+      const delegate = (prisma as any).relationshipStageMaster;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const code = urlParams.get("code");
+        const listType = urlParams.get("listType");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const rec = await delegate.findUnique({ where: { id: Number(id) } });
+          if (!rec) return new Response(JSON.stringify({ error: "Stage not found" }), { status: 404, headers });
+          return new Response(JSON.stringify({ success: true, stage: rec }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (code) where.code = code;
+        if (listType) where.listType = listType;
+        if (search) {
+          where.OR = [
+            { code: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+            { listType: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await delegate.findMany({ where, orderBy: { id: "asc" } });
+        return new Response(JSON.stringify({ success: true, stages: list }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const code = String(body.code || "").trim();
+        const description = String(body.description || "").trim();
+        const listType = String(body.listType || "").trim();
+
+        if (!code || !description || !listType) {
+          return new Response(JSON.stringify({ error: "Code, Description, and List Type are required" }), { status: 400, headers });
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) existing = await delegate.findUnique({ where: { id } });
+        if (!existing) existing = await delegate.findUnique({ where: { code } });
+
+        const activeVal = String(body.active || "Yes").trim();
+        const computedStatus = activeVal.toLowerCase() === "no" ? "Inactive" : "Active";
+
+        const payloadData = {
+          code,
+          description,
+          listType,
+          appliesTo: body.appliesTo || "All Customer Accounts",
+          active: activeVal,
+          status: computedStatus,
+        };
+
+        let saved;
+        if (existing) {
+          saved = await delegate.update({ where: { id: existing.id }, data: payloadData });
+        } else {
+          saved = await delegate.create({ data: payloadData });
+        }
+
+        return new Response(JSON.stringify({ success: true, stage: saved }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const code = urlParams.get("code");
+
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Stage deleted" }), { status: 200, headers });
+        } else if (code) {
+          await delegate.deleteMany({ where: { code } });
+          return new Response(JSON.stringify({ success: true, message: "Stage deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Code is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+    // =========================================================================
+    // 27. /api/reminder-rules - Dedicated Reminder Rules and Intervals (MST-21)
+    // =========================================================================
+    if (path === "/api/reminder-rules") {
+      const urlParams = new URL(request.url).searchParams;
+      const delegate = (prisma as any).reminderRuleMaster;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const ruleCode = urlParams.get("ruleCode");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const rec = await delegate.findUnique({ where: { id: Number(id) } });
+          if (!rec) return new Response(JSON.stringify({ error: "Reminder rule not found" }), { status: 404, headers });
+          return new Response(JSON.stringify({ success: true, reminderRule: rec }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (ruleCode) where.ruleCode = ruleCode;
+        if (search) {
+          where.OR = [
+            { ruleCode: { contains: search, mode: "insensitive" } },
+            { reminderType: { contains: search, mode: "insensitive" } },
+            { channel: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await delegate.findMany({ where, orderBy: { id: "asc" } });
+        return new Response(JSON.stringify({ success: true, reminderRules: list }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const ruleCode = String(body.ruleCode || "").trim();
+        const reminderType = String(body.reminderType || "").trim();
+        const leadDays = body.leadDays !== undefined && body.leadDays !== null ? parseInt(String(body.leadDays), 10) : 30;
+
+        if (!ruleCode || !reminderType) {
+          return new Response(JSON.stringify({ error: "Rule Code and Reminder Type are required" }), { status: 400, headers });
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) existing = await delegate.findUnique({ where: { id } });
+        if (!existing) existing = await delegate.findUnique({ where: { ruleCode } });
+
+        const payloadData = {
+          ruleCode,
+          reminderType,
+          customerCategory: body.customerCategory || "All Customers",
+          leadDays,
+          maxReminders: body.maxReminders !== undefined && body.maxReminders !== null ? parseInt(String(body.maxReminders), 10) : 3,
+          intervalDays: body.intervalDays !== undefined && body.intervalDays !== null ? parseInt(String(body.intervalDays), 10) : 7,
+          channel: body.channel || "SMS + WhatsApp",
+          consentRequired: body.consentRequired || "Yes",
+          status: body.status || "Active",
+        };
+
+        let saved;
+        if (existing) {
+          saved = await delegate.update({ where: { id: existing.id }, data: payloadData });
+        } else {
+          saved = await delegate.create({ data: payloadData });
+        }
+
+        return new Response(JSON.stringify({ success: true, reminderRule: saved }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const ruleCode = urlParams.get("ruleCode");
+
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Reminder rule deleted" }), { status: 200, headers });
+        } else if (ruleCode) {
+          await delegate.deleteMany({ where: { ruleCode } });
+          return new Response(JSON.stringify({ success: true, message: "Reminder rule deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Rule Code is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+    // =========================================================================
+    // 28. /api/notification-templates - Dedicated Notification Templates (MST-22)
+    // =========================================================================
+    if (path === "/api/notification-templates") {
+      const urlParams = new URL(request.url).searchParams;
+      const delegate = (prisma as any).notificationTemplateMaster;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const templateId = urlParams.get("templateId");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const rec = await delegate.findUnique({ where: { id: Number(id) } });
+          if (!rec) return new Response(JSON.stringify({ error: "Template not found" }), { status: 404, headers });
+          return new Response(JSON.stringify({ success: true, template: rec }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (templateId) where.templateId = templateId;
+        if (search) {
+          where.OR = [
+            { templateId: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { channel: { contains: search, mode: "insensitive" } },
+            { language: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await delegate.findMany({ where, orderBy: { id: "asc" } });
+        return new Response(JSON.stringify({ success: true, templates: list }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const templateId = String(body.templateId || "").trim();
+        const name = String(body.name || "").trim();
+        const channel = String(body.channel || "").trim();
+        const messageBody = String(body.body || "").trim();
+
+        if (!templateId || !name || !channel || !messageBody) {
+          return new Response(JSON.stringify({ error: "Template Code, Name, Channel, and Message Body are required" }), { status: 400, headers });
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) existing = await delegate.findUnique({ where: { id } });
+        if (!existing) existing = await delegate.findUnique({ where: { templateId } });
+
+        const activeVal = String(body.active || "Yes").trim();
+        const computedStatus = activeVal.toLowerCase() === "no" ? "Inactive" : "Active";
+
+        const payloadData = {
+          templateId,
+          name,
+          channel,
+          language: body.language || "English",
+          subject: body.subject || null,
+          body: messageBody,
+          active: activeVal,
+          status: computedStatus,
+        };
+
+        let saved;
+        if (existing) {
+          saved = await delegate.update({ where: { id: existing.id }, data: payloadData });
+        } else {
+          saved = await delegate.create({ data: payloadData });
+        }
+
+        return new Response(JSON.stringify({ success: true, template: saved }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const templateId = urlParams.get("templateId");
+
+        if (id) {
+          await delegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Template deleted" }), { status: 200, headers });
+        } else if (templateId) {
+          await delegate.deleteMany({ where: { templateId } });
+          return new Response(JSON.stringify({ success: true, message: "Template deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Template Code is required" }), { status: 400, headers });
+        }
+      }
+    }

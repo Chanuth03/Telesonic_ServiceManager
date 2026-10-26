@@ -76,7 +76,7 @@ export async function handleLoginRequest(request: Request): Promise<Response> {
       });
     }
 
-    // 1. User කෙනෙක් ඉන්නවද කියලා Email එකෙන් Check කිරීම (Case-insensitive & trimmed)
+        // 1. Check if user exists in PostgreSQL database
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
@@ -88,7 +88,15 @@ export async function handleLoginRequest(request: Request): Promise<Response> {
       });
     }
 
-    // 2. Password එක නිවැරදිද කියලා Bcrypt හරහා Compare කිරීම (SQL Injection වලින් 100% ආරක්ෂිතයි)
+    // 2. Check if account is active
+    if (user.status && user.status.toLowerCase() === "inactive") {
+      return new Response(
+        JSON.stringify({ error: "Your account is deactivated. Please contact an administrator." }),
+        { status: 403, headers }
+      );
+    }
+
+    // 3. Bcrypt password comparison against hashed password in database
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return new Response(JSON.stringify({ error: "Invalid Email or Password" }), {
@@ -97,13 +105,41 @@ export async function handleLoginRequest(request: Request): Promise<Response> {
       });
     }
 
-    // 3. User ගේ Role එක ඇතුලත් කරලා Secure JWT Token එකක් හැදීම (Expires in 1 day)
-    const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, {
-      expiresIn: "1d",
+    // 4. Fetch assigned role and its permissions from system_roles table
+    let rolePermissions: string[] = [];
+    const roleRecord = await prisma.systemRole.findUnique({
+      where: { code: user.role.toUpperCase().trim() },
     });
 
-    // 4. Frontend (Lovable UI) එකට අවශ්‍ය දත්ත සහ Token එක යැවීම
-    const responsePayload: LoginResponseSuccess = {
+    if (roleRecord && roleRecord.permissions) {
+      try {
+        if (roleRecord.permissions.startsWith("[") || roleRecord.permissions.startsWith("{")) {
+          const parsed = JSON.parse(roleRecord.permissions);
+          rolePermissions = Array.isArray(parsed) ? parsed : Object.keys(parsed);
+        } else {
+          rolePermissions = roleRecord.permissions.split(",").map((p) => p.trim()).filter(Boolean);
+        }
+      } catch {
+        rolePermissions = roleRecord.permissions.split(",").map((p) => p.trim()).filter(Boolean);
+      }
+    } else if (user.role.toUpperCase() === "ADMIN") {
+      rolePermissions = ["ALL"];
+    }
+
+    // 5. Issue JWT Token with permissions
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        permissions: rolePermissions,
+      },
+      JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    // 6. Return user profile with permissions
+    const responsePayload = {
       success: true,
       message: "Login successful",
       token,
@@ -111,7 +147,8 @@ export async function handleLoginRequest(request: Request): Promise<Response> {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role, // ADMIN හෝ TECHNICIAN කියා ලැබෙයි
+        role: user.role,
+        permissions: rolePermissions,
       },
     };
 

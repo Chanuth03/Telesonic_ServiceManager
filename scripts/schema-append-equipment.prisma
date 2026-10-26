@@ -1,0 +1,36 @@
+
+// Dedicated Equipment / Installed Base Master Model (MST-06 / O1-SCR-MST-06)
+// Primary Key: Numeric auto-increment ID (1, 2, 3...)
+model Equipment {
+  id               Int             @id @default(autoincrement())
+  equipmentId      String          @unique // e.g. "EQ-018834"
+  customerId       Int?
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName     String?         // Snapshot
+  siteId           Int?
+  site             Site?           @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteName         String?         // Snapshot
+  itemCategory     String
+  brand            String
+  model            String?
+  serialId         Int?
+  serial           SerialRegister? @relation(fields: [serialId], references: [id], onDelete: SetNull)
+  serialNo         String?         // Snapshot
+  origin           String          @default("Telesonic-originated")
+  serviceProvider  String          @default("Telesonic In-House SRE")
+  installedDate    String?
+  commissionedDate String?
+  warrantyTo       String?
+  relationship     String?         @default("Active Under Warranty")
+  systemId         String?
+  meterReading     Float?          @default(0)
+  status           String          @default("Installed")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([siteId])
+  @@index([serialId])
+  @@map("equipments")
+}
+

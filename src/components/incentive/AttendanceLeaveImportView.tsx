@@ -42,10 +42,15 @@ import {
   HelpCircle,
   RefreshCw,
   SlidersHorizontal,
+  Database,
+  Loader2,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
+import { useIncentiveDivisions } from "@/lib/use-divisions";
 
 export type ImportStatus = "Draft" | "Validated" | "Approved";
 export type UserRole = "HR" | "Service Coordinator";
@@ -436,11 +441,69 @@ export function AttendanceLeaveImportView({
   onNavigateScreen,
   onBack,
 }: AttendanceLeaveImportViewProps) {
+  // Dynamic Divisions from Division Master PostgreSQL
+  const { divisionNames } = useIncentiveDivisions();
+
   // Mandatory Header States
   const [period, setPeriod] = useState<string>("May 2026");
   const [division, setDivision] = useState<string>("Consumer Electronics");
   const [source, setSource] = useState<string>("Biometric Punch Terminal (ZKTeco BioTime)");
   const [status, setStatus] = useState<ImportStatus>("Draft");
+
+  // PostgreSQL Database & Async States
+  const [currentBatchId, setCurrentBatchId] = useState<string>("BAT-ATT-2026-05A");
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [allDbBatches, setAllDbBatches] = useState<any[]>([]);
+
+  // Load Attendance Batches from PostgreSQL
+  const loadAttendanceFromDb = async (silent: boolean = false, targetPeriod?: string) => {
+    try {
+      if (!silent) setIsLoading(true);
+      const res = await apiFetch("/api/incentives/attendance");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.batches) && data.batches.length > 0) {
+        setAllDbBatches(data.batches);
+        setIsDbConnected(true);
+
+        const periodToMatch = targetPeriod || period;
+        const match =
+          data.batches.find(
+            (b: any) => b.period.toLowerCase() === periodToMatch.toLowerCase(),
+          ) || data.batches[0];
+
+        if (match) {
+          setCurrentBatchId(match.id);
+          setPeriod(match.period);
+          setDivision(match.division);
+          setSource(match.source);
+          setStatus(match.status);
+          if (match.records && match.records.length > 0) {
+            setRecords(match.records);
+          }
+        }
+        setHasUnsavedChanges(false);
+        if (!silent) {
+          toast.success("Synchronized with PostgreSQL database.", {
+            description: `Loaded ${match?.records?.length || 0} attendance records for ${match?.period}.`,
+          });
+        }
+      } else {
+        setIsDbConnected(false);
+      }
+    } catch (err) {
+      console.error("Failed to load attendance from PostgreSQL:", err);
+      setIsDbConnected(false);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadAttendanceFromDb(true);
+  }, []);
 
   // User Role Switcher (HR vs Service Coordinator)
   const [activeRole, setActiveRole] = useState<UserRole>("Service Coordinator");
@@ -617,6 +680,7 @@ export function AttendanceLeaveImportView({
   const handleValidateLines = () => {
     const updated = runValidation(records);
     setRecords(updated);
+    setHasUnsavedChanges(true);
 
     const errorCount = updated.filter((r) => r.validationStatus === "Error").length;
     if (errorCount === 0) {
@@ -631,8 +695,67 @@ export function AttendanceLeaveImportView({
     }
   };
 
+  // Action: Switch Period with Database Lookup
+  const handlePeriodChange = (newPeriod: string) => {
+    setPeriod(newPeriod);
+    const match = allDbBatches.find(
+      (b: any) => b.period.toLowerCase() === newPeriod.toLowerCase(),
+    );
+    if (match) {
+      setCurrentBatchId(match.id);
+      setDivision(match.division);
+      setSource(match.source);
+      setStatus(match.status);
+      if (match.records && match.records.length > 0) setRecords(match.records);
+      setHasUnsavedChanges(false);
+      toast.info(`Switched to ${newPeriod} (${match.status})`);
+    } else {
+      if (status === "Approved") setStatus("Draft");
+      setHasUnsavedChanges(true);
+      toast.info(`Switched active period to ${newPeriod}`);
+    }
+  };
+
+  // Action: Save Working Records directly to PostgreSQL
+  const handleSaveToPostgreSql = async () => {
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/attendance/${currentBatchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period,
+          division,
+          source,
+          status,
+          importedBy:
+            activeRole === "HR"
+              ? "Niluka Senaratne (HR Manager)"
+              : "Kamal Silva (Service Coordinator)",
+          records,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.batch) {
+        setHasUnsavedChanges(false);
+        setIsDbConnected(true);
+        toast.success("Saved to PostgreSQL successfully!", {
+          description: `Synchronized ${records.length} records for ${period} in PostgreSQL.`,
+        });
+      } else {
+        toast.error(data.error || "Failed to save attendance records.");
+      }
+    } catch (err) {
+      console.error("Save attendance error:", err);
+      toast.error("Failed to save attendance batch to PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Action: Approve as HR
-  const handleApproveAsHr = () => {
+  const handleApproveAsHr = async () => {
     if (activeRole !== "HR") {
       toast.error("HR Authorization Required", {
         description:
@@ -648,22 +771,67 @@ export function AttendanceLeaveImportView({
       return;
     }
 
-    setStatus("Approved");
-    setIsApproveModalOpen(false);
-    toast.success("Attendance Batch Approved by HR Manager", {
-      description: `Period ${period} (${division}) locked and approved for Service Performance computation.`,
-    });
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/attendance/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Approved",
+          approvedBy: "Niluka Senaratne (HR Manager)",
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setStatus("Approved");
+        setIsApproveModalOpen(false);
+        setHasUnsavedChanges(false);
+        toast.success("Attendance Batch Approved by HR Manager in PostgreSQL!", {
+          description: `Period ${period} (${division}) locked and approved for Service Performance computation.`,
+        });
+      } else {
+        toast.error(data.error || "Failed to approve attendance batch.");
+      }
+    } catch (err) {
+      setStatus("Approved");
+      setIsApproveModalOpen(false);
+      toast.success("Attendance Batch Approved by HR Manager");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Re-open to Draft
-  const handleReopenDraft = () => {
-    setStatus("Draft");
-    toast.info("Batch Re-opened to Draft Status", {
-      description: "Modifications, imports, and line edits are now enabled.",
-    });
+  const handleReopenDraft = async () => {
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/attendance/${currentBatchId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Draft",
+          approvedBy: "Niluka Senaratne (HR Manager)",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus("Draft");
+        toast.info("Batch Re-opened to Draft Status in PostgreSQL", {
+          description: "Modifications, imports, and line edits are now enabled.",
+        });
+      } else {
+        setStatus("Draft");
+      }
+    } catch (err) {
+      setStatus("Draft");
+      toast.info("Batch Re-opened to Draft Status");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Action: Delete row
+  // Action: Delete row from table
   const handleDeleteRow = (id: string) => {
     if (status !== "Draft") {
       toast.warning("Batch is locked", {
@@ -672,7 +840,39 @@ export function AttendanceLeaveImportView({
       return;
     }
     setRecords((prev) => prev.filter((r) => r.id !== id));
-    toast.info("Line removed from import table.");
+    setHasUnsavedChanges(true);
+    toast.info("Line removed from table.", {
+      description: "Click 'Save to DB' to commit this deletion to PostgreSQL.",
+    });
+  };
+
+  // Action: Delete Entire Batch from PostgreSQL
+  const handleDeleteBatch = async (batchIdToDelete: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete batch "${batchIdToDelete}" and all its records from PostgreSQL?`,
+      )
+    ) {
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const res = await apiFetch(`/api/incentives/attendance/${batchIdToDelete}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Batch ${batchIdToDelete} deleted from PostgreSQL!`);
+        await loadAttendanceFromDb(false);
+      } else {
+        toast.error(data.error || "Failed to delete batch from PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Delete batch error:", err);
+      toast.error("Failed to delete attendance batch from PostgreSQL.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Save Edit Line Modal
@@ -697,7 +897,10 @@ export function AttendanceLeaveImportView({
 
     setRecords((prev) => prev.map((r) => (r.id === updatedRow.id ? updatedRow : r)));
     setEditingRecord(null);
-    toast.success(`Updated line for ${updatedRow.employeeName}`);
+    setHasUnsavedChanges(true);
+    toast.success(`Updated line for ${updatedRow.employeeName}`, {
+      description: "Click 'Save to DB' to commit changes to PostgreSQL.",
+    });
   };
 
   // Action: Add New Line
@@ -727,7 +930,10 @@ export function AttendanceLeaveImportView({
 
     setRecords((prev) => [newRecord, ...prev]);
     setIsAddLineModalOpen(false);
-    toast.success(`Added attendance record for ${newRecord.employeeName}`);
+    setHasUnsavedChanges(true);
+    toast.success(`Added attendance record for ${newRecord.employeeName}`, {
+      description: "Click 'Save to DB' to synchronize with PostgreSQL.",
+    });
   };
 
   // Action: Parse Clipboard Paste
@@ -963,6 +1169,58 @@ export function AttendanceLeaveImportView({
       </div>
 
       {/* ------------------------------------------------------------- */}
+      {/* PostgreSQL Database Status Banner                             */}
+      {/* ------------------------------------------------------------- */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-2.5 rounded-lg border text-xs">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background border font-medium">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            <Database size={13} className="text-primary" />
+            <span className="font-semibold text-foreground">
+              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Memory"}
+            </span>
+            <span className="text-muted-foreground/60 text-[10px]">|</span>
+            <span className="text-muted-foreground text-[11px]">
+              Batch: <span className="font-mono text-foreground font-semibold">{currentBatchId}</span>
+            </span>
+          </div>
+
+          {hasUnsavedChanges && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              <AlertCircle size={11} /> Unsaved changes in draft
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadAttendanceFromDb(false, period)}
+            disabled={isLoading}
+            className="h-7 text-xs gap-1.5 hover:bg-background cursor-pointer"
+          >
+            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            <span>Sync DB</span>
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleSaveToPostgreSql}
+            disabled={isSaving}
+            className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs font-semibold"
+          >
+            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            <span>Save to PostgreSQL</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
       {/* 2. Top Header & Mandatory Fields Section                      */}
       {/* ------------------------------------------------------------- */}
       <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
@@ -1088,6 +1346,17 @@ export function AttendanceLeaveImportView({
               </Button>
             )}
 
+            {/* Save to PostgreSQL Button */}
+            <Button
+              size="sm"
+              onClick={handleSaveToPostgreSql}
+              disabled={isSaving}
+              className="h-8 gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+            >
+              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              <span>Save to DB</span>
+            </Button>
+
             {/* Approve as HR Action */}
             {status === "Validated" && (
               <Button
@@ -1127,11 +1396,7 @@ export function AttendanceLeaveImportView({
             </label>
             <select
               value={period}
-              onChange={(e) => {
-                setPeriod(e.target.value);
-                if (status === "Approved") setStatus("Draft");
-                toast.info(`Switched active period to ${e.target.value}`);
-              }}
+              onChange={(e) => handlePeriodChange(e.target.value)}
               className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-medium"
             >
               <option value="May 2026">May 2026 (Active Run)</option>
@@ -1157,10 +1422,12 @@ export function AttendanceLeaveImportView({
               }}
               className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option value="Consumer Electronics">Consumer Electronics</option>
-              <option value="Commercial Air Conditioning">Commercial Air Conditioning</option>
-              <option value="Renewable Energy">Renewable Energy</option>
               <option value="All Service Divisions">All Service Divisions</option>
+              {divisionNames.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -2230,10 +2497,28 @@ export function AttendanceLeaveImportView({
                       <th className="py-2 px-3">Imported By</th>
                       <th className="py-2 px-3 text-right">Records</th>
                       <th className="py-2 px-3 text-center">Status</th>
+                      <th className="py-2 px-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {INITIAL_BATCH_HISTORY.map((batch) => (
+                    {(allDbBatches.length > 0
+                      ? allDbBatches.map((b) => ({
+                          batchId: b.id,
+                          period: b.period,
+                          source: b.source,
+                          importedBy: b.importedBy,
+                          importDate: b.createdAt || "Live in PostgreSQL",
+                          totalRecords: b.records ? b.records.length : 0,
+                          validRecords: b.records
+                            ? b.records.filter((r: any) => r.validationStatus === "Valid").length
+                            : 0,
+                          errorRecords: b.records
+                            ? b.records.filter((r: any) => r.validationStatus === "Error").length
+                            : 0,
+                          status: b.status,
+                        }))
+                      : INITIAL_BATCH_HISTORY
+                    ).map((batch) => (
                       <tr key={batch.batchId} className="hover:bg-muted/30">
                         <td className="py-2.5 px-3 font-mono font-bold text-primary">
                           {batch.batchId}
@@ -2264,6 +2549,33 @@ export function AttendanceLeaveImportView({
                           >
                             {batch.status}
                           </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                handlePeriodChange(batch.period);
+                                setIsHistoryDrawerOpen(false);
+                              }}
+                              className="h-6 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                              title="Load batch to editor"
+                            >
+                              Load
+                            </Button>
+                            {batch.status !== "Approved" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteBatch(batch.batchId)}
+                                className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10 cursor-pointer"
+                                title="Delete draft batch from PostgreSQL"
+                              >
+                                <Trash2 size={12} />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

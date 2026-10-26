@@ -6,16 +6,16 @@ export function MobileNav() {
 
   const navItems = [
     {
-      to: "/mobile/jobs",
-      label: "Jobs",
-      icon: ClipboardList,
-      activeMatch: (p: string) => p.startsWith("/mobile/jobs"),
-    },
-    {
       to: "/mobile",
       label: "Overview",
       icon: Home,
       activeMatch: (p: string) => p === "/mobile" || p === "/mobile/",
+    },
+    {
+      to: "/mobile/jobs",
+      label: "Jobs",
+      icon: ClipboardList,
+      activeMatch: (p: string) => p.startsWith("/mobile/jobs"),
     },
     {
       to: "/mobile/stock-count",

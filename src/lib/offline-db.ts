@@ -1,5 +1,12 @@
 import Dexie, { type EntityTable } from "dexie";
-import { initialMobileJobs, MobileJob } from "./mobile-data";
+import {
+  initialMobileJobs,
+  initialNotifications,
+  initialStockCountItems,
+  MobileJob,
+  MobileNotification,
+  StockCountItem,
+} from "./mobile-data";
 
 export interface DexieJob extends MobileJob {
   syncStatus: "synced" | "pending" | "error";
@@ -31,6 +38,10 @@ export interface DexieMeta {
   updatedAt: number;
 }
 
+export interface DexieStockItem extends StockCountItem {
+  updatedAt: number;
+}
+
 /**
  * Dexie.js Offline Database for Field Service Mobile PWA
  */
@@ -38,6 +49,8 @@ class TelesonicOfflineDB extends Dexie {
   jobs!: EntityTable<DexieJob, "id">;
   syncQueue!: EntityTable<DexieSyncQueueItem, "id">;
   offlineMeta!: EntityTable<DexieMeta, "key">;
+  stockCount!: EntityTable<DexieStockItem, "sku">;
+  notifications!: EntityTable<MobileNotification, "id">;
 
   constructor() {
     super("TelesonicOfflineDB");
@@ -46,6 +59,14 @@ class TelesonicOfflineDB extends Dexie {
       jobs: "id, customerName, status, priority, technicianName, scheduledDate, syncStatus, updatedAt",
       syncQueue: "++id, action, entityId, createdAt, status",
       offlineMeta: "key, updatedAt",
+    });
+
+    this.version(2).stores({
+      jobs: "id, customerName, status, priority, technicianName, scheduledDate, syncStatus, updatedAt",
+      syncQueue: "++id, action, entityId, createdAt, status",
+      offlineMeta: "key, updatedAt",
+      stockCount: "sku, updatedAt",
+      notifications: "id, read, type",
     });
   }
 }
@@ -220,17 +241,21 @@ export async function markDexieAsSynced(
     "rw",
     [offlineDB.jobs, offlineDB.syncQueue, offlineDB.offlineMeta],
     async () => {
-      // Mark jobs as synced
+      if (queueItemIds.length > 0) {
+        await offlineDB.syncQueue.bulkDelete(queueItemIds);
+      }
+
       for (const id of syncedJobIds) {
+        const stillPending = await offlineDB.syncQueue
+          .where("entityId")
+          .equals(id)
+          .filter((item) => item.status === "pending")
+          .count();
+        if (stillPending > 0) continue;
         await offlineDB.jobs.update(id, {
           syncStatus: "synced",
           syncedAt: now,
         });
-      }
-
-      // Delete or update processed queue items
-      if (queueItemIds.length > 0) {
-        await offlineDB.syncQueue.bulkDelete(queueItemIds);
       }
 
       // Record last sync time
@@ -250,6 +275,38 @@ export async function markDexieAsSynced(
 /**
  * Get count of pending unsynced items
  */
+export async function saveDexieStock(items: StockCountItem[]): Promise<void> {
+  const now = Date.now();
+  await offlineDB.stockCount.bulkPut(items.map((item) => ({ ...item, updatedAt: now })));
+}
+
+export async function getDexieStock(): Promise<StockCountItem[]> {
+  const rows = await offlineDB.stockCount.toArray();
+  return rows.map(({ updatedAt: _updatedAt, ...item }) => item);
+}
+
+export async function saveDexieNotifications(items: MobileNotification[]): Promise<void> {
+  await offlineDB.notifications.clear();
+  if (items.length > 0) await offlineDB.notifications.bulkPut(items);
+}
+
+export async function getDexieNotifications(): Promise<MobileNotification[]> {
+  return offlineDB.notifications.toArray();
+}
+
+export async function ensureOfflineReferenceData(): Promise<void> {
+  await seedDexieInitialJobs();
+  const now = Date.now();
+  if ((await offlineDB.stockCount.count()) === 0) {
+    await offlineDB.stockCount.bulkPut(
+      initialStockCountItems.map((item) => ({ ...item, updatedAt: now })),
+    );
+  }
+  if ((await offlineDB.notifications.count()) === 0) {
+    await offlineDB.notifications.bulkPut(initialNotifications.map((item) => ({ ...item })));
+  }
+}
+
 export async function getPendingSyncCount(): Promise<number> {
   try {
     const countJobs = await offlineDB.jobs.where("syncStatus").equals("pending").count();
