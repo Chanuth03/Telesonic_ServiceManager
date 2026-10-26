@@ -51,32 +51,32 @@ const TECH_PROFILE: UserProfile = {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("auth_user");
-      if (savedUser) {
-        try {
-          return JSON.parse(savedUser);
-        } catch {}
-      }
-    }
-    return ADMIN_PROFILE;
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile>(ADMIN_PROFILE);
+  const [role, setRoleState] = useState<UserRole>("ADMIN");
+  const [mounted, setMounted] = useState(false);
 
-  const [role, setRoleState] = useState<UserRole>(() => {
+  useEffect(() => {
+    setMounted(true);
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("auth_user");
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.role) return parsed.role;
+          if (parsed) {
+            setCurrentUser(parsed);
+            if (parsed.role) {
+              setRoleState(parsed.role);
+              return;
+            }
+          }
         } catch {}
       }
-      const saved = localStorage.getItem("app_user_role");
-      if (saved) return saved;
+      const savedRole = localStorage.getItem("app_user_role");
+      if (savedRole) {
+        setRoleState(savedRole);
+      }
     }
-    return "ADMIN";
-  });
+  }, []);
 
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);

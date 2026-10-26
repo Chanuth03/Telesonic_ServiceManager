@@ -11,11 +11,21 @@ let pool: pg.Pool | null = null;
 
 export function getDbPool(): pg.Pool {
   if (!pool) {
+    const isRemote =
+      connectionString.includes("supabase.com") ||
+      connectionString.includes("neon.tech") ||
+      connectionString.includes("render.com") ||
+      connectionString.includes("pooler");
+
+    // Clean connection string so node-pg doesn't enforce strict CA verification for self-signed pooler certs
+    const cleanConnectionString = connectionString.replace(/[?&]sslmode=[^&]+/g, "");
+
     pool = new Pool({
-      connectionString,
+      connectionString: cleanConnectionString,
       max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 10000,
+      ssl: isRemote ? { rejectUnauthorized: false } : undefined,
     });
 
     pool.on("error", (err) => {
