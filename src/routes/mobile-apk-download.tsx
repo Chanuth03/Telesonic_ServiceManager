@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Smartphone,
   Download,
@@ -11,11 +11,18 @@ import {
   Server,
   Cpu,
   HardDrive,
-  ExternalLink,
   ChevronRight,
   Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  isInAppBrowser,
+  isIosDevice,
+  isStandalonePwa,
+  openInDeviceBrowser,
+  promptPwaInstall,
+  waitForInstallPrompt,
+} from "@/lib/pwa";
 
 export const Route = createFileRoute("/mobile-apk-download")({
   head: () => ({
@@ -24,13 +31,13 @@ export const Route = createFileRoute("/mobile-apk-download")({
       {
         name: "description",
         content:
-          "Download and install Telesonic Service Manager Android Mobile Application for field service technicians.",
+          "Install the Telesonic Service Manager mobile app on your phone home screen.",
       },
       { property: "og:title", content: "Telesonic Mobile App Download — Servio ITSM" },
       {
         property: "og:description",
         content:
-          "Download and install Telesonic Service Manager Android Mobile Application for field service technicians.",
+          "Install the Telesonic Service Manager mobile app on your phone home screen.",
       },
     ],
   }),
@@ -39,13 +46,57 @@ export const Route = createFileRoute("/mobile-apk-download")({
 
 function MobileApkDownloadPage() {
   const navigate = useNavigate();
-  const [isLaunching, setIsLaunching] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [manualInstall, setManualInstall] = useState<"ios" | "android" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const handleStartApp = () => {
-    setIsLaunching(true);
-    setTimeout(() => {
+  useEffect(() => {
+    setInstalled(isStandalonePwa());
+  }, []);
+
+  const handleDownload = async () => {
+    setMessage(null);
+    setManualInstall(null);
+
+    if (isStandalonePwa()) {
       navigate({ to: "/mobile/login" });
-    }, 600);
+      return;
+    }
+
+    if (isIosDevice()) {
+      setManualInstall("ios");
+      return;
+    }
+
+    if (isInAppBrowser()) {
+      openInDeviceBrowser();
+      return;
+    }
+
+    setIsInstalling(true);
+    try {
+      const ready = await waitForInstallPrompt(4000);
+      if (!ready) {
+        setManualInstall("android");
+        return;
+      }
+      const outcome = await promptPwaInstall();
+      if (outcome === "accepted") {
+        setInstalled(true);
+        navigate({ to: "/mobile/login" });
+        return;
+      }
+      if (outcome === "dismissed") {
+        setMessage(
+          "Installation was cancelled. Tap Download again when you want the app on this phone.",
+        );
+      } else {
+        setManualInstall("android");
+      }
+    } finally {
+      setIsInstalling(false);
+    }
   };
 
   return (
@@ -88,11 +139,11 @@ function MobileApkDownloadPage() {
                   Telesonic Mobile App
                 </h1>
                 <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground border">
-                  v2.4.0-APK
+                  v2.4.0
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Telesonic Service Manager Android Application for Field Service Technicians
+                Installs on your phone home screen. Opens the field service app without an app store.
               </p>
               <p className="text-[11px] font-mono text-primary flex items-center gap-1 pt-0.5">
                 <ShieldCheck size={13} />
@@ -101,16 +152,14 @@ function MobileApkDownloadPage() {
             </div>
           </div>
 
-          {/* SIMULATION DISCLAIMER BANNER - CLEAR REQUIREMENT */}
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 space-y-1.5">
-            <div className="flex items-center gap-2 font-semibold text-xs text-amber-800 dark:text-amber-300">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>Browser Demonstration Mode</span>
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-semibold text-xs text-primary">
+              <Info size={16} className="shrink-0" />
+              <span>Install on this phone</span>
             </div>
-            <p className="text-xs leading-relaxed opacity-90">
-              This is a browser-based frontend demonstration preview. No actual Android{" "}
-              <code>.apk</code> package file will be saved to your local storage or device. Clicking
-              the button below will open the separate mobile app login screen.
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Tap Download. On Android, confirm Install in the browser prompt and the app is added
+              to your home screen. On iPhone, Safari will show Add to Home Screen.
             </p>
           </div>
 
@@ -118,16 +167,16 @@ function MobileApkDownloadPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
             <div className="rounded-xl bg-muted/40 p-3 border space-y-1">
               <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-                <HardDrive size={12} /> Package Size
+                <HardDrive size={12} /> Installs as
               </span>
-              <p className="font-bold text-foreground font-mono">28.4 MB (Simulated)</p>
+              <p className="font-bold text-foreground font-mono">Home screen app</p>
             </div>
 
             <div className="rounded-xl bg-muted/40 p-3 border space-y-1">
               <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
                 <Cpu size={12} /> Target OS
               </span>
-              <p className="font-bold text-foreground">Android 11.0+</p>
+              <p className="font-bold text-foreground">Android and iPhone</p>
             </div>
 
             <div className="col-span-2 sm:col-span-1 rounded-xl bg-muted/40 p-3 border space-y-1">
@@ -165,18 +214,66 @@ function MobileApkDownloadPage() {
             </ul>
           </div>
 
+          {manualInstall && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+              <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-2xl space-y-3">
+                <div className="flex items-center gap-2 text-base font-bold">
+                  <Smartphone size={18} className="text-primary" />
+                  {manualInstall === "ios"
+                    ? "Add Telesonic on your iPhone"
+                    : "Install Telesonic on this phone"}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {manualInstall === "ios"
+                    ? "iPhone does not download an app file. Safari adds the icon to your home screen."
+                    : "Chrome did not open the install popup. Add the app from the browser menu."}
+                </p>
+                <ol className="list-decimal space-y-1.5 pl-4 text-sm">
+                  {manualInstall === "ios" ? (
+                    <>
+                      <li>Open this page in Safari, not inside WhatsApp or Chrome.</li>
+                      <li>Tap the Share button.</li>
+                      <li>Tap Add to Home Screen, then Add.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Open this page in Chrome, not inside WhatsApp.</li>
+                      <li>Tap the three-dot menu at the top right.</li>
+                      <li>Tap Install app or Add to Home screen, then Install.</li>
+                    </>
+                  )}
+                </ol>
+                <Button className="w-full" onClick={() => setManualInstall(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {message && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <span>{message}</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-3 border-t pt-5">
             <Button
-              onClick={handleStartApp}
-              disabled={isLaunching}
+              onClick={handleDownload}
+              disabled={isInstalling}
               size="lg"
               className="w-full h-12 text-sm font-bold shadow-md gap-2"
             >
-              {isLaunching ? (
+              {isInstalling ? (
                 <>
                   <Smartphone size={18} className="animate-spin" />
-                  Opening Mobile Application...
+                  Waiting for install confirmation...
+                </>
+              ) : installed ? (
+                <>
+                  <CheckCircle2 size={18} />
+                  Open installed app
                 </>
               ) : (
                 <>

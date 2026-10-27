@@ -1,8 +1,6 @@
-// Telesonic Service Worker for PWA Offline Caching
-const CACHE_NAME = "telesonic-pwa-v1";
-
+/* Installability requires a fetch handler. Navigation stays on the network so the app is not stuck on a stale page. */
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
@@ -10,11 +8,14 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Pass-through fetch with network-first strategy
-  if (event.request.method === "GET" && !event.request.url.includes("/api/")) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (
+    url.pathname.startsWith("/@") ||
+    url.pathname.startsWith("/src/") ||
+    url.pathname.startsWith("/node_modules/")
+  ) {
+    return;
   }
+  event.respondWith(fetch(event.request));
 });
-
