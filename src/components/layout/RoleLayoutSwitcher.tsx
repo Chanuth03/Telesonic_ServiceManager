@@ -142,9 +142,12 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
   // Filter desktop tiles according to permissions assigned to the user's role
-  const userPerms = (user.permissions && user.permissions.length > 0)
-    ? user.permissions.map((p) => p.toUpperCase().trim())
-    : (user.role.toUpperCase() === "ADMIN" ? ["ALL"] : []);
+  const userPerms =
+    user.permissions && user.permissions.length > 0
+      ? user.permissions.map((p) => p.toUpperCase().trim())
+      : user.role.toUpperCase() === "ADMIN"
+        ? ["ALL"]
+        : [];
 
   const hasAll = userPerms.includes("ALL");
 
@@ -188,160 +191,14 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
       {/* Workspace Header with PostgreSQL Status */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary text-primary-foreground flex items-center gap-1">
-              <Shield className="w-3 h-3" />
-              <span>ROLE: {user.role || "ADMIN"}</span>
-            </span>
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Database className="w-3 h-3 text-emerald-500" />
-              <span>Direct PostgreSQL (via Prisma)</span>
-            </span>
-          </div>
           <p className="text-sm font-medium text-muted-foreground">Welcome back, {user.name}</p>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Your workspace</h1>
-        </div>
-
-        {/* Live Database Status Indicator */}
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 justify-end">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>PostgreSQL API Live</span>
-            </div>
-            <div className="text-[11px] font-mono text-muted-foreground">
-              Last fetched: {lastRefreshed || "loading..."}
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchPostgresData}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-primary" : ""}`} />
-            <span>Refresh PostgreSQL Data</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* PostgreSQL Database Monitor Panel */}
-      <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <Server className="w-4 h-4 text-primary" />
-            <h3 className="font-bold text-sm text-foreground">
-              PostgreSQL Database Live Monitor (Direct Server API)
-            </h3>
-            <span className="text-[11px] font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded border border-primary/20">
-              Prisma: datasource db (PostgreSQL)
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <span>DATABASE_URL:</span>
-            <span className="text-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
-              {dbStats?.databaseUrl || 'env("DATABASE_URL")'}
-            </span>
-          </div>
-        </div>
-
-        {/* Quick Database Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <span className="text-[11px] text-muted-foreground font-medium block">
-              Total Jobs in PostgreSQL
-            </span>
-            <span className="text-xl font-bold font-mono text-foreground">{pgJobs.length}</span>
-          </div>
-          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-            <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium block">
-              DB Status
-            </span>
-            <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              {dbStats?.status || "CONNECTED"}
-            </span>
-          </div>
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <span className="text-[11px] text-blue-700 dark:text-blue-400 font-medium block">
-              Sync Audit Logs
-            </span>
-            <span className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">
-              {dbStats?.counts?.syncLogs || 1} Batches
-            </span>
-          </div>
-          <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-            <span className="text-[11px] text-purple-700 dark:text-purple-400 font-medium block">
-              Service Requests
-            </span>
-            <span className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400">
-              {dbStats?.counts?.serviceRequests || 4}
-            </span>
-          </div>
-        </div>
-
-        {/* Compact PostgreSQL Live Records View */}
-        <div className="overflow-x-auto border border-border rounded-lg">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted text-muted-foreground font-semibold border-b border-border">
-              <tr>
-                <th className="p-2.5">Job ID</th>
-                <th className="p-2.5">Customer & Site</th>
-                <th className="p-2.5">Town</th>
-                <th className="p-2.5">Status</th>
-                <th className="p-2.5">Priority</th>
-                <th className="p-2.5">Technician</th>
-                <th className="p-2.5">Sync Status</th>
-                <th className="p-2.5 text-right">Updated At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {pgJobs.slice(0, 5).map((job) => (
-                <tr key={job.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="p-2.5 font-mono font-bold text-primary">{job.id}</td>
-                  <td className="p-2.5 font-medium text-foreground">
-                    {job.customerName}
-                    <span className="text-[10px] text-muted-foreground block">
-                      {job.siteAddress}
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-muted-foreground">{job.town}</td>
-                  <td className="p-2.5">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-foreground border border-border">
-                      {job.status}
-                    </span>
-                  </td>
-                  <td className="p-2.5">
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        job.priority === "Critical"
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-muted text-foreground"
-                      }`}
-                    >
-                      {job.priority}
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-foreground">{job.technicianName}</td>
-                  <td className="p-2.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>PostgreSQL Synced</span>
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-right font-mono text-[11px] text-muted-foreground">
-                    {job.updatedAt ? new Date(job.updatedAt).toLocaleTimeString() : "Recent"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
 
       {/* Service Desk Module Launcher Grid */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-foreground">Service Desk Modules</h2>
+        <h2 className="text-lg font-bold text-foreground">Modules</h2>
         <nav aria-label="Service desk modules" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {visibleModules.map(({ to, label, icon: Icon, tone }) => (
             <Button

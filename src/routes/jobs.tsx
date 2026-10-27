@@ -16,13 +16,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/jobs")({
   head: () => ({
     meta: [
-      { title: "Job Management — Servio ITSM" },
+      { title: "Job Management — Service Manager" },
       {
         name: "description",
         content:
           "Kanban board and table of work orders: assign technicians, track status and due dates.",
       },
-      { property: "og:title", content: "Job Management — Servio ITSM" },
+      { property: "og:title", content: "Job Management — Service Manager" },
       {
         property: "og:description",
         content:

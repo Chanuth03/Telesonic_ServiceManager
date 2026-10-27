@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Servio ITSM — Service Desk Platform" },
+      { title: "Service Manager — Service Desk Platform" },
       {
         name: "description",
         content: "Modern IT service management: incidents, requests, changes and assets.",
@@ -131,7 +131,16 @@ function RootComponent() {
     applyTheme(getSavedTheme());
     void startMobileOfflineBridge();
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      if (import.meta.env.PROD) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      } else {
+        // In local development, unregister active service workers so they don't break Vite HMR
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
     }
   }, []);
   return (

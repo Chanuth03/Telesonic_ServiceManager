@@ -1,14 +1,14 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight, Smartphone, Download } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — Servio ITSM" },
-      { name: "description", content: "Sign in to the Servio ITSM service desk." },
-      { property: "og:title", content: "Sign in — Servio ITSM" },
-      { property: "og:description", content: "Sign in to the Servio ITSM service desk." },
+      { title: "Sign in â€” Service Manager" },
+      { name: "description", content: "Sign in to the Service Manager service desk." },
+      { property: "og:title", content: "Sign in â€” Service Manager" },
+      { property: "og:description", content: "Sign in to the Service Manager service desk." },
     ],
   }),
   component: LoginPage,
@@ -109,12 +109,12 @@ function LoginPage() {
             <Headset size={18} />
           </span>
           <span className="text-lg font-bold tracking-tight">
-            Servio<span className="font-medium text-sidebar-muted"> ITSM</span>
+            Service<span className="font-medium text-sidebar-muted">Manager</span>
           </span>
         </div>
         <div>
           <h2 className="max-w-md text-3xl font-bold leading-tight tracking-tight">
-            Every ticket, job and asset — one service desk.
+            Every ticket, job and asset â€” one service desk.
           </h2>
           <p className="mt-3 max-w-sm text-sm text-sidebar-muted">
             Designed for IT operations teams who need clarity, speed and compliance across
@@ -130,13 +130,13 @@ function LoginPage() {
               <div className="text-xs text-sidebar-muted">Mean resolution</div>
             </div>
             <div>
-              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">4.9★</div>
+              <div className="text-2xl font-bold tracking-tight text-sidebar-foreground">4.9â˜…</div>
               <div className="text-xs text-sidebar-muted">User satisfaction</div>
             </div>
           </div>
         </div>
         <div className="flex items-center justify-between text-xs text-sidebar-muted">
-          <span>© 2026 Telesonic Service Manager</span>
+          <span>Â© 2026 Telesonic Service Manager</span>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -146,9 +146,9 @@ function LoginPage() {
               <Smartphone size={13} />
               Download Mobile App
             </button>
-            <span>·</span>
+            <span>Â·</span>
             <span>Privacy</span>
-            <span>·</span>
+            <span>Â·</span>
             <span>Terms</span>
           </div>
         </div>
@@ -161,7 +161,7 @@ function LoginPage() {
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Headset size={18} />
               </span>
-              <span className="text-lg font-bold tracking-tight">Servio ITSM</span>
+              <span className="text-lg font-bold tracking-tight">Service Manager</span>
             </div>
             <button
               type="button"
@@ -234,7 +234,7 @@ function LoginPage() {
                 <input
                   type={showPw ? "text" : "password"}
                   className="input-field pl-9 pr-10"
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);

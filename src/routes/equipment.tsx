@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/equipment")({
   head: () => ({
     meta: [
-      { title: "Equipment Card — Servio ITSM" },
+      { title: "Equipment Card — Service Manager" },
       { name: "description", content: "Track, assign and return company equipment." },
-      { property: "og:title", content: "Equipment Card — Servio ITSM" },
+      { property: "og:title", content: "Equipment Card — Service Manager" },
       { property: "og:description", content: "Track, assign and return company equipment." },
     ],
   }),

@@ -1,18 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import {
-  Smartphone,
-  Download,
-  ArrowLeft,
-  CheckCircle2,
-  Sparkles,
-} from "lucide-react";
+import { Smartphone, Download, ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mobile-apk-download")({
   head: () => ({
     meta: [
-      { title: "Telesonic Mobile App — Servio ITSM" },
+      { title: "Telesonic Mobile App — Service Manager" },
       {
         name: "description",
         content: "Install and run Telesonic Service Manager Mobile Application.",

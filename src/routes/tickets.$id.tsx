@@ -12,9 +12,9 @@ export const Route = createFileRoute("/tickets/$id")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: `${loaderData?.id ?? "Ticket"} — Servio ITSM` },
+      { title: `${loaderData?.id ?? "Ticket"} — Service Manager` },
       { name: "description", content: loaderData?.subject ?? "Ticket details" },
-      { property: "og:title", content: `${loaderData?.id ?? "Ticket"} — Servio ITSM` },
+      { property: "og:title", content: `${loaderData?.id ?? "Ticket"} — Service Manager` },
       { property: "og:description", content: loaderData?.subject ?? "Ticket details" },
     ],
   }),

@@ -23,12 +23,12 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/mobile/")({
   head: () => ({
     meta: [
-      { title: "Telesonic Mobile App — Servio ITSM" },
+      { title: "Telesonic Mobile App — Service Manager" },
       {
         name: "description",
         content: "Telesonic Service Manager Mobile App for field service technicians.",
       },
-      { property: "og:title", content: "Telesonic Mobile App — Servio ITSM" },
+      { property: "og:title", content: "Telesonic Mobile App — Service Manager" },
       {
         property: "og:description",
         content: "Telesonic Service Manager Mobile App for field service technicians.",

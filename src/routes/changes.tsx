@@ -5,9 +5,9 @@ import { ModulePlaceholder } from "@/components/itsm/ModulePlaceholder";
 export const Route = createFileRoute("/changes")({
   head: () => ({
     meta: [
-      { title: "Change Management — Servio ITSM" },
+      { title: "Change Management — Service Manager" },
       { name: "description", content: "Plan, approve and schedule changes safely." },
-      { property: "og:title", content: "Change Management — Servio ITSM" },
+      { property: "og:title", content: "Change Management — Service Manager" },
       { property: "og:description", content: "Plan, approve and schedule changes safely." },
     ],
   }),

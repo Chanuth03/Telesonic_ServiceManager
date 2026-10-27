@@ -7,12 +7,12 @@ import { PageHeader, PriorityBadge, StatusBadge, Avatar } from "@/components/its
 export const Route = createFileRoute("/incidents")({
   head: () => ({
     meta: [
-      { title: "Incidents — Servio ITSM" },
+      { title: "Incidents — Service Manager" },
       {
         name: "description",
         content: "Track, filter and create IT incidents with priorities and assignments.",
       },
-      { property: "og:title", content: "Incidents — Servio ITSM" },
+      { property: "og:title", content: "Incidents — Service Manager" },
       {
         property: "og:description",
         content: "Track, filter and create IT incidents with priorities and assignments.",

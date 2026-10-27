@@ -37,13 +37,13 @@ import { IncentiveDashboardWorkspace } from "@/components/incentive/IncentiveDas
 export const Route = createFileRoute("/incentive")({
   head: () => ({
     meta: [
-      { title: "Incentive & Commission Management — Servio ITSM" },
+      { title: "Incentive & Commission Management — Service Manager" },
       {
         name: "description",
         content:
           "Telesonic Lanka Incentive & Commission Management: 19 core functional screens, schemes, rate matrices, calculation runs, settlements and performance monitoring.",
       },
-      { property: "og:title", content: "Incentive & Commission Management — Servio ITSM" },
+      { property: "og:title", content: "Incentive & Commission Management — Service Manager" },
       {
         property: "og:description",
         content:
@@ -393,7 +393,8 @@ function IncentiveModulePage() {
                   Telesonic End-to-End Month-End Incentive Lifecycle
                 </span>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Sequential business process flow matching Section 5 specifications. Click any stage to inspect relevant screens.
+                  Sequential business process flow matching Section 5 specifications. Click any
+                  stage to inspect relevant screens.
                 </p>
               </div>
 
@@ -438,7 +439,9 @@ function IncentiveModulePage() {
                     </div>
 
                     <div>
-                      <div className="font-bold text-xs text-foreground leading-tight">{st.title}</div>
+                      <div className="font-bold text-xs text-foreground leading-tight">
+                        {st.title}
+                      </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
                         {st.screenCodes}
                       </div>
