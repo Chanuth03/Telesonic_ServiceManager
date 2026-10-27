@@ -15,7 +15,7 @@ import {
 import { Avatar } from "./Badges";
 import { Button } from "@/components/ui/button";
 import { themes, applyTheme, getSavedTheme } from "@/lib/theme";
-import { RoleSwitcherBar, useRole } from "@/context/RoleContext";
+import { useRole } from "@/context/RoleContext";
 import { useRouterState } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -36,7 +36,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isTechnicianMobileView) {
     return (
       <div className="min-h-screen bg-muted/20">
-        <RoleSwitcherBar />
         <div>{children}</div>
       </div>
     );
@@ -44,7 +43,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <RoleSwitcherBar />
       <div>
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-3 border-b bg-card/85 px-4 py-3 backdrop-blur sm:px-6">
           <Link
@@ -70,12 +68,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
-              placeholder="Search tickets, assets, articlesâ€¦"
+              placeholder="Search..."
               className="input-field pl-9 bg-muted border-transparent"
             />
-            <kbd className="absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-card px-1.5 font-mono text-[10px] text-muted-foreground sm:block">
-              âŒ˜K
-            </kbd>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <div className="relative">
