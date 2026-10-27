@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { apiFetch } from "@/lib/api-client";
 import {
   ArrowLeft,
   Download,
@@ -102,6 +103,35 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     meta.code === "TRX-04" && formData["googleMeetLinkRequired"] === "Yes",
   );
 
+  
+  // Fetch real record from PostgreSQL database for Service Requests (TRX-01)
+  useEffect(() => {
+    if (meta.code === "TRX-01") {
+      (async () => {
+        try {
+          const res = await apiFetch("/api/service-requests");
+          if (res.ok) {
+            const json = await res.json();
+            if (json.requests && json.requests.length > 0) {
+              const latest = json.requests[0];
+              setFormData((prev) => ({
+                ...prev,
+                ...latest,
+                ...(latest.data || {}),
+                requestNo: latest.requestNo || latest.id,
+              }));
+              if (latest.updatedAt) {
+                setLastSavedTime(new Date(latest.updatedAt).toLocaleTimeString());
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[PostgreSQL] Failed to fetch service requests:", err);
+        }
+      })();
+    }
+  }, [meta.code]);
+
   const activeTab = meta.tabs.find((t) => t.id === activeTabId) || meta.tabs[0];
   const currentTabData = useMemo(() => {
     return (activeTab ? tabDatasets[activeTab.id] : []) || [];
@@ -161,7 +191,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   };
 
   // Save full transaction
-  const handleSaveTransaction = () => {
+    const handleSaveTransaction = async () => {
     saveFormData(storageKey, formData);
     meta.tabs.forEach((tab) => {
       const data = tabDatasets[tab.id];
@@ -169,12 +199,39 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         saveTabData(storageKey, tab.id, data);
       }
     });
+
+    // Save directly to PostgreSQL if TRX-01 (Service Request)
+    if (meta.code === "TRX-01") {
+      try {
+        const payload = {
+          ...formData,
+          data: {
+            formData,
+            tabDatasets,
+          },
+        };
+        const res = await apiFetch("/api/service-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const now = new Date().toLocaleTimeString();
+          setLastSavedTime(now);
+          showToast(`Service Request ${currentRecordRef} successfully saved to PostgreSQL database!`);
+          return;
+        }
+      } catch (err) {
+        console.error("[PostgreSQL] Failed to save service request:", err);
+      }
+    }
+
     const now = new Date().toLocaleTimeString();
     setLastSavedTime(now);
     try {
       localStorage.setItem(`${storageKey}_last_saved`, now);
     } catch {
-      // localStorage may be unavailable in private browsing
+      // localStorage may be unavailable
     }
     showToast(
       `Transaction ${currentRecordRef} saved successfully with ${currentTabData.length} line items.`,
@@ -358,18 +415,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
             </button>
 
             <button
-              onClick={() => setShowSpecDetails(!showSpecDetails)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
-                showSpecDetails
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-foreground border-border hover:bg-muted"
-              }`}
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>Specification Details</span>
-            </button>
-
-            <button
               onClick={() => setIsExportOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
             >
@@ -385,22 +430,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               <span>Audit</span>
             </button>
 
-            {b1Syncing && (
-              <span className="flex items-center gap-1.5 text-xs text-sky-600 font-medium px-2 py-1 bg-sky-50 dark:bg-sky-950/60 rounded">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Syncing SAP B1...</span>
-              </span>
-            )}
-          </div>
+            </div>
         </div>
 
         {/* Workflow & Status Breadcrumb Strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60 text-xs">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="font-semibold text-foreground">Status Progression:</span>
-            <span className="font-mono text-primary font-medium">{meta.statusFlow}</span>
-          </div>
-
           {/* Primary Action Buttons from Specification */}
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.actions
