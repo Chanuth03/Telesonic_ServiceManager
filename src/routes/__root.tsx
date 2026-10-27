@@ -9,11 +9,12 @@ import {
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
+import { isStandalonePwa } from "@/lib/pwa";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 import { RoleProvider } from "@/context/RoleContext";
 
@@ -88,8 +89,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "theme-color", content: "#4F46E5" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Telesonic" },
     ],
     links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -110,6 +118,11 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});if("serviceWorker"in navigator){navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(function(){});}})();`,
+          }}
+        />
         <HeadContent />
       </head>
       <body suppressHydrationWarning>
@@ -123,10 +136,18 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const bare = pathname === "/login";
+  const [standalone, setStandalone] = useState(false);
   useEffect(() => {
     applyTheme(getSavedTheme());
+    const media = window.matchMedia("(display-mode: standalone)");
+    const sync = () => setStandalone(isStandalonePwa());
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
   }, []);
+  const installedMobile =
+    standalone && (pathname === "/mobile-apk-download" || pathname.startsWith("/mobile"));
+  const bare = pathname === "/login" || pathname === "/mobile-apk-download" || installedMobile;
   return (
     <RoleProvider>
       <QueryClientProvider client={queryClient}>

@@ -262,14 +262,14 @@ function MobileLoginPage() {
 
           {/* Quick Flow Navigation Links */}
           <div className="border-t pt-4 space-y-2 text-center text-xs">
-            <p className="text-muted-foreground text-[11px]">Looking for simulated app download?</p>
+            <p className="text-muted-foreground text-[11px]">Need the app on this phone?</p>
             <div className="flex items-center justify-center gap-3 text-xs font-medium">
               <Link
                 to="/mobile-apk-download"
                 className="text-primary hover:underline inline-flex items-center gap-1"
               >
                 <Download size={13} />
-                Simulated APK Download Page
+                Download Mobile App
               </Link>
               <span className="text-muted-foreground">·</span>
               <Link to="/login" className="text-muted-foreground hover:underline">
