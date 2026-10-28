@@ -17,11 +17,13 @@ function MobileLayout() {
   return (
     <>
       {pathname !== "/mobile/login" ? (
-        <div className="mx-auto w-full max-w-md px-3 pt-3">
+        <div className="mx-auto w-full max-w-md space-y-3.5 px-1 py-3">
           <SyncStatusBadge />
+          <Outlet />
         </div>
-      ) : null}
-      <Outlet />
+      ) : (
+        <Outlet />
+      )}
     </>
   );
 }

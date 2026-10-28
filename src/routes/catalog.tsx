@@ -22,12 +22,12 @@ import { PageHeader } from "@/components/itsm/Badges";
 export const Route = createFileRoute("/catalog")({
   head: () => ({
     meta: [
-      { title: "Service Catalog — Servio ITSM" },
+      { title: "Service Catalog — Service Manager" },
       {
         name: "description",
         content: "Request hardware, software licenses, access and HR services.",
       },
-      { property: "og:title", content: "Service Catalog — Servio ITSM" },
+      { property: "og:title", content: "Service Catalog — Service Manager" },
       {
         property: "og:description",
         content: "Request hardware, software licenses, access and HR services.",

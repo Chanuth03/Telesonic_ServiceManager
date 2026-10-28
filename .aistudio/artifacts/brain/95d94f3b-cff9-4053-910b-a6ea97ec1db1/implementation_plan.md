@@ -55,7 +55,7 @@ Implementation plan for introducing the **Masters Hub** on the main Workspace an
 
 ### Visual Identity & Theme
 
-- **Theme**: Seamless integration with the existing Servio ITSM design system (neutral palette, clean borders, custom themes: Indigo, Emerald, Ocean, Sunset, Plum).
+- **Theme**: Seamless integration with the existing Service Manager design system (neutral palette, clean borders, custom themes: Indigo, Emerald, Ocean, Sunset, Plum).
 - **Typography**: `Plus Jakarta Sans` for clean UI labels and typography hierarchy; `JetBrains Mono` for Code IDs, Serial numbers, and currency values (`tabular-nums`).
 - **Indicators**:
   - `⇄B1` badge: Slate/blue pill tag indicating two-way or incoming synchronization with SAP Business One.

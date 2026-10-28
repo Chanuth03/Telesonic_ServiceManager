@@ -14,10 +14,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
-import { isStandalonePwa } from "@/lib/pwa";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 import { RoleProvider } from "@/context/RoleContext";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
+import { isStandalonePwa } from "@/lib/pwa";
 import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
 
 function NotFoundComponent() {
@@ -84,22 +84,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Servio ITSM — Service Desk Platform" },
+      { title: "Service Manager — Service Desk Platform" },
       {
         name: "description",
         content: "Modern IT service management: incidents, requests, changes and assets.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "theme-color", content: "#4F46E5" },
+      { name: "theme-color", content: "#2563eb" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "Telesonic" },
     ],
     links: [
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -108,6 +106,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -122,7 +122,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});if("serviceWorker"in navigator){navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(function(){});}})();`,
+            __html: `(function(){window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
           }}
         />
         <HeadContent />
@@ -140,17 +140,30 @@ function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [standalone, setStandalone] = useState(false);
   useEffect(() => {
-    applyTheme(getSavedTheme());
-void startMobileOfflineBridge();
     const media = window.matchMedia("(display-mode: standalone)");
     const sync = () => setStandalone(isStandalonePwa());
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
   }, []);
-  const installedMobile =
-    standalone && (pathname === "/mobile-apk-download" || pathname.startsWith("/mobile"));
+  const installedMobile = standalone && pathname.startsWith("/mobile");
   const bare = pathname === "/login" || pathname === "/mobile-apk-download" || installedMobile;
+  useEffect(() => {
+    applyTheme(getSavedTheme());
+    void startMobileOfflineBridge();
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      if (import.meta.env.PROD) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      } else {
+        // In local development, unregister active service workers so they don't break Vite HMR
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    }
+  }, []);
   return (
     <RoleProvider>
       <QueryClientProvider client={queryClient}>

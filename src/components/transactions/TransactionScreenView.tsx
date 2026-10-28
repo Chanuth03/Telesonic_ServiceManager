@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { apiFetch } from "@/lib/api-client";
+import { isOfflineForTransactions, saveOfflineTransaction } from "@/lib/offline-db";
 import {
   ArrowLeft,
   Download,
   History,
-  Info,
   Check,
   RefreshCw,
   FileText,
@@ -12,25 +13,26 @@ import {
   Video,
   UserCheck,
   CheckCircle2,
-  AlertCircle,
-  Building2,
-  ExternalLink,
-  PauseCircle,
-  PlayCircle,
-  Printer,
-  Sliders,
-  DollarSign,
-  Layers,
-  Send,
-  FileSpreadsheet,
-  Plus,
-  Trash2,
-  Save,
+  AlertTriangle,
+  Play,
   RotateCcw,
   Sparkles,
+  ChevronRight,
+  Plus,
+  Save,
+  Trash2,
+  Layers,
   Package,
+  Wrench,
+  Search,
+  Edit3,
+  X,
+  Database,
 } from "lucide-react";
-import { TransactionScreenMeta } from "@/data/transactionsSpecData";
+import {
+  TransactionScreenMeta,
+  TransactionFieldDef,
+} from "@/data/transactionsSpecData";
 import { TransactionField } from "./TransactionField";
 import { TransactionAuditModal } from "./TransactionAuditModal";
 import { TransactionExportModal } from "./TransactionExportModal";
@@ -60,19 +62,39 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     loadSavedFormData(storageKey, meta.sampleRecord),
   );
 
-  const [activeTabId, setActiveTabId] = useState<string>(meta.tabs[0]?.id || "");
+  const [activeTabId, setActiveTabId] = useState<string>("saved-requests");
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isAddPartModalOpen, setIsAddPartModalOpen] = useState(false);
-  const [showSpecDetails, setShowSpecDetails] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [b1Syncing, setB1Syncing] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(() => {
     try {
       return localStorage.getItem(`${storageKey}_last_saved`) || null;
     } catch {
       return null;
     }
+  });
+
+  // Saved records directory from PostgreSQL for CRUD listing
+  const [savedRecords, setSavedRecords] = useState<Record<string, unknown>[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Master dropdown options from PostgreSQL (MST-01, MST-02, MST-03, MST-06, etc.)
+  const [masterOptions, setMasterOptions] = useState<{
+    customers: string[];
+    contacts: string[];
+    sites: string[];
+    technicians: string[];
+    equipment: string[];
+    serviceTypes: string[];
+  }>({
+    customers: [],
+    contacts: [],
+    sites: [],
+    technicians: [],
+    equipment: [],
+    serviceTypes: [],
   });
 
   // Tab datasets with persistent state
@@ -102,6 +124,45 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     meta.code === "TRX-04" && formData["googleMeetLinkRequired"] === "Yes",
   );
 
+  // Fetch Saved Service Requests from PostgreSQL (Full List View)
+  const fetchSavedServiceRequests = async () => {
+    if (meta.code === "TRX-01") {
+      try {
+        const res = await apiFetch("/api/service-requests");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.requests && Array.isArray(json.requests)) {
+            setSavedRecords(json.requests);
+          }
+        }
+      } catch (err) {
+        console.warn("[PostgreSQL] Error fetching service requests:", err);
+      }
+    }
+  };
+
+  // Fetch Master Dropdown Options from PostgreSQL
+  const fetchMasterOptions = async () => {
+    try {
+      const res = await apiFetch("/api/service-requests/master-options");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.options) {
+          setMasterOptions(json.options);
+        }
+      }
+    } catch (err) {
+      console.warn("[PostgreSQL] Error fetching master options:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (meta.code === "TRX-01") {
+      fetchSavedServiceRequests();
+      fetchMasterOptions();
+    }
+  }, [meta.code]);
+
   const activeTab = meta.tabs.find((t) => t.id === activeTabId) || meta.tabs[0];
   const currentTabData = useMemo(() => {
     return (activeTab ? tabDatasets[activeTab.id] : []) || [];
@@ -120,6 +181,75 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     });
   };
 
+  // Clear fields / Reset form
+  const handleClearForm = () => {
+    const freshRecord: Record<string, unknown> = {};
+    meta.fields.forEach((f) => {
+      if (f.key === "requestNo") {
+        freshRecord[f.key] = `SR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+      } else if (f.key === "requestDate") {
+        freshRecord[f.key] = new Date().toISOString().split("T")[0];
+      } else if (f.key === "status") {
+        freshRecord[f.key] = "Draft";
+      } else {
+        freshRecord[f.key] = "";
+      }
+    });
+    setFormData(freshRecord);
+    saveFormData(storageKey, freshRecord);
+    showToast("Form fields cleared. Ready for new Service Request entry.");
+  };
+
+  // Load a record from saved list into the form for editing
+  const handleLoadRecord = (rec: Record<string, unknown>) => {
+    const rawData = (rec['data'] as Record<string, unknown>) || {};
+    const merged = {
+      ...formData,
+      ...rec,
+      ...(rawData['formData'] ? (rawData['formData'] as Record<string, unknown>) : {}),
+      requestNo: rec['requestNo'] || rec['id'],
+    };
+    setFormData(merged);
+    saveFormData(storageKey, merged);
+
+    if (rawData['tabDatasets']) {
+      setTabDatasets(rawData['tabDatasets'] as Record<string, Array<Record<string, unknown>>>);
+    }
+
+    if (rec['updatedAt']) {
+      setLastSavedTime(new Date(String(rec['updatedAt'])).toLocaleTimeString());
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    showToast(`Loaded Service Request ${rec['requestNo'] || rec['id']} into editor.`);
+  };
+
+  // Delete a saved record from PostgreSQL database
+  const handleDeleteRecord = async (rec: Record<string, unknown>) => {
+    const recId = String(rec['requestNo'] || rec['id']);
+    if (!window.confirm(`Are you sure you want to delete Service Request "${recId}" from the database?`)) {
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`/api/service-requests/${encodeURIComponent(recId)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Service Request "${recId}" removed from database.`);
+        fetchSavedServiceRequests();
+        if (formData["requestNo"] === recId) {
+          handleClearForm();
+        }
+      } else {
+        showToast(`Failed to delete record "${recId}".`);
+      }
+    } catch (err) {
+      console.error("[PostgreSQL] Delete error:", err);
+      showToast("Error connecting to server to delete record.");
+    }
+  };
+
   // Add Part / Row Line
   const handleSavePart = (row: Record<string, unknown>) => {
     if (!activeTab) return;
@@ -128,13 +258,12 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     setTabDatasets((prev) => ({ ...prev, [tabId]: updated }));
     saveTabData(storageKey, tabId, updated);
 
-    // Save timestamp
     const now = new Date().toLocaleTimeString();
     setLastSavedTime(now);
     try {
       localStorage.setItem(`${storageKey}_last_saved`, now);
     } catch {
-      // localStorage may be unavailable in private browsing
+      // localStorage fallback
     }
 
     const partName = String(row["item"] || row["itemCode"] || row["description"] || "Part");
@@ -160,8 +289,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     showToast(`Reset ${activeTab.label} to original specification dataset.`);
   };
 
-  // Save full transaction
-  const handleSaveTransaction = () => {
+  // Save full transaction to PostgreSQL
+  const handleSaveTransaction = async () => {
+    setIsSaving(true);
     saveFormData(storageKey, formData);
     meta.tabs.forEach((tab) => {
       const data = tabDatasets[tab.id];
@@ -169,41 +299,74 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         saveTabData(storageKey, tab.id, data);
       }
     });
+
+    const payload = {
+      ...formData,
+      data: {
+        formData,
+        tabDatasets,
+      },
+    };
+    const recordRef = String(
+      formData[primaryKey] ||
+        (meta.sampleRecord as Record<string, unknown>)[primaryKey] ||
+        meta.code,
+    );
+
+    if (isOfflineForTransactions()) {
+      await saveOfflineTransaction({
+        code: meta.code,
+        storageKey,
+        recordRef,
+        payload,
+      });
+      const now = new Date().toLocaleTimeString();
+      setLastSavedTime(now);
+      setIsSaving(false);
+      showToast(`Transaction ${recordRef} stored offline in Dexie. See the browser console for the JSON.`);
+      return;
+    }
+
+    if (meta.code === "TRX-01") {
+      try {
+        const res = await apiFetch("/api/service-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const now = new Date().toLocaleTimeString();
+          setLastSavedTime(now);
+          showToast(`Service Request ${currentRecordRef} successfully saved to PostgreSQL database!`);
+          fetchSavedServiceRequests();
+          setIsSaving(false);
+          return;
+        }
+      } catch (err) {
+        console.error("[PostgreSQL] Failed to save service request:", err);
+        await saveOfflineTransaction({
+          code: meta.code,
+          storageKey,
+          recordRef,
+          payload,
+        });
+        const now = new Date().toLocaleTimeString();
+        setLastSavedTime(now);
+        setIsSaving(false);
+        showToast(`Database was unreachable. Transaction ${recordRef} stored offline in Dexie.`);
+        return;
+      }
+    }
+
     const now = new Date().toLocaleTimeString();
     setLastSavedTime(now);
     try {
       localStorage.setItem(`${storageKey}_last_saved`, now);
     } catch {
-      // localStorage may be unavailable in private browsing
+      // ignore
     }
-    showToast(
-      `Transaction ${currentRecordRef} saved successfully with ${currentTabData.length} line items.`,
-    );
-  };
-
-  // Create new blank record for demo
-  const handleCreateNewBlank = () => {
-    const blank: Record<string, unknown> = {};
-    meta.fields.forEach((f) => {
-      if (f.key === meta.fields[0]?.key) {
-        blank[f.key] = `${meta.code}-NEW-${Math.floor(1000 + Math.random() * 9000)}`;
-      } else if (f.key === "status") {
-        blank[f.key] = "Draft / Pending";
-      } else {
-        blank[f.key] = "";
-      }
-    });
-    setFormData(blank);
-    saveFormData(storageKey, blank);
-
-    // Clear active tab data
-    if (activeTab) {
-      setTabDatasets((prev) => ({ ...prev, [activeTab.id]: [] }));
-      saveTabData(storageKey, activeTab.id, []);
-    }
-    showToast(
-      `Initialized fresh blank record for ${meta.code}. You can now enter details and add parts!`,
-    );
+    setIsSaving(false);
+    showToast(`Transaction ${currentRecordRef} saved successfully.`);
   };
 
   const handleAction = (action: string) => {
@@ -215,18 +378,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       setIsExportOpen(true);
       return;
     }
-    if (
-      action.includes("SAP") ||
-      action.includes("Post to SAP") ||
-      action.includes("Refresh SAP")
-    ) {
-      setB1Syncing(true);
-      setTimeout(() => {
-        setB1Syncing(false);
-        showToast("⇄ SAP Business One DI Server API: Real-time synchronization completed.");
-      }, 750);
-      return;
-    }
     if (action.includes("Print")) {
       window.print();
       return;
@@ -235,99 +386,81 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       handleSaveTransaction();
       return;
     }
-    if (action.includes("Hold")) {
-      handleFieldChange("status", "On Hold");
-      showToast(`Call placed On Hold. SLA timer suspended pending customer confirmation.`);
-      return;
-    }
-    if (action.includes("Resume")) {
-      handleFieldChange("status", "In Progress");
-      showToast(`Call resumed into active triage. SLA clock reactivated.`);
-      return;
-    }
-    if (action.includes("Approve")) {
-      handleFieldChange("status", "Approved");
-      showToast(`Transaction approved under compliance authority matrix.`);
-      return;
-    }
     if (action.includes("Submit")) {
       handleFieldChange("status", "Submitted");
-      showToast(`Transaction ${meta.code} submitted successfully with parts register.`);
+      handleSaveTransaction();
+      showToast(`Service Request submitted for triage & service call scheduling.`);
       return;
     }
-    if (action.includes("Generate Meet Link")) {
-      setMeetLinkGenerated(true);
-      handleFieldChange("meetLink", "https://meet.google.com/xyz-servio-tel");
-      showToast("Google Meet video diagnostic session link generated & sent to participants.");
+    if (action.includes("Cancel")) {
+      handleFieldChange("status", "Cancelled");
+      handleSaveTransaction();
+      showToast(`Service Request marked as Cancelled.`);
       return;
     }
-
-    // Default action notification
-    showToast(`Action "${action}" processed successfully.`);
+    if (action.includes("Create Service Calls")) {
+      handleFieldChange("status", "Converted");
+      handleSaveTransaction();
+      showToast(`Converted to Service Call. Navigating to Service Call Generation...`);
+      return;
+    }
+    showToast(`Action "${action}" recorded.`);
   };
 
-  const firstFieldKey = meta.fields[0]?.key;
-  const currentRecordRef = firstFieldKey ? String(formData[firstFieldKey] ?? meta.code) : meta.code;
+  const primaryKey = meta.fields[0]?.key || 'id';
+  const currentRecordRef = String(formData[primaryKey] || (meta.sampleRecord as Record<string, unknown>)[primaryKey] || meta.code);
 
-  // Calculate live tab metrics
   const tabMetrics = useMemo(() => {
-    let totalQty = 0;
-    let totalLkr = 0;
-
-    currentTabData.forEach((row) => {
-      // Qty calculation
-      const q = parseFloat(String(row["qty"] || row["quantity"] || row["reqQty"] || 0));
-      if (!isNaN(q)) totalQty += q;
-
-      // Price calculation
-      const amtStr = String(
-        row["total"] || row["amount"] || row["totalAmount"] || row["cost"] || row["price"] || "0",
-      ).replace(/[^0-9.]/g, "");
-      const amt = parseFloat(amtStr);
-      if (!isNaN(amt)) totalLkr += amt;
-    });
-
     return {
       count: currentTabData.length,
-      totalQty,
-      totalLkr,
     };
   }, [currentTabData]);
 
+  // Filtered saved records list
+  const filteredSavedRecords = useMemo(() => {
+    if (!searchQuery.trim()) return savedRecords;
+    const q = searchQuery.toLowerCase();
+    return savedRecords.filter((r) => {
+      return (
+        String(r['requestNo'] || r['id'] || '').toLowerCase().includes(q) ||
+        String(r['customer'] || r['customerName'] || '').toLowerCase().includes(q) ||
+        String(r['status'] || '').toLowerCase().includes(q) ||
+        String(r['priority'] || '').toLowerCase().includes(q) ||
+        String(r['requestType'] || '').toLowerCase().includes(q)
+      );
+    });
+  }, [savedRecords, searchQuery]);
+
   return (
-    <div className="space-y-4">
-      {/* Toast Notification Banner */}
+    <div className="space-y-6 animate-in fade-in duration-150">
+      {/* Toast Notice Banner */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xl text-xs font-medium border border-border animate-in fade-in slide-in-from-top-3">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="fixed top-4 right-4 z-50 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 px-4 py-3 rounded-lg shadow-xl text-xs font-medium flex items-center gap-2 border border-neutral-700 animate-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Screen Top Header Bar */}
-      <div className="bg-card border border-border p-4 rounded-xl shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
+      {/* Screen Title & Top Navigation Header */}
+      <div className="bg-card border border-border p-4 sm:p-5 rounded-xl shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-1.5 rounded-lg border border-border bg-muted/60 hover:bg-muted text-foreground cursor-pointer transition-colors"
-              title="Return to Transaction Screens Directory"
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              title="Return to Transaction Registry"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium bg-muted text-foreground">
-                  {meta.type}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                  {meta.code}
                 </span>
-                <span className="text-xs text-muted-foreground">·</span>
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {meta.module}
-                </span>
-
+                <span className="text-xs text-muted-foreground">{meta.module}</span>
                 {lastSavedTime && (
-                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
-                    Saved at {lastSavedTime}
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    · Saved at {lastSavedTime}
                   </span>
                 )}
               </div>
@@ -341,32 +474,21 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleSaveTransaction}
+              disabled={isSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs cursor-pointer transition-colors"
-              title="Save all changes and parts into local register"
+              title="Save all changes directly into PostgreSQL database"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>Save Record</span>
+              <Save className={`w-3.5 h-3.5 ${isSaving ? "animate-spin" : ""}`} />
+              <span>{isSaving ? "Saving..." : "Save Record"}</span>
             </button>
 
             <button
-              onClick={handleCreateNewBlank}
+              onClick={handleClearForm}
               className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
-              title="Create a new blank transaction to demonstrate saving from scratch"
+              title="Clear all fields to enter a new record"
             >
               <Plus className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden sm:inline">New Transaction</span>
-            </button>
-
-            <button
-              onClick={() => setShowSpecDetails(!showSpecDetails)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
-                showSpecDetails
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-foreground border-border hover:bg-muted"
-              }`}
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>Specification Details</span>
+              <span>Clear Fields</span>
             </button>
 
             <button
@@ -384,35 +506,25 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               <History className="w-3.5 h-3.5" />
               <span>Audit</span>
             </button>
-
-            {b1Syncing && (
-              <span className="flex items-center gap-1.5 text-xs text-sky-600 font-medium px-2 py-1 bg-sky-50 dark:bg-sky-950/60 rounded">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Syncing SAP B1...</span>
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Workflow & Status Breadcrumb Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60 text-xs">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="font-semibold text-foreground">Status Progression:</span>
-            <span className="font-mono text-primary font-medium">{meta.statusFlow}</span>
-          </div>
-
-          {/* Primary Action Buttons from Specification */}
+        {/* Status Actions Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.actions
               .filter(
-                (a) => !a.includes("Export") && !a.includes("History") && !a.includes("Audit"),
+                (a) =>
+                  !a.includes("Export") &&
+                  !a.includes("History") &&
+                  !a.includes("Audit") &&
+                  !a.includes("SAP"),
               )
               .map((action) => {
                 const isPrimary =
                   action.includes("Save") ||
                   action.includes("Submit") ||
-                  action.includes("Approve") ||
-                  action.includes("Assign");
+                  action.includes("Create");
                 return (
                   <button
                     key={action}
@@ -431,89 +543,55 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         </div>
       </div>
 
-      {/* Expandable Specification Details Panel */}
-      {showSpecDetails && (
-        <div className="bg-card border border-primary/30 p-5 rounded-xl shadow-xs space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b pb-3 border-border">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary" />
-              <span>Telesonic Option 01 Specification Register · {meta.id}</span>
-            </h3>
-            <span className="text-xs px-2 py-0.5 rounded font-mono bg-primary/10 text-primary font-semibold">
-              Effort: {meta.effort}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="space-y-1">
-              <span className="text-muted-foreground font-medium block">Purpose:</span>
-              <p className="text-foreground leading-relaxed">{meta.purpose}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground font-medium block">Authorized Roles:</span>
-              <p className="text-foreground font-semibold">{meta.roles}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground font-medium block">Related Requirements:</span>
-              <p className="font-mono text-[11px] text-muted-foreground leading-snug">
-                {meta.requirements}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground font-medium block">
-                Related Reports & Scope:
-              </span>
-              <p className="font-mono text-[11px] text-muted-foreground leading-snug">
-                Reports: {meta.reports}
-                <br />
-                Scope: {meta.scopePoints}
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-border flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <div>
-              <span>Linked Navigation: </span>
-              {meta.linkedNavigation.map((nav, i) => (
-                <span
-                  key={nav}
-                  className="inline-flex items-center gap-0.5 font-medium text-primary"
-                >
-                  {i > 0 && " · "}
-                  {nav}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Interactive Form Card */}
       <div className="bg-card border border-border p-5 sm:p-6 rounded-xl shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b pb-3 border-border">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <span>Transaction Header Information</span>
           </h2>
+          <span className="text-xs font-mono text-muted-foreground">
+            Current Status: <strong className="text-primary">{String(formData["status"] || "Draft")}</strong>
+          </span>
         </div>
 
-        {/* Dynamic Form Header Fields Grid */}
+        {/* Dynamic Form Header Fields Grid with Master Lookups */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {meta.fields.map((field) => (
-            <TransactionField
-              key={field.key}
-              field={field}
-              value={formData[field.key]}
-              onChange={(val) => handleFieldChange(field.key, val)}
-              onLinkClick={(key, val) => {
-                showToast(`Navigating to related master reference: ${val}`);
-              }}
-            />
-          ))}
+          {meta.fields.map((field) => {
+            // Provide dropdown options from Master tables if available
+            let optionsOverride: string[] | undefined = undefined;
+            let placeholderOverride: string | undefined = undefined;
+
+            if (field.key === "customer" && masterOptions.customers.length > 0) {
+              optionsOverride = masterOptions.customers;
+            } else if (field.key === "contact" && masterOptions.contacts.length > 0) {
+              optionsOverride = masterOptions.contacts;
+            } else if (field.key === "site" && masterOptions.sites.length > 0) {
+              optionsOverride = masterOptions.sites;
+            } else if (field.key === "receivedBy" && masterOptions.technicians.length > 0) {
+              optionsOverride = masterOptions.technicians;
+            } else if (field.key === "equipmentSystem" && masterOptions.equipment.length > 0) {
+              optionsOverride = masterOptions.equipment;
+            } else if (field.key === "requestType" && masterOptions.serviceTypes.length > 0) {
+              optionsOverride = masterOptions.serviceTypes;
+            }
+
+            return (
+              <TransactionField
+                key={field.key}
+                field={field}
+                value={formData[field.key]}
+                optionsOverride={optionsOverride}
+                placeholderOverride={placeholderOverride}
+                onChange={(val) => handleFieldChange(field.key, val)}
+                onLinkClick={(key, val) => {
+                  showToast(`Master reference: ${val}`);
+                }}
+              />
+            );
+          })}
         </div>
 
         {/* Specialized Interactive Widgets per Screen Type */}
-
-        {/* 1. Dispatch Board (TRX-03) Interactive Timeline */}
         {meta.code === "TRX-03" && (
           <div className="mt-4 p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
             <div className="flex items-center justify-between">
@@ -525,14 +603,10 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() =>
-                    showToast(
-                      "BCR-20 Auto-suggest: Matched Lead Tech K. Silva based on VRV Skill rating (Grade A).",
-                    )
-                  }
+                  onClick={() => showToast("Auto-suggest: Matched Lead Tech based on skill rating.")}
                   className="px-2.5 py-1 text-xs rounded bg-card border border-border hover:bg-muted font-medium text-foreground cursor-pointer"
                 >
-                  Auto-suggest (BCR-20)
+                  Auto-suggest
                 </button>
                 <button
                   onClick={() => showToast("Appointments locked & confirmed via SMS.")}
@@ -548,7 +622,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           </div>
         )}
 
-        {/* 2. Appointment / Reschedule Dialog (TRX-04) Google Meet Toggle */}
         {meta.code === "TRX-04" && (
           <div className="mt-4 p-4 rounded-xl border border-sky-200 dark:border-sky-900 bg-sky-50/60 dark:bg-sky-950/30 space-y-3">
             <div className="flex items-center justify-between">
@@ -559,304 +632,285 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                 </span>
               </div>
               <button
-                onClick={() => handleAction("Generate Meet Link")}
+                onClick={() => setMeetLinkGenerated(true)}
                 className="px-3 py-1.5 text-xs rounded-md bg-sky-600 text-white font-medium hover:bg-sky-700 cursor-pointer flex items-center gap-1.5 shadow-xs"
               >
                 <Video className="w-3.5 h-3.5" />
-                <span>
-                  {meetLinkGenerated ? "Regenerate Google Meet" : "Create Google Meet Link"}
-                </span>
+                <span>{meetLinkGenerated ? "Regenerate Google Meet" : "Create Google Meet Link"}</span>
               </button>
             </div>
             {meetLinkGenerated && (
               <div className="p-2.5 rounded bg-white dark:bg-neutral-900 border border-sky-300 dark:border-sky-800 flex items-center justify-between text-xs">
                 <span className="font-mono text-sky-700 dark:text-sky-300">
-                  https://meet.google.com/xyz-servio-tel
+                  https://meet.google.com/xyz-meeting-room
                 </span>
-                <span className="text-[10px] text-emerald-600 font-medium">
-                  Link Active · Invites Queued
-                </span>
+                <span className="text-[10px] text-emerald-600 font-medium">Link Active</span>
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {/* 3. Hold / Resume Dialog (TRX-06) Controls */}
-        {meta.code === "TRX-06" && (
-          <div className="mt-4 p-4 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/30 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <PauseCircle className="w-5 h-5 text-amber-600 shrink-0" />
-              <div className="text-xs">
-                <span className="font-bold text-foreground block">SLA Clock Governance</span>
-                <span className="text-muted-foreground">
-                  Putting this ticket on hold freezes customer response and resolution countdowns.
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => handleAction("Hold")}
-                className="px-3 py-1.5 text-xs rounded-md bg-amber-600 text-white font-medium hover:bg-amber-700 cursor-pointer shadow-xs"
-              >
-                Place On Hold
-              </button>
-              <button
-                onClick={() => handleAction("Resume")}
-                className="px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700 cursor-pointer shadow-xs"
-              >
-                Resume Call
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 4. Technician Evaluation (TRX-23) Scoring Controls */}
-        {meta.code === "TRX-23" && (
-          <div className="mt-4 p-4 rounded-xl border border-border bg-muted/30 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-foreground">Score Evaluation:</span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setEvalScore(Math.max(50, evalScore - 5))}
-                  className="px-2 py-1 text-xs border rounded bg-card hover:bg-muted"
-                >
-                  -5
-                </button>
-                <span className="font-mono font-bold text-sm px-2 text-primary">
-                  {evalNotRequired ? "Not Required" : `${evalScore} / 100`}
-                </span>
-                <button
-                  onClick={() => setEvalScore(Math.min(100, evalScore + 5))}
-                  className="px-2 py-1 text-xs border rounded bg-card hover:bg-muted"
-                >
-                  +5
-                </button>
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-              <input
-                type="checkbox"
-                checked={evalNotRequired}
-                onChange={(e) => setEvalNotRequired(e.target.checked)}
-                className="rounded border-border text-primary focus:ring-primary"
-              />
-              <span>Mark Evaluation Not Required (Override)</span>
-            </label>
-          </div>
-        )}
-
-        {/* 5. Stock Count Initiation (TRX-30) Blind Count Toggle */}
-        {meta.code === "TRX-30" && (
-          <div className="mt-4 p-4 rounded-xl border border-border bg-muted/30 flex items-center justify-between gap-4">
-            <div className="text-xs">
-              <span className="font-bold text-foreground block">Blind Stock Count Mode</span>
-              <span className="text-muted-foreground">
-                Hiding theoretical system quantities forces physical counting without bias.
-              </span>
-            </div>
+      {/* SAVED RECORDS REGISTER & CONTEXT TABS CONTAINER */}
+      <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+        {/* Navigation Tabs Header */}
+        <div className="flex border-b border-border bg-muted/40 overflow-x-auto">
+          {/* Tab 1: Saved Service Requests in PostgreSQL */}
+          {meta.code === "TRX-01" && (
             <button
-              onClick={() => {
-                const next = !blindCountActive;
-                setBlindCountActive(next);
-                handleFieldChange("blindCount", next ? "Yes" : "No");
-                showToast(`Blind count mode ${next ? "Activated" : "Disabled"}.`);
-              }}
-              className={`px-3 py-1.5 text-xs rounded-md font-medium cursor-pointer transition-colors ${
-                blindCountActive
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "bg-card border border-border text-foreground hover:bg-muted"
+              onClick={() => setActiveTabId("saved-requests")}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                activeTabId === "saved-requests"
+                  ? "border-primary text-primary bg-background shadow-xs font-bold"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
               }`}
             >
-              {blindCountActive ? "Blind Mode: ACTIVE" : "Blind Mode: OFF"}
+              <Database className="w-3.5 h-3.5" />
+              <span>Saved Requests Directory</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                {savedRecords.length} in PostgreSQL
+              </span>
             </button>
+          )}
+
+          {/* Contextual Sub-tabs (Commercial, Lines, Duplicates, Linked Calls, etc.) */}
+          {meta.tabs.map((tab) => {
+            const isActive = activeTabId === tab.id;
+            const count = (tabDatasets[tab.id] || []).length;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTabId(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                  isActive
+                    ? "border-primary text-primary bg-background shadow-xs font-bold"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground">
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab Content: Saved Records Directory (Full CRUD List View) */}
+        {activeTabId === "saved-requests" && meta.code === "TRX-01" && (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <span>Saved Service Requests</span>
+                  <span className="text-xs font-mono text-muted-foreground font-normal">
+                    ({filteredSavedRecords.length} of {savedRecords.length} records in PostgreSQL)
+                  </span>
+                </h3>
+              </div>
+
+              {/* Search Bar for Saved Service Requests */}
+              <div className="relative min-w-[260px] sm:w-72">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search requests, customers, status..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            {/* Responsive Table of Saved Requests */}
+            <div className="overflow-x-auto border border-border rounded-lg">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-muted/60 border-b border-border">
+                    <th className="p-3 font-semibold text-foreground">Request No.</th>
+                    <th className="p-3 font-semibold text-foreground">Request Date</th>
+                    <th className="p-3 font-semibold text-foreground">Customer & Site</th>
+                    <th className="p-3 font-semibold text-foreground">Type</th>
+                    <th className="p-3 font-semibold text-foreground">Priority</th>
+                    <th className="p-3 font-semibold text-foreground">Status</th>
+                    <th className="p-3 text-right font-semibold text-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredSavedRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                        <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                        <p className="font-semibold text-foreground">No saved Service Requests found.</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Enter details in the form above and click "Save Record" to store in PostgreSQL.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSavedRecords.map((rec, idx) => {
+                      const reqNo = String(rec['requestNo'] || rec['id'] || `SR-${idx + 1}`);
+                      const statusVal = String(rec['status'] || "Draft");
+                      const isSubmitted = statusVal.toLowerCase() === "submitted";
+                      return (
+                        <tr key={reqNo} className="hover:bg-muted/40 transition-colors">
+                          <td className="p-3 font-mono font-bold text-primary whitespace-nowrap">
+                            {reqNo}
+                          </td>
+                          <td className="p-3 text-foreground whitespace-nowrap">
+                            {String(rec['requestDate'] || '—')}
+                          </td>
+                          <td className="p-3 text-foreground">
+                            <span className="font-medium block">{String(rec['customer'] || rec['customerName'] || 'Customer')}</span>
+                            <span className="text-[11px] text-muted-foreground block">{String(rec['site'] || '')}</span>
+                          </td>
+                          <td className="p-3 text-foreground whitespace-nowrap">
+                            {String(rec['requestType'] || rec['callType'] || 'Breakdown Repair')}
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-foreground border border-border">
+                              {String(rec['priority'] || 'P3 - Medium')}
+                            </span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isSubmitted
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                              }`}
+                            >
+                              {statusVal}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleLoadRecord(rec)}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-md bg-muted hover:bg-primary hover:text-primary-foreground text-foreground transition-colors cursor-pointer flex items-center gap-1"
+                                title="Load this request into the editor above"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                                <span>Load</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRecord(rec)}
+                                className="p-1 rounded-md hover:bg-rose-50 text-muted-foreground hover:text-rose-600 dark:hover:bg-rose-950/60 transition-colors cursor-pointer"
+                                title="Delete this request from database"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Lines / Child Sub-grids */}
+        {activeTabId !== "saved-requests" && activeTab && (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-foreground">
+                    {activeTab.label} Register
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                    {tabMetrics.count} recorded
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setIsAddPartModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Line Item</span>
+                </button>
+
+                <button
+                  onClick={handleResetTab}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Default</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-border rounded-lg">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-muted/60 border-b border-border">
+                    {activeTab.columns.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`p-3 font-semibold text-foreground whitespace-nowrap ${
+                          col.align === "right" ? "text-right" : "text-left"
+                        }`}
+                      >
+                        <span>{col.label}</span>
+                      </th>
+                    ))}
+                    <th className="p-3 text-right font-semibold text-foreground w-16">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {currentTabData.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={activeTab.columns.length + 1}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        <Package className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                        <p className="font-semibold text-foreground">
+                          No items in this register yet.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Click "Add Line Item" above to add items.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    currentTabData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-muted/40 transition-colors">
+                        {activeTab.columns.map((col) => (
+                          <td
+                            key={col.key}
+                            className={`p-3 text-foreground whitespace-nowrap ${
+                              col.align === "right" ? "text-right font-mono tabular-nums" : ""
+                            }`}
+                          >
+                            <span>{row[col.key] != null ? String(row[col.key]) : "—"}</span>
+                          </td>
+                        ))}
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => handleDeleteRow(idx)}
+                            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                            title="Delete item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Interactive Context Tabs View */}
-      {meta.tabs.length > 0 && (
-        <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
-          {/* Tab Navigation Buttons */}
-          <div className="flex border-b border-border bg-muted/40 overflow-x-auto">
-            {meta.tabs.map((tab) => {
-              const isActive = (activeTab?.id || meta.tabs[0]?.id) === tab.id;
-              const count = (tabDatasets[tab.id] || []).length;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTabId(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
-                    isActive
-                      ? "border-primary text-primary bg-background"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Tab Dataset Table */}
-          {activeTab && (
-            <div className="p-4 sm:p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold text-foreground">
-                      {activeTab.label} Register
-                    </h3>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
-                      {tabMetrics.count} recorded
-                    </span>
-                  </div>
-                </div>
-
-                {/* Primary Action to Add Parts / Line Items */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => setIsAddPartModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Spare Part / Line Item</span>
-                  </button>
-
-                  <button
-                    onClick={handleResetTab}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
-                    title="Reset to default sample data"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span className="hidden sm:inline">Reset</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsExportOpen(true)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground hover:bg-muted cursor-pointer transition-colors"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Export</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic Summary Strip if parts/amounts are present */}
-              {tabMetrics.totalLkr > 0 && (
-                <div className="px-4 py-2.5 rounded-lg bg-muted/40 border border-border/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-                  <div className="flex items-center gap-4">
-                    <span className="text-muted-foreground">
-                      Total Line Items:{" "}
-                      <strong className="text-foreground">{tabMetrics.count}</strong>
-                    </span>
-                    {tabMetrics.totalQty > 0 && (
-                      <span className="text-muted-foreground">
-                        Total Quantity:{" "}
-                        <strong className="text-foreground">{tabMetrics.totalQty} Units</strong>
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Calculated Subtotal:</span>
-                    <span className="text-sm font-extrabold text-primary">
-                      LKR {tabMetrics.totalLkr.toLocaleString("en-US")}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Responsive Table */}
-              <div className="overflow-x-auto border border-border rounded-lg">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-muted/60 border-b border-border">
-                      {activeTab.columns.map((col) => (
-                        <th
-                          key={col.key}
-                          className={`p-3 font-semibold text-foreground whitespace-nowrap ${
-                            col.align === "right" ? "text-right" : "text-left"
-                          }`}
-                        >
-                          <div
-                            className={`flex items-center gap-1.5 ${
-                              col.align === "right" ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            <span>{col.label}</span>
-                          </div>
-                        </th>
-                      ))}
-                      <th className="p-3 text-right font-semibold text-foreground w-16">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {currentTabData.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={activeTab.columns.length + 1}
-                          className="p-8 text-center text-muted-foreground"
-                        >
-                          <Package className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                          <p className="font-semibold text-foreground">
-                            No parts or line items in this register yet.
-                          </p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Click{" "}
-                            <strong className="text-primary font-bold">
-                              "Add Spare Part / Line Item"
-                            </strong>{" "}
-                            above to register parts from the Telesonic Spares catalog.
-                          </p>
-                        </td>
-                      </tr>
-                    ) : (
-                      currentTabData.map((row, idx) => (
-                        <tr
-                          key={String(row["_id"] || idx)}
-                          className={`hover:bg-muted/40 transition-colors group ${
-                            row["_isNew"] ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""
-                          }`}
-                        >
-                          {activeTab.columns.map((col, cIdx) => (
-                            <td
-                              key={col.key}
-                              className={`p-3 text-foreground whitespace-nowrap ${
-                                col.align === "right" ? "text-right font-mono tabular-nums" : ""
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5">
-                                {cIdx === 0 && Boolean(row["_isNew"]) && (
-                                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 shrink-0">
-                                    Saved
-                                  </span>
-                                )}
-                                <span>{row[col.key] != null ? String(row[col.key]) : "—"}</span>
-                              </div>
-                            </td>
-                          ))}
-                          <td className="p-3 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => handleDeleteRow(idx)}
-                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                              title="Delete line item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Add Part / Line Item Modal */}
       {activeTab && (

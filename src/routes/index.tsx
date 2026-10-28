@@ -20,17 +20,17 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Workspace — Servio ITSM" },
+      { title: "Workspace — Service Manager" },
       {
         name: "description",
         content:
-          "Your Servio ITSM workspace: incidents, jobs, service catalog, changes, assets and knowledge.",
+          "Your Service Manager workspace: incidents, jobs, service catalog, changes, assets and knowledge.",
       },
-      { property: "og:title", content: "Workspace — Servio ITSM" },
+      { property: "og:title", content: "Workspace — Service Manager" },
       {
         property: "og:description",
         content:
-          "Your Servio ITSM workspace: incidents, jobs, service catalog, changes, assets and knowledge.",
+          "Your Service Manager workspace: incidents, jobs, service catalog, changes, assets and knowledge.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -1,3 +1,11 @@
+import { getMasterDropdownOptions } from "@/lib/master-options-db";
+import {
+  getAllServiceRequests,
+  getServiceRequestById,
+  createServiceRequest,
+  updateServiceRequest,
+  deleteServiceRequest,
+} from "@/lib/service-requests-db";
 import bcrypt from "bcryptjs";
 /**
  * API Route Handler
@@ -373,18 +381,82 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       }
     }
 
-    // 3. /api/service-requests — Fetch service requests from PostgreSQL
-    if (path === "/api/service-requests" && method === "GET") {
-      const requests = await prisma.serviceRequest.findMany();
-      return new Response(
-        JSON.stringify({
-          success: true,
-          source: "PostgreSQL (via Prisma)",
-          count: requests.length,
-          requests,
-        }),
-        { status: 200, headers },
-      );
+    // 3. /api/service-requests — Full CRUD for Service Requests in PostgreSQL
+    if (path.startsWith("/api/service-requests")) {
+      const subPath = path.replace("/api/service-requests", "").replace(/^\//, "");
+
+      
+      // GET /api/service-requests/master-options - Fetch lookup dropdowns from Masters
+      if (subPath === "master-options" && method === "GET") {
+        const options = await getMasterDropdownOptions();
+        return new Response(JSON.stringify({ success: true, options }), { status: 200, headers });
+      }
+
+      // GET /api/service-requests/:id
+      if (subPath && method === "GET") {
+        const item = await getServiceRequestById(subPath);
+        if (!item) {
+          return new Response(JSON.stringify({ error: "Service Request not found" }), { status: 404, headers });
+        }
+        return new Response(JSON.stringify({ success: true, request: item }), { status: 200, headers });
+      }
+
+      // GET /api/service-requests
+      if (!subPath && method === "GET") {
+        const requests = await getAllServiceRequests();
+        return new Response(
+          JSON.stringify({
+            success: true,
+            source: "PostgreSQL (Dedicated)",
+            count: requests.length,
+            requests,
+          }),
+          { status: 200, headers },
+        );
+      }
+
+      // POST /api/service-requests
+      if (!subPath && method === "POST") {
+        const body = await request.json();
+        const created = await createServiceRequest(body);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Service Request created successfully in PostgreSQL",
+            request: created,
+          }),
+          { status: 201, headers },
+        );
+      }
+
+      // PUT /api/service-requests/:id
+      if (subPath && method === "PUT") {
+        const body = await request.json();
+        const updated = await updateServiceRequest(subPath, body);
+        if (!updated) {
+          return new Response(JSON.stringify({ error: "Service Request not found" }), { status: 404, headers });
+        }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Service Request updated successfully in PostgreSQL",
+            request: updated,
+          }),
+          { status: 200, headers },
+        );
+      }
+
+      // DELETE /api/service-requests/:id
+      if (subPath && method === "DELETE") {
+        const ok = await deleteServiceRequest(subPath);
+        return new Response(
+          JSON.stringify({
+            success: ok,
+            message: ok ? "Service Request deleted from PostgreSQL" : "Failed to delete Service Request",
+          }),
+          { status: 200, headers },
+        );
+      }
     }
 
     // 4. /api/incentives/schemes — Incentive Scheme Master CRUD Endpoints

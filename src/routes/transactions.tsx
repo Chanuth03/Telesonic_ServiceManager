@@ -52,13 +52,13 @@ import { TransactionScreenView } from "@/components/transactions/TransactionScre
 export const Route = createFileRoute("/transactions")({
   head: () => ({
     meta: [
-      { title: "Transactions Hub — Servio & Telesonic Lanka" },
+      { title: "Transactions Hub — ServiceManager & Telesonic Lanka" },
       {
         name: "description",
         content:
           "Operational Transaction Screens (O1-SCR-TRX-01 to TRX-35) for Service Management Option 01.",
       },
-      { property: "og:title", content: "Transactions Hub — Servio & Telesonic Lanka" },
+      { property: "og:title", content: "Transactions Hub — ServiceManager & Telesonic Lanka" },
       {
         property: "og:description",
         content:

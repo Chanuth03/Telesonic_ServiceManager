@@ -5,9 +5,9 @@ import { ModulePlaceholder } from "@/components/itsm/ModulePlaceholder";
 export const Route = createFileRoute("/problems")({
   head: () => ({
     meta: [
-      { title: "Problem Management — Servio ITSM" },
+      { title: "Problem Management — Service Manager" },
       { name: "description", content: "Find and eliminate root causes of recurring incidents." },
-      { property: "og:title", content: "Problem Management — Servio ITSM" },
+      { property: "og:title", content: "Problem Management — Service Manager" },
       {
         property: "og:description",
         content: "Find and eliminate root causes of recurring incidents.",

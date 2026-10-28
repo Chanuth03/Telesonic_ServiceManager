@@ -5,9 +5,9 @@ import { ModulePlaceholder } from "@/components/itsm/ModulePlaceholder";
 export const Route = createFileRoute("/assets")({
   head: () => ({
     meta: [
-      { title: "Asset Management — Servio ITSM" },
+      { title: "Asset Management — Service Manager" },
       { name: "description", content: "Track hardware, software and configuration items." },
-      { property: "og:title", content: "Asset Management — Servio ITSM" },
+      { property: "og:title", content: "Asset Management — Service Manager" },
       { property: "og:description", content: "Track hardware, software and configuration items." },
     ],
   }),

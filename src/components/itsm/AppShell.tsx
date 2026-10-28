@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+﻿import { Link } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
 import {
   Search,
@@ -15,7 +15,7 @@ import {
 import { Avatar } from "./Badges";
 import { Button } from "@/components/ui/button";
 import { themes, applyTheme, getSavedTheme } from "@/lib/theme";
-import { RoleSwitcherBar, useRole } from "@/context/RoleContext";
+import { useRole } from "@/context/RoleContext";
 import { useRouterState } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -36,7 +36,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isTechnicianMobileView) {
     return (
       <div className="min-h-screen bg-muted/20">
-        <RoleSwitcherBar />
         <div>{children}</div>
       </div>
     );
@@ -44,19 +43,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <RoleSwitcherBar />
       <div>
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-3 border-b bg-card/85 px-4 py-3 backdrop-blur sm:px-6">
           <Link
             to="/"
-            aria-label="Servio ITSM home"
+            aria-label="Service Manager home"
             className="flex shrink-0 items-center gap-2.5 sm:mr-4"
           >
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
               <Headset size={18} />
             </span>
             <span className="hidden font-bold sm:block">
-              Servio<span className="font-medium text-muted-foreground"> ITSM</span>
+              Service<span className="font-medium text-muted-foreground">Manager</span>
             </span>
           </Link>
           <Button asChild variant="ghost" size="icon" title="All modules">
@@ -70,12 +68,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
-              placeholder="Search tickets, assets, articles…"
+              placeholder="Search..."
               className="input-field pl-9 bg-muted border-transparent"
             />
-            <kbd className="absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-card px-1.5 font-mono text-[10px] text-muted-foreground sm:block">
-              ⌘K
-            </kbd>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <div className="relative">
@@ -161,7 +156,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Avatar name={user?.name || "User"} className="h-8 w-8" />
                 <span className="hidden text-left text-sm leading-tight sm:block">
                   <span className="block font-semibold">{user?.name || "User"}</span>
-                  <span className="text-xs text-muted-foreground">{user?.role || "Service Manager"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {user?.role || "Service Manager"}
+                  </span>
                 </span>
                 <ChevronDown size={14} className="text-muted-foreground" />
               </Button>

@@ -70,7 +70,7 @@ describe("PostgreSQL Service Performance & Job Sheet Actuals API Integration (IN
         id: testBatchId,
         period: "June 2026 (Test)",
         division: "Consumer Electronics",
-        sourceSystem: "Servio Service Desk",
+        sourceSystem: "ServiceManager Service Desk",
         receivedOn: "01-Jun-2026 10:00 IST",
         status: "Draft",
         notes: "Automated test service performance batch",

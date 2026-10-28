@@ -5,9 +5,9 @@ import { ModulePlaceholder } from "@/components/itsm/ModulePlaceholder";
 export const Route = createFileRoute("/knowledge")({
   head: () => ({
     meta: [
-      { title: "Knowledge Base — Servio ITSM" },
+      { title: "Knowledge Base — Service Manager" },
       { name: "description", content: "Self-help articles and agent runbooks." },
-      { property: "og:title", content: "Knowledge Base — Servio ITSM" },
+      { property: "og:title", content: "Knowledge Base — Service Manager" },
       { property: "og:description", content: "Self-help articles and agent runbooks." },
     ],
   }),

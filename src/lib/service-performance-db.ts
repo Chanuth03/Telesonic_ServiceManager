@@ -255,7 +255,7 @@ export async function createServicePerformanceBatch(
     const id = b.id || `BAT-SRV-${Date.now().toString().slice(-6)}`;
     const period = b.period || "May 2026";
     const division = b.division || "Consumer Electronics";
-    const sourceSystem = b.sourceSystem || "Servio Service Desk / SAP B1 Service Module";
+    const sourceSystem = b.sourceSystem || "ServiceManager Service Desk / SAP B1 Service Module";
     const receivedOn = b.receivedOn || `${new Date().toLocaleDateString("en-GB")} IST`;
     const status = b.status || "Draft";
     const lockedBy = b.lockedBy || null;

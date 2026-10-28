@@ -44,12 +44,12 @@ import { MasterScreenView } from "@/components/masters/MasterScreenView";
 export const Route = createFileRoute("/masters")({
   head: () => ({
     meta: [
-      { title: "Masters Registry — Servio & Telesonic Lanka" },
+      { title: "Masters Registry — ServiceManager & Telesonic Lanka" },
       {
         name: "description",
         content: "Master Data and System Configuration screens for Service Management Option 01.",
       },
-      { property: "og:title", content: "Masters Registry — Servio & Telesonic Lanka" },
+      { property: "og:title", content: "Masters Registry — ServiceManager & Telesonic Lanka" },
       {
         property: "og:description",
         content: "Master Data and System Configuration screens for Service Management Option 01.",

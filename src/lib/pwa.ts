@@ -43,7 +43,7 @@ export function initPwa() {
     notify();
   });
 
-  if ("serviceWorker" in navigator) {
+  if ("serviceWorker" in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
       /* Install stays unavailable if the worker cannot register. */
     });
@@ -51,8 +51,8 @@ export function initPwa() {
 }
 
 export function subscribeInstallPrompt(listener: InstallListener) {
-  listener(deferredPrompt);
   listeners.add(listener);
+  listener(deferredPrompt);
   return () => {
     listeners.delete(listener);
   };
@@ -94,13 +94,14 @@ export function openInDeviceBrowser() {
 export function waitForInstallPrompt(timeoutMs: number) {
   if (canPromptPwaInstall()) return Promise.resolve(true);
   return new Promise<boolean>((resolve) => {
+    let timer = 0;
     const stop = subscribeInstallPrompt((event) => {
       if (!event) return;
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       stop();
       resolve(true);
     });
-    const timer = window.setTimeout(() => {
+    timer = window.setTimeout(() => {
       stop();
       resolve(canPromptPwaInstall());
     }, timeoutMs);

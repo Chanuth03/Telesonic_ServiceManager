@@ -26,13 +26,13 @@ import { MultiEquipmentBreakdownScreen } from "@/components/service-requests/Mul
 export const Route = createFileRoute("/service-requests")({
   head: () => ({
     meta: [
-      { title: "Service Request Module — Servio & Telesonic Lanka" },
+      { title: "Service Request Module — ServiceManager & Telesonic Lanka" },
       {
         name: "description",
         content:
           "Service Request Transaction Screens Suite (O1-SCR-TRX-01 to TRX-04) synchronized with SAP Business One.",
       },
-      { property: "og:title", content: "Service Request Module — Servio & Telesonic Lanka" },
+      { property: "og:title", content: "Service Request Module — ServiceManager & Telesonic Lanka" },
       {
         property: "og:description",
         content:

@@ -1,6 +1,8 @@
-/* Installability requires a fetch handler. Navigation stays on the network so the app is not stuck on a stale page. */
+// Telesonic Service Worker for PWA Offline Caching
+const CACHE_NAME = "telesonic-pwa-v1";
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -8,14 +10,40 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  const url = new URL(event.request.url);
+  // Only handle GET requests and skip internal vite/HMR requests and API routes
   if (
-    url.pathname.startsWith("/@") ||
-    url.pathname.startsWith("/src/") ||
-    url.pathname.startsWith("/node_modules/")
+    event.request.method === "GET" &&
+    !event.request.url.includes("/api/") &&
+    !event.request.url.includes("/@vite/") &&
+    !event.request.url.includes("/@fs/") &&
+    !event.request.url.includes("?t=")
   ) {
-    return;
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (!response || response.status !== 200 || response.type !== "basic") {
+            return response;
+          }
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(event.request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Return a safe offline fallback response instead of undefined
+          return new Response("Offline", {
+            status: 503,
+            statusText: "Service Unavailable",
+            headers: new Headers({ "Content-Type": "text/plain" }),
+          });
+        })
+    );
   }
-  event.respondWith(fetch(event.request));
 });
+
+

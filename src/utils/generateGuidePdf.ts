@@ -134,7 +134,7 @@ export function generateTelesonicGuidePdf(): jsPDF {
   doc.setFontSize(9);
   doc.setTextColor(51, 65, 85);
   doc.text(
-    "The entry point of the application is the Servio Workspace launcher (at /). As required by the system",
+    "The entry point of the application is the ServiceManager Workspace launcher (at /). As required by the system",
     margin,
     y,
   );
@@ -677,7 +677,7 @@ export function generateTelesonicGuidePdf(): jsPDF {
       minute: "0:00 - 1:00",
       title: "Workspace Entry & High-Level Architecture",
       script:
-        '"Good morning/afternoon team. Today I am presenting the Servio ITSM system for Telesonic. Notice our clean Workspace at the root route (/), keeping all modules accessible. Today we focus on three core operational engines: Masters, Transactions, and the unified continuous Dashboard."',
+        '"Good morning/afternoon team. Today I am presenting the Service Manager system for Telesonic. Notice our clean Workspace at the root route (/), keeping all modules accessible. Today we focus on three core operational engines: Masters, Transactions, and the unified continuous Dashboard."',
       action: "Show the / route. Highlight the Transactions, Masters, and Dashboard tiles.",
     },
     {

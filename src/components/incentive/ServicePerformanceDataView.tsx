@@ -476,7 +476,7 @@ const INITIAL_AUDIT_LOG: PerformanceAuditEntry[] = [
     user: "Automated Data Pipeline",
     role: "System Integration",
     action: "Source Sync Completed",
-    details: "Synchronized 363 closed calls from Servio Service Desk / SAP B1 Service Module.",
+    details: "Synchronized 363 closed calls from ServiceManager Service Desk / SAP B1 Service Module.",
   },
   {
     id: "aud-02",
@@ -510,7 +510,7 @@ export function ServicePerformanceDataView({
   const [period, setPeriod] = useState<string>("May 2026");
   const [division, setDivision] = useState<string>("Consumer Electronics");
   const [sourceSystem, setSourceSystem] = useState<string>(
-    "Servio Service Desk / SAP B1 Service Module",
+    "ServiceManager Service Desk / SAP B1 Service Module",
   );
   const [receivedOn, setReceivedOn] = useState<string>("12-May-2026 14:35 IST");
   const [status, setStatus] = useState<PerformanceStatus>("Draft");
@@ -1339,8 +1339,8 @@ export function ServicePerformanceDataView({
               disabled={status !== "Draft"}
               className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 shadow-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-75"
             >
-              <option value="Servio Service Desk / SAP B1 Service Module">
-                Servio Service Desk / SAP B1
+              <option value="ServiceManager Service Desk / SAP B1 Service Module">
+                ServiceManager Service Desk / SAP B1
               </option>
               <option value="Field Technicians Mobile Telematics API">
                 Field Technicians Mobile Telematics

@@ -981,16 +981,32 @@ CREATE TABLE IF NOT EXISTS jobs (
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS service_requests (
     id VARCHAR(64) PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    "callType" VARCHAR(100) NOT NULL,
-    "customerName" VARCHAR(255) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    priority VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    "callType" VARCHAR(100),
+    "customerName" VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'Draft',
+    priority VARCHAR(50) DEFAULT 'P3 - Medium',
     "assignedTo" VARCHAR(255),
     "scheduledDate" VARCHAR(50),
+    "requestNo" VARCHAR(100) UNIQUE,
+    "requestDate" VARCHAR(50),
+    "channel" VARCHAR(100),
+    "receivedBy" VARCHAR(255),
+    "customer" VARCHAR(255),
+    "contact" VARCHAR(255),
+    "site" VARCHAR(255),
+    "requestType" VARCHAR(100),
+    "equipmentSystem" VARCHAR(255),
+    "customerOrigin" VARCHAR(100) DEFAULT 'Telesonic Sold',
+    "equipmentOrigin" VARCHAR(100) DEFAULT 'Telesonic Sold',
+    "entitlement" VARCHAR(100) DEFAULT 'Under Warranty',
+    "description" TEXT,
+    "data" JSONB DEFAULT '{}'::jsonb,
     "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_service_requests_request_no ON service_requests ("requestNo");
 
 -- ====================================================================
 -- 4. SYNC LOGS TABLE
