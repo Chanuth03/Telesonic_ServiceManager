@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Headset, Mail, Lock, Eye, EyeOff, ArrowRight, Smartphone, Download } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -19,12 +19,24 @@ import { apiFetch } from "@/lib/api-client";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { setRole, setUser } = useRole();
+  const { isAuthenticated, authReady, loginUser } = useRole();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // If user already has a saved login session ("Keep me signed in"), go straight to workspace
+  useEffect(() => {
+    if (authReady && isAuthenticated) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady || isAuthenticated) {
+    return null;
+  }
 
   const handleDownloadApp = () => {
     navigate({ to: "/mobile-apk-download" });
@@ -58,16 +70,8 @@ function LoginPage() {
         return;
       }
 
-      // Store JWT Token in localStorage
-      if (data.token) {
-        localStorage.setItem("auth_token", data.token);
-      }
-
-      // Update Active User & Role in Context and localStorage
       if (data.user) {
-        setUser(data.user);
-      } else if (data.user?.role) {
-        setRole(data.user.role);
+        await loginUser(data.user, data.token || "session-token", rememberMe);
       }
 
       navigate({ to: "/" });
@@ -172,9 +176,14 @@ function LoginPage() {
               {error}
             </p>
           )}
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" className="h-4 w-4 rounded border accent-primary" /> Keep me
-            signed in
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border accent-primary cursor-pointer"
+            />{" "}
+            Keep me signed in
           </label>
           <button
             type="submit"

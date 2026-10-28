@@ -31,6 +31,7 @@ import { useRole, UserProfile } from "@/context/RoleContext";
 import { useSyncManager } from "@/hooks/useSyncManager";
 import { MobileShell } from "@/components/mobile/MobileShell";
 import { getDexieJobs, updateDexieJobStatus, DexieJob } from "@/lib/offline-db";
+import { isJobAssignedToTechnician } from "@/lib/mobile-data";
 import { PrismaJobRecord } from "@/lib/prisma";
 import { apiFetch } from "@/lib/api-client";
 
@@ -231,6 +232,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
  * -------------------------------------------------------------
  */
 function TechnicianMobileLayout() {
+  const { user } = useRole();
   const [dexieJobs, setDexieJobs] = useState<DexieJob[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [isLoading, setIsLoading] = useState(true);
@@ -259,16 +261,18 @@ function TechnicianMobileLayout() {
 
     window.addEventListener("telesonic:dexie-update", handleDexieUpdate);
     window.addEventListener("telesonic:sync-complete", handleDexieUpdate);
+    window.addEventListener("telesonic:auth-changed", handleDexieUpdate);
 
     return () => {
       window.removeEventListener("telesonic:dexie-update", handleDexieUpdate);
       window.removeEventListener("telesonic:sync-complete", handleDexieUpdate);
+      window.removeEventListener("telesonic:auth-changed", handleDexieUpdate);
     };
-  }, []);
+  }, [user?.name]);
 
   const handleUpdateStatus = async (jobId: string, newStatus: DexieJob["status"]) => {
     try {
-      const updated = await updateDexieJobStatus(jobId, newStatus);
+      await updateDexieJobStatus(jobId, newStatus);
       setActionNotice(`Status updated to "${newStatus}" in local Dexie.js.`);
       setTimeout(() => setActionNotice(null), 3000);
       await loadLocalJobs();
@@ -283,6 +287,9 @@ function TechnicianMobileLayout() {
   };
 
   const filteredJobs = dexieJobs.filter((job) => {
+    if (user?.name && !isJobAssignedToTechnician(job, user.name, user.email)) {
+      return false;
+    }
     if (selectedStatus === "ALL") return true;
     return job.status === selectedStatus;
   });

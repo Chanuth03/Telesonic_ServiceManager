@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import {
-  initialMobileJobs,
+  defaultTechnicianSeedJobs,
   initialNotifications,
   initialStockCountItems,
   MobileJob,
@@ -106,9 +106,9 @@ export async function seedDexieInitialJobs(): Promise<void> {
   seedingPromise = (async () => {
     try {
       const count = await offlineDB.jobs.count();
+      const now = Date.now();
       if (count === 0) {
-        const now = Date.now();
-        const initialDexieJobs: DexieJob[] = initialMobileJobs.map((job) => ({
+        const initialDexieJobs: DexieJob[] = defaultTechnicianSeedJobs.map((job) => ({
           ...job,
           syncStatus: "synced",
           updatedAt: now,
@@ -124,6 +124,20 @@ export async function seedDexieInitialJobs(): Promise<void> {
         console.log(
           `[Dexie.js] Seeded ${initialDexieJobs.length} initial jobs for offline PWA storage.`,
         );
+      } else {
+        // Ensure any newly defined default technician jobs are present without overwriting existing ones
+        for (const seedJob of defaultTechnicianSeedJobs) {
+          const exists = await offlineDB.jobs.get(seedJob.id);
+          if (!exists) {
+            await offlineDB.jobs.put({
+              ...seedJob,
+              syncStatus: "synced",
+              updatedAt: now,
+              syncedAt: now,
+              localVersion: 1,
+            });
+          }
+        }
       }
     } catch (err) {
       console.error("[Dexie.js] Error seeding initial jobs:", err);
@@ -329,6 +343,16 @@ export async function saveOfflineTransaction(input: {
 export async function saveDexieStock(items: StockCountItem[]): Promise<void> {
   const now = Date.now();
   await offlineDB.stockCount.bulkPut(items.map((item) => ({ ...item, updatedAt: now })));
+  await offlineDB.syncQueue.add({
+    action: "GENERIC_UPDATE",
+    entityId: `STOCK-COUNT-${now}`,
+    payload: { type: "STOCK_COUNT", items, updatedAt: new Date(now).toISOString() },
+    createdAt: now,
+    status: "pending",
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("telesonic:dexie-update", { detail: { type: "stock" } }));
+  }
 }
 
 export async function getDexieStock(): Promise<StockCountItem[]> {
@@ -365,5 +389,69 @@ export async function getPendingSyncCount(): Promise<number> {
     return Math.max(countJobs, countQueue);
   } catch {
     return 0;
+  }
+}
+
+
+/**
+ * Merge server jobs into Dexie.js without overwriting local unsynced ('pending') edits
+ */
+export async function syncServerJobsIntoDexie(serverJobs: MobileJob[]): Promise<DexieJob[]> {
+  await seedDexieInitialJobs();
+  const now = Date.now();
+  for (const sJob of serverJobs) {
+    if (!sJob?.id) continue;
+    const existing = await offlineDB.jobs.get(sJob.id);
+    if (existing && existing.syncStatus === "pending") {
+      continue;
+    }
+    await offlineDB.jobs.put({
+      ...(existing || {}),
+      ...sJob,
+      syncStatus: "synced",
+      updatedAt: now,
+      syncedAt: now,
+      localVersion: existing?.localVersion || 1,
+    });
+  }
+  return await getDexieJobs();
+}
+
+export interface SavedOfflineAuthSession {
+  token: string;
+  user: Record<string, unknown>;
+  rememberMe: boolean;
+  savedAt: string;
+}
+
+export async function saveOfflineAuthSession(session: SavedOfflineAuthSession): Promise<void> {
+  try {
+    await offlineDB.offlineMeta.put({
+      key: "saved_auth_session",
+      value: session,
+      updatedAt: Date.now(),
+    });
+  } catch (err) {
+    console.error("[Dexie.js] Failed to save offline auth session:", err);
+  }
+}
+
+export async function getOfflineAuthSession(): Promise<SavedOfflineAuthSession | null> {
+  try {
+    const meta = await offlineDB.offlineMeta.get("saved_auth_session");
+    if (meta && meta.value && typeof meta.value === "object") {
+      return meta.value as SavedOfflineAuthSession;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearOfflineAuthSession(): Promise<void> {
+  try {
+    await offlineDB.offlineMeta.delete("saved_auth_session");
+  } catch {
+    // ignore
   }
 }

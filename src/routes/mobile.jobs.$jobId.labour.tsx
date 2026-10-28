@@ -16,7 +16,7 @@ import {
 import {
   getMobileJobById,
   addJobLabourLog,
-  MOCK_TECHNICIAN_NAME,
+  getActiveTechnicianName,
   getLocalTodayDateString,
   type MobileJob,
   type LabourLog,
@@ -61,10 +61,12 @@ function MobileLabourScreen() {
       intervalRef.current = setInterval(() => {
         setTimerSeconds((prev) => prev + 1);
       }, 1000);
-    } else {
+    } else if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    return () => clearInterval(intervalRef.current);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [isTimerRunning]);
 
   if (!job) {
@@ -90,7 +92,7 @@ function MobileLabourScreen() {
     const hrs = Math.max(0.1, Number((timerSeconds / 3600).toFixed(2)));
     const newLog: LabourLog = {
       id: `L-${Date.now().toString().slice(-4)}`,
-      technicianName: MOCK_TECHNICIAN_NAME,
+      technicianName: getActiveTechnicianName(),
       date: getLocalTodayDateString(),
       hours: hrs,
       rateType,
@@ -109,7 +111,7 @@ function MobileLabourScreen() {
     if (hrs <= 0) return;
     const newLog: LabourLog = {
       id: `L-${Date.now().toString().slice(-4)}`,
-      technicianName: MOCK_TECHNICIAN_NAME,
+      technicianName: getActiveTechnicianName(),
       date: getLocalTodayDateString(),
       hours: hrs,
       rateType,

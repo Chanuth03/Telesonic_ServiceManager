@@ -605,11 +605,211 @@ export type MobilePersistEvent =
   | { kind: "stock"; items: StockCountItem[] }
   | { kind: "notifications"; items: MobileNotification[] };
 
+// ADDITIONAL SEEDED JOBS FOR REGISTERED TECHNICIANS (Nalin Chathuranga, vihasna, saman kumara)
+export const extraTechnicianJobs: MobileJob[] = [
+  {
+    id: "SC-2026-20521",
+    customerName: "ayesha (cst01)",
+    customerContact: "test 3 (7894561233)",
+    town: "Biyagama",
+    window: "Today, 09:00 - 11:30",
+    priority: "Critical",
+    role: "Lead Technician",
+    status: "Assigned",
+    category: "Toshiba efdwdf (SN: qsfc)",
+    siteName: "PBSS Biyagama Facility",
+    siteAddress: "PBSS, biyagama road",
+    technicianName: "Nalin Chathuranga",
+    scheduledDate: todayStr,
+    specialConditions: "Priority P1 Breakdown call",
+    instructions:
+      "Inspect Toshiba inverter unit compressor pressure, PCB fault log, and condenser airflow.",
+    components: [
+      {
+        name: "Toshiba Inverter Compressor",
+        modelOrSerial: "test eq 000001 / SN: qsfc",
+        status: "Inspection Required",
+      },
+    ],
+    travel: { status: "Not Started", startOdometer: 98420 },
+    parts: [],
+    labourLogs: [],
+    photos: [],
+  },
+  {
+    id: "SC-2026-20522",
+    customerName: "Ceylon Agro Machinery PLC (C-20014)",
+    customerContact: "Mr. Bandara (011-2445566)",
+    town: "Colombo 02",
+    window: "Today, 13:30 - 16:00",
+    priority: "High",
+    role: "Lead Technician",
+    status: "Assigned",
+    category: "Carrier AquaForce 30XW Chiller",
+    siteName: "Nawam Mawatha Plant Room",
+    siteAddress: "No. 45/A, Nawam Mawatha, Colombo 02",
+    technicianName: "Nalin Chathuranga",
+    scheduledDate: todayStr,
+    specialConditions: "Bring digital manifold gauge set",
+    instructions: "Perform chilled water flow switch calibration and suction superheat inspection.",
+    travel: { status: "Not Started", startOdometer: 98455 },
+    parts: [],
+    labourLogs: [],
+    photos: [],
+  },
+  {
+    id: "SC-2026-20520",
+    customerName: "Rajapaksha Clinic & Diagnostic Labs (C-30512)",
+    customerContact: "Dr. Nimal Rajapaksha",
+    town: "Kandy",
+    window: "Yesterday, 10:00 - 12:30",
+    priority: "Normal",
+    role: "Lead Technician",
+    status: "Completed",
+    category: "Daikin VRV IV-X System",
+    siteName: "Diagnostic Lab Wing A",
+    siteAddress: "No. 142/B, Peradeniya Road, Kandy",
+    technicianName: "Nalin Chathuranga",
+    scheduledDate: yesterdayStr,
+    instructions: "Preventive maintenance and filter cleaning completed.",
+    completion: {
+      signerName: "Dr. Nimal Rajapaksha",
+      signerRole: "Medical Director",
+      ratingStars: 5,
+      feedbackComments: "Very thorough inspection and clean work.",
+      completedAt: `${yesterdayStr} 12:20`,
+      workSlipNumber: "WS-2026-99201",
+    },
+  },
+  {
+    id: "SC-2026-20531",
+    customerName: "ayesha (cst01)",
+    customerContact: "test 3 (7894561233)",
+    town: "Biyagama",
+    window: "Today, 10:00 - 12:00",
+    priority: "High",
+    role: "Lead Technician",
+    status: "Assigned",
+    category: "Daikin VRV IV-X Outdoor Unit",
+    siteName: "PBSS Main Building",
+    siteAddress: "PBSS, biyagama road",
+    technicianName: "vihasna",
+    scheduledDate: todayStr,
+    instructions: "Inspect outdoor unit refrigerant charge and inverter module.",
+    travel: { status: "Not Started" },
+    parts: [],
+    labourLogs: [],
+    photos: [],
+  },
+  {
+    id: "SC-2026-20541",
+    customerName: "Kandy Lake Hotel (C-30514)",
+    customerContact: "Mr. Silva (Chief Engineer)",
+    town: "Kandy",
+    window: "Today, 11:00 - 14:00",
+    priority: "Normal",
+    role: "Lead Technician",
+    status: "Assigned",
+    category: "Split AC 24000 BTU",
+    siteName: "Banquet Hall",
+    siteAddress: "No. 12, Sangamitta Mawatha, Kandy",
+    technicianName: "saman kumara",
+    scheduledDate: todayStr,
+    instructions: "Quarterly preventive maintenance and evaporator coil wash.",
+    travel: { status: "Not Started" },
+    parts: [],
+    labourLogs: [],
+    photos: [],
+  },
+];
+
+export const defaultTechnicianSeedJobs: MobileJob[] = [
+  ...initialMobileJobs,
+  ...extraTechnicianJobs,
+];
+
 // REACTIVE STORE STATE
-let jobsStore: MobileJob[] = [...initialMobileJobs];
+let jobsStore: MobileJob[] = [...defaultTechnicianSeedJobs];
 let notificationsStore: MobileNotification[] = [...initialNotifications];
 let stockCountStore: StockCountItem[] = [...initialStockCountItems];
 let mutationEpoch = 0;
+
+export function getActiveAuthUser(): {
+  id?: string | number;
+  name: string;
+  email?: string;
+  role?: string;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const rawSession = sessionStorage.getItem("auth_user");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      if (parsed && typeof parsed.name === "string" && parsed.name.trim()) return parsed;
+    }
+    const rawLocal = localStorage.getItem("auth_user");
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (parsed && typeof parsed.name === "string" && parsed.name.trim()) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function getActiveTechnicianName(): string {
+  const user = getActiveAuthUser();
+  if (user?.name) return user.name;
+  if (typeof window !== "undefined") {
+    const techId =
+      sessionStorage.getItem("mobile_tech_id") || localStorage.getItem("mobile_tech_id");
+    if (techId) return techId;
+  }
+  return MOCK_TECHNICIAN_NAME;
+}
+
+function normalizeTechToken(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isJobAssignedToTechnician(
+  job: MobileJob,
+  techName?: string,
+  techEmail?: string,
+): boolean {
+  const targetName = (techName || "").trim();
+  if (!targetName) return true;
+  const jobTechRaw = (job.technicianName || "").trim();
+  if (!jobTechRaw) return false;
+
+  const normTarget = normalizeTechToken(targetName);
+  const normJobTech = normalizeTechToken(jobTechRaw);
+  if (!normTarget || !normJobTech) return false;
+
+  if (normJobTech === normTarget) return true;
+  if (normJobTech.includes(normTarget) || normTarget.includes(normJobTech)) return true;
+
+  const targetFirst = normTarget.split(" ")[0] || "";
+  const jobFirst = normJobTech.split(" ")[0] || "";
+  if (targetFirst.length >= 4 && jobFirst.length >= 4 && targetFirst === jobFirst) {
+    return true;
+  }
+
+  if (techEmail) {
+    const emailPrefix = techEmail.split("@")[0]?.toLowerCase().trim() || "";
+    if (emailPrefix.length >= 4 && normJobTech.includes(emailPrefix)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 const listeners = new Set<(event?: MobileStoreEvent) => void>();
 const persistListeners = new Set<(event: MobilePersistEvent) => void>();
@@ -663,15 +863,26 @@ export function hydrateMobileStores(data: {
 }
 
 export function resetMobileMemoryStores() {
-  jobsStore = initialMobileJobs.map((job) => ({ ...job }));
+  jobsStore = defaultTechnicianSeedJobs.map((job) => ({ ...job }));
   notificationsStore = initialNotifications.map((item) => ({ ...item }));
   stockCountStore = initialStockCountItems.map((item) => ({ ...item }));
   notifyAll("hydrate");
 }
 
 // JOB READ / UPDATE API
-export function getMobileJobs(): MobileJob[] {
-  return jobsStore;
+export function getMobileJobs(filterByActiveTech = true): MobileJob[] {
+  if (!filterByActiveTech) return jobsStore;
+  const activeUser = getActiveAuthUser();
+  if (activeUser && activeUser.name) {
+    return jobsStore.filter((job) =>
+      isJobAssignedToTechnician(job, activeUser.name, activeUser.email),
+    );
+  }
+  // When no user is logged in (e.g. unit tests), return default Nimal Perera jobs
+  const nimalJobs = jobsStore.filter((j) =>
+    isJobAssignedToTechnician(j, "Nimal Perera"),
+  );
+  return nimalJobs.length > 0 ? nimalJobs : jobsStore;
 }
 
 export function getMobileJobById(id: string): MobileJob | undefined {
@@ -834,13 +1045,38 @@ export function submitJobHoldRequest(
 
 // O1-SCR-MOB-14: NOTIFICATIONS
 export function getMobileNotifications(): MobileNotification[] {
-  return notificationsStore;
+  const activeUser = getActiveAuthUser();
+  if (!activeUser || !activeUser.name) {
+    return notificationsStore;
+  }
+  const assignedJobs = getMobileJobs(true);
+  const assignedJobIds = new Set(assignedJobs.map((j) => j.id));
+
+  // Filter existing notifications to only show general notifications or notifications for assigned jobs,
+  // plus generate assignment notifications for any newly assigned jobs
+  const baseNotifs = notificationsStore.filter(
+    (n) => !n.jobId || assignedJobIds.has(n.jobId),
+  );
+  const existingJobNotifIds = new Set(baseNotifs.map((n) => n.jobId).filter(Boolean));
+  const dynamicJobNotifs: MobileNotification[] = assignedJobs
+    .filter((j) => !existingJobNotifIds.has(j.id) && j.status === "Assigned")
+    .map((j) => ({
+      id: `N-JOB-${j.id}`,
+      title: "Assigned Service Job",
+      message: `${j.priority} priority job ${j.id} at ${j.customerName} (${j.town}) is assigned to you.`,
+      time: "Today",
+      read: false,
+      type: "assignment",
+      jobId: j.id,
+    }));
+
+  return [...dynamicJobNotifs, ...baseNotifs];
 }
 
 export function markNotificationRead(id: string) {
   notificationsStore = notificationsStore.map((n) => (n.id === id ? { ...n, read: true } : n));
   notifyAll("notifications");
-  emitPersist({ kind: "notifications", items: getMobileNotifications() });
+  emitPersist({ kind: "notifications", items: notificationsStore });
 }
 
 export function markMobileNotificationAsRead(id: string): MobileNotification[] {
@@ -851,7 +1087,7 @@ export function markMobileNotificationAsRead(id: string): MobileNotification[] {
 export function markAllNotificationsRead() {
   notificationsStore = notificationsStore.map((n) => ({ ...n, read: true }));
   notifyAll("notifications");
-  emitPersist({ kind: "notifications", items: getMobileNotifications() });
+  emitPersist({ kind: "notifications", items: notificationsStore });
 }
 
 export function markAllMobileNotificationsAsRead(): MobileNotification[] {
@@ -862,7 +1098,7 @@ export function markAllMobileNotificationsAsRead(): MobileNotification[] {
 export function deleteMobileNotification(id: string): MobileNotification[] {
   notificationsStore = notificationsStore.filter((n) => n.id !== id);
   notifyAll("notifications");
-  emitPersist({ kind: "notifications", items: getMobileNotifications() });
+  emitPersist({ kind: "notifications", items: notificationsStore });
   return getMobileNotifications();
 }
 
@@ -872,9 +1108,16 @@ export function getStockCountItems(): StockCountItem[] {
 }
 
 export function updateStockCountItem(sku: string, countedQty: number, varianceReason?: string) {
-  stockCountStore = stockCountStore.map((item) =>
-    item.sku === sku ? { ...item, countedQty, varianceReason } : item,
-  );
+  stockCountStore = stockCountStore.map((item) => {
+    if (item.sku !== sku) return item;
+    const updated: StockCountItem = { ...item, countedQty };
+    if (varianceReason !== undefined) {
+      updated.varianceReason = varianceReason;
+    } else {
+      delete updated.varianceReason;
+    }
+    return updated;
+  });
   notifyAll("stock");
   emitPersist({ kind: "stock", items: stockCountStore.map((item) => ({ ...item })) });
 }

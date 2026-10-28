@@ -1,23 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
-  Smartphone,
   ArrowLeft,
   ClipboardList,
   CheckCircle2,
   Bell,
   ScanLine,
-  Truck,
-  ShieldCheck,
-  PauseCircle,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import {
   getMobileJobs,
   getMobileNotifications,
   subscribeMobileJobs,
-  MOCK_TECHNICIAN_NAME,
+  getActiveTechnicianName,
 } from "@/lib/mobile-data";
+import { useRole } from "@/context/RoleContext";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mobile/")({
@@ -39,6 +37,8 @@ export const Route = createFileRoute("/mobile/")({
 });
 
 function MobileOverviewPage() {
+  const { user, logoutUser } = useRole();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState(() => getMobileJobs());
   const [notifications, setNotifications] = useState(() => getMobileNotifications());
 
@@ -48,20 +48,41 @@ function MobileOverviewPage() {
       setNotifications(getMobileNotifications());
     };
     syncState();
-    return subscribeMobileJobs(syncState);
-  }, []);
+    const unsub = subscribeMobileJobs(syncState);
+    window.addEventListener("telesonic:auth-changed", syncState);
+    window.addEventListener("telesonic:dexie-update", syncState);
+    window.addEventListener("telesonic:sync-complete", syncState);
+    return () => {
+      unsub();
+      window.removeEventListener("telesonic:auth-changed", syncState);
+      window.removeEventListener("telesonic:dexie-update", syncState);
+      window.removeEventListener("telesonic:sync-complete", syncState);
+    };
+  }, [user?.name]);
+
+  const activeTechName = user?.name || getActiveTechnicianName();
 
   const assignedJobs = jobs.filter((j) => j.status === "Assigned" || j.status === "Accepted");
-  const activeJobs = jobs.filter((j) => j.status === "In Progress");
-  const onHoldJobs = jobs.filter((j) => j.status === "On Hold");
   const completedJobs = jobs.filter((j) => j.status === "Completed");
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="space-y-3.5 max-w-full overflow-hidden pb-4">
       {/* Mobile Welcome Heading */}
-      <div className="px-0.5 pt-0.5">
-        <h2 className="text-lg font-bold text-foreground">Welcome, Nimal</h2>
+      <div className="px-0.5 pt-0.5 flex items-center justify-between gap-2">
+        <h2 className="text-lg font-bold text-foreground truncate">Welcome, {activeTechName}</h2>
+        <button
+          type="button"
+          onClick={async () => {
+            await logoutUser();
+            navigate({ to: "/mobile/login", replace: true });
+          }}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-destructive transition-colors shrink-0 cursor-pointer"
+          title="Sign out of Mobile App"
+        >
+          <LogOut size={13} />
+          <span>Sign out</span>
+        </button>
       </div>
 
       {/* Technician Workflow Quick Summary Cards */}

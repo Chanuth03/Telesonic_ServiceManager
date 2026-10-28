@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import {
   Smartphone,
   Headset,
@@ -9,11 +9,37 @@ import {
   EyeOff,
   ArrowRight,
   AlertCircle,
-  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRole } from "@/context/RoleContext";
+import { apiFetch } from "@/lib/api-client";
+import { refreshMobileJobsFromServer } from "@/lib/mobile-offline-bridge";
+
+function hasSavedBrowserSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (sessionStorage.getItem("auth_user") && sessionStorage.getItem("auth_token")) {
+      return true;
+    }
+    if (
+      localStorage.getItem("telesonic_remember_session") === "true" &&
+      localStorage.getItem("auth_user") &&
+      localStorage.getItem("auth_token")
+    ) {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
 
 export const Route = createFileRoute("/mobile/login")({
+  beforeLoad: () => {
+    if (hasSavedBrowserSession()) {
+      throw redirect({ to: "/mobile", replace: true });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Mobile Sign In (O1-SCR-MOB-01) — Telesonic Mobile" },
@@ -31,17 +57,27 @@ export const Route = createFileRoute("/mobile/login")({
   component: MobileLoginPage,
 });
 
-import { useRole } from "@/context/RoleContext";
-import { apiFetch } from "@/lib/api-client";
-
 function MobileLoginPage() {
   const navigate = useNavigate();
-  const { setRole, setUser } = useRole();
+  const { isAuthenticated, authReady, loginUser } = useRole();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // If the user previously saved login ("Keep me signed in") on this device,
+  // skip the login prompt and go directly to the Mobile PWA home screen!
+  useEffect(() => {
+    if (authReady && isAuthenticated) {
+      navigate({ to: "/mobile", replace: true });
+    }
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady || isAuthenticated || hasSavedBrowserSession()) {
+    return null;
+  }
 
   const handleMobileSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,28 +107,12 @@ function MobileLoginPage() {
         return;
       }
 
-      if (data.token) {
-        localStorage.setItem("auth_token", data.token);
-      }
-
       if (data.user) {
-        setUser(data.user);
-      } else if (data.user?.role) {
-        setRole(data.user.role);
+        await loginUser(data.user, data.token || "session-token", true);
       }
 
-      sessionStorage.setItem("mobile_authenticated", "true");
-      sessionStorage.setItem("mobile_tech_id", data.user?.name || email.trim());
-
-      // Navigate according to user role from database
-      const userRole = String(data.user?.role || "")
-        .toUpperCase()
-        .trim();
-      if (userRole === "TECHNICIAN") {
-        navigate({ to: "/mobile" });
-      } else {
-        navigate({ to: "/" });
-      }
+      await refreshMobileJobsFromServer();
+      navigate({ to: "/mobile", replace: true });
     } catch {
       setError("Something went wrong on the server");
     } finally {
@@ -183,9 +203,14 @@ function MobileLoginPage() {
               </div>
             )}
 
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" className="h-3.5 w-3.5 rounded border accent-primary" />
-              Keep me signed in
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border accent-primary cursor-pointer"
+              />
+              Keep me signed in (Save Login on this device)
             </label>
 
             {/* Submit Button */}
