@@ -42,6 +42,16 @@ export interface DexieStockItem extends StockCountItem {
   updatedAt: number;
 }
 
+export interface DexieTransactionRecord {
+  id: string;
+  code: string;
+  storageKey: string;
+  recordRef: string;
+  payload: Record<string, unknown>;
+  createdAt: number;
+  syncStatus: "pending" | "synced";
+}
+
 /**
  * Dexie.js Offline Database for Field Service Mobile PWA
  */
@@ -51,6 +61,7 @@ class TelesonicOfflineDB extends Dexie {
   offlineMeta!: EntityTable<DexieMeta, "key">;
   stockCount!: EntityTable<DexieStockItem, "sku">;
   notifications!: EntityTable<MobileNotification, "id">;
+  transactions!: EntityTable<DexieTransactionRecord, "id">;
 
   constructor() {
     super("TelesonicOfflineDB");
@@ -67,6 +78,15 @@ class TelesonicOfflineDB extends Dexie {
       offlineMeta: "key, updatedAt",
       stockCount: "sku, updatedAt",
       notifications: "id, read, type",
+    });
+
+    this.version(3).stores({
+      jobs: "id, customerName, status, priority, technicianName, scheduledDate, syncStatus, updatedAt",
+      syncQueue: "++id, action, entityId, createdAt, status",
+      offlineMeta: "key, updatedAt",
+      stockCount: "sku, updatedAt",
+      notifications: "id, read, type",
+      transactions: "id, code, storageKey, recordRef, createdAt, syncStatus",
     });
   }
 }
@@ -275,6 +295,37 @@ export async function markDexieAsSynced(
 /**
  * Get count of pending unsynced items
  */
+export function isOfflineForTransactions(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (!navigator.onLine) return true;
+  try {
+    return localStorage.getItem("telesonic_simulated_offline") === "true";
+  } catch {
+    return false;
+  }
+}
+
+export async function saveOfflineTransaction(input: {
+  code: string;
+  storageKey: string;
+  recordRef: string;
+  payload: Record<string, unknown>;
+}): Promise<DexieTransactionRecord> {
+  const record: DexieTransactionRecord = {
+    id: `${input.code}-${input.recordRef}-${Date.now()}`,
+    code: input.code,
+    storageKey: input.storageKey,
+    recordRef: input.recordRef,
+    payload: input.payload,
+    createdAt: Date.now(),
+    syncStatus: "pending",
+  };
+  await offlineDB.transactions.put(record);
+  const stored = await offlineDB.transactions.get(record.id);
+  console.log("[Dexie] Offline transaction stored. JSON:", JSON.stringify(stored, null, 2));
+  return record;
+}
+
 export async function saveDexieStock(items: StockCountItem[]): Promise<void> {
   const now = Date.now();
   await offlineDB.stockCount.bulkPut(items.map((item) => ({ ...item, updatedAt: now })));

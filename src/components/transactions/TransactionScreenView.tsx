@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { isOfflineForTransactions, saveOfflineTransaction } from "@/lib/offline-db";
 import {
   ArrowLeft,
   Download,
@@ -299,15 +300,35 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       }
     });
 
+    const payload = {
+      ...formData,
+      data: {
+        formData,
+        tabDatasets,
+      },
+    };
+    const recordRef = String(
+      formData[primaryKey] ||
+        (meta.sampleRecord as Record<string, unknown>)[primaryKey] ||
+        meta.code,
+    );
+
+    if (isOfflineForTransactions()) {
+      await saveOfflineTransaction({
+        code: meta.code,
+        storageKey,
+        recordRef,
+        payload,
+      });
+      const now = new Date().toLocaleTimeString();
+      setLastSavedTime(now);
+      setIsSaving(false);
+      showToast(`Transaction ${recordRef} stored offline in Dexie. See the browser console for the JSON.`);
+      return;
+    }
+
     if (meta.code === "TRX-01") {
       try {
-        const payload = {
-          ...formData,
-          data: {
-            formData,
-            tabDatasets,
-          },
-        };
         const res = await apiFetch("/api/service-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -323,6 +344,17 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         }
       } catch (err) {
         console.error("[PostgreSQL] Failed to save service request:", err);
+        await saveOfflineTransaction({
+          code: meta.code,
+          storageKey,
+          recordRef,
+          payload,
+        });
+        const now = new Date().toLocaleTimeString();
+        setLastSavedTime(now);
+        setIsSaving(false);
+        showToast(`Database was unreachable. Transaction ${recordRef} stored offline in Dexie.`);
+        return;
       }
     }
 
