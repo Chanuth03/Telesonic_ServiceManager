@@ -1,5 +1,12 @@
 import { getMasterDropdownOptions } from "@/lib/master-options-db";
 import {
+  PROCESS_KEY_TO_CONFIG,
+  getTransactionRecordsByProcess,
+  getTransactionRecordByNo,
+  upsertTransactionRecord,
+  deleteTransactionRecordByNo,
+} from "@/lib/transactions-db";
+import {
   getAllServiceRequests,
   getServiceRequestById,
   createServiceRequest,
@@ -255,44 +262,88 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       const now = new Date().toISOString();
       const batchId = `SYNC-BATCH-${Date.now().toString(36).toUpperCase()}`;
 
+      const toSafeJobData = (raw: Record<string, unknown>, idOverride?: string) => {
+        const jobId = String(idOverride || raw["id"] || "");
+        const nowDate = new Date();
+        return {
+          id: jobId,
+          customerName: String(raw["customerName"] || "Customer"),
+          customerContact: raw["customerContact"] ? String(raw["customerContact"]) : null,
+          town: String(raw["town"] || "Colombo"),
+          window: String(raw["window"] || "Today, 09:00 - 12:00"),
+          priority: String(raw["priority"] || "Normal"),
+          role: String(raw["role"] || authRole || "Lead Technician"),
+          status: String(raw["status"] || "Assigned"),
+          category: String(raw["category"] || "Service Call"),
+          siteName: raw["siteName"] ? String(raw["siteName"]) : null,
+          siteAddress: String(raw["siteAddress"] || "Customer Site"),
+          technicianName: String(raw["technicianName"] || "Technician"),
+          scheduledDate: String(raw["scheduledDate"] || nowDate.toISOString().slice(0, 10)),
+          syncStatus: "synced",
+          syncedAt: nowDate,
+          updatedAt: nowDate,
+        };
+      };
+
       // 1. Process queued mutations
       if (body.queueItems && body.queueItems.length > 0) {
         for (const item of body.queueItems) {
+          const payloadObj = (item.payload as Record<string, unknown> | undefined) || {};
+          if (payloadObj["type"] === "STOCK_COUNT") {
+            if (item.id) processedQueueIds.push(item.id);
+            continue;
+          }
+
           if (item.action === "UPDATE_STATUS") {
-            const rawStatus = (item.payload as Record<string, unknown> | undefined)?.["status"];
+            const rawStatus = payloadObj["status"];
             const statusStr = typeof rawStatus === "string" ? rawStatus : "In Progress";
+            const safeJob = toSafeJobData({ ...payloadObj, status: statusStr }, item.entityId);
             await prisma.job.upsert({
               where: { id: item.entityId },
-              create: {
-                id: item.entityId,
-                customerName: ((item.payload as Record<string, unknown> | undefined)?.["customerName"] as string) || "Unknown",
-                town: ((item.payload as Record<string, unknown> | undefined)?.["town"] as string) || "Unknown",
-                window: ((item.payload as Record<string, unknown> | undefined)?.["window"] as string) || "Morning",
-                priority: ((item.payload as Record<string, unknown> | undefined)?.["priority"] as string) || "medium",
-                role: authRole,
-                status: statusStr,
-                category: ((item.payload as Record<string, unknown> | undefined)?.["category"] as string) || "Repair",
-                siteAddress: ((item.payload as Record<string, unknown> | undefined)?.["siteAddress"] as string) || "Site Address",
-                technicianName: ((item.payload as Record<string, unknown> | undefined)?.["technicianName"] as string) || "Technician",
-                scheduledDate: ((item.payload as Record<string, unknown> | undefined)?.["scheduledDate"] as string) || new Date().toISOString().split("T")[0],
-                updatedAt: now,
-                syncStatus: "synced",
-              } as any,
+              create: safeJob,
               update: {
                 status: statusStr,
-                role: authRole,
-                updatedAt: now,
+                updatedAt: new Date(),
                 syncStatus: "synced",
+                syncedAt: new Date(),
               },
             });
-            syncedJobIds.push(item.entityId);
-          } else if (item.action === "GENERIC_UPDATE" && item.payload) {
+            await prisma
+              .$executeRawUnsafe(
+                `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+                statusStr,
+                item.entityId,
+              )
+              .catch(() => {});
+            if (!syncedJobIds.includes(item.entityId)) {
+              syncedJobIds.push(item.entityId);
+            }
+          } else if (item.entityId && payloadObj) {
+            const safeJob = toSafeJobData(payloadObj, item.entityId);
             await prisma.job.upsert({
               where: { id: item.entityId },
-              create: item.payload as any,
-              update: item.payload as any,
+              create: safeJob,
+              update: {
+                status: safeJob.status,
+                customerName: safeJob.customerName,
+                siteAddress: safeJob.siteAddress,
+                technicianName: safeJob.technicianName,
+                scheduledDate: safeJob.scheduledDate,
+                syncStatus: "synced",
+                syncedAt: new Date(),
+                updatedAt: new Date(),
+              },
             });
-            syncedJobIds.push(item.entityId);
+            await prisma
+              .$executeRawUnsafe(
+                `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+                safeJob.status,
+                item.entityId,
+              )
+              .catch(() => {});
+            if (!syncedJobIds.includes(item.entityId)) {
+              syncedJobIds.push(item.entityId);
+            }
           }
 
           if (item.id) {
@@ -304,21 +355,28 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       // 2. Process pending full job records
       if (body.pendingJobs && body.pendingJobs.length > 0) {
         for (const job of body.pendingJobs) {
+          const safeJob = toSafeJobData(job as unknown as Record<string, unknown>, job.id);
           await prisma.job.upsert({
             where: { id: job.id },
-            create: {
-              ...job,
-              syncStatus: "synced",
-              syncedAt: now,
-              updatedAt: now,
-            },
+            create: safeJob,
             update: {
-              ...job,
+              status: safeJob.status,
+              customerName: safeJob.customerName,
+              siteAddress: safeJob.siteAddress,
+              technicianName: safeJob.technicianName,
+              scheduledDate: safeJob.scheduledDate,
               syncStatus: "synced",
-              syncedAt: now,
-              updatedAt: now,
+              syncedAt: new Date(),
+              updatedAt: new Date(),
             },
           });
+          await prisma
+            .$executeRawUnsafe(
+              `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+              safeJob.status,
+              job.id,
+            )
+            .catch(() => {});
           if (!syncedJobIds.includes(job.id)) {
             syncedJobIds.push(job.id);
           }
@@ -453,6 +511,69 @@ export async function handleApiRequest(request: Request): Promise<Response> {
           JSON.stringify({
             success: ok,
             message: ok ? "Service Request deleted from PostgreSQL" : "Failed to delete Service Request",
+          }),
+          { status: 200, headers },
+        );
+      }
+    }
+
+    // 3b. All Operational Transaction Process APIs (PostgreSQL-backed CRUD)
+    const trxMatch = path.match(/^\/api\/([a-z0-9-]+)(?:\/(.+))?$/);
+    if (trxMatch && trxMatch[1] && trxMatch[1] !== "service-requests" && PROCESS_KEY_TO_CONFIG[trxMatch[1]]) {
+      const processKey = trxMatch[1];
+      const subId = trxMatch[2] ? decodeURIComponent(trxMatch[2]) : "";
+
+      if (subId === "master-options" && method === "GET") {
+        const options = await getMasterDropdownOptions();
+        return new Response(JSON.stringify({ success: true, options }), { status: 200, headers });
+      }
+
+      if (subId && method === "GET") {
+        const item = await getTransactionRecordByNo(processKey, subId);
+        if (!item) {
+          return new Response(JSON.stringify({ error: "Transaction record not found" }), { status: 404, headers });
+        }
+        return new Response(JSON.stringify({ success: true, record: item }), { status: 200, headers });
+      }
+
+      if (!subId && method === "GET") {
+        const records = await getTransactionRecordsByProcess(processKey);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            source: "PostgreSQL (Dedicated)",
+            process: processKey,
+            count: records.length,
+            records,
+            requests: records,
+          }),
+          { status: 200, headers },
+        );
+      }
+
+      if (method === "POST" || method === "PUT") {
+        const body = await request.json();
+        if (subId && !body.recordNo) {
+          body.recordNo = subId;
+        }
+        const saved = await upsertTransactionRecord(processKey, body);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Transaction saved to PostgreSQL (${processKey})`,
+            record: saved,
+            request: saved,
+          }),
+          { status: method === "POST" ? 201 : 200, headers },
+        );
+      }
+
+      if (subId && method === "DELETE") {
+        const ok = await deleteTransactionRecordByNo(processKey, subId);
+        return new Response(
+          JSON.stringify({
+            success: ok,
+            message: ok ? "Transaction record deleted from PostgreSQL" : "Record not found",
           }),
           { status: 200, headers },
         );
@@ -7204,6 +7325,192 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         }
       }
     }
+
+    // 12. /api/equipments — Dedicated Equipment / Installed Base Master (MST-06 / O1-SCR-MST-06)
+    if (path === "/api/equipments") {
+      const urlParams = new URL(request.url).searchParams;
+      const equipDelegate = (prisma as any).equipment;
+
+      if (method === "GET") {
+        const id = urlParams.get("id");
+        const equipmentId = urlParams.get("equipmentId");
+        const customerId = urlParams.get("customerId");
+        const siteId = urlParams.get("siteId");
+        const search = urlParams.get("search")?.toLowerCase().trim();
+
+        if (id) {
+          const equip = await equipDelegate.findUnique({
+            where: { id: Number(id) },
+            include: { customer: true, site: true, serial: true },
+          });
+          if (!equip) {
+            return new Response(JSON.stringify({ error: "Equipment not found" }), { status: 404, headers });
+          }
+          return new Response(JSON.stringify({ success: true, equipment: equip }), { status: 200, headers });
+        }
+
+        const where: any = {};
+        if (equipmentId) where.equipmentId = equipmentId;
+        if (customerId) where.customerId = Number(customerId);
+        if (siteId) where.siteId = Number(siteId);
+        if (search) {
+          where.OR = [
+            { equipmentId: { contains: search, mode: "insensitive" } },
+            { customerName: { contains: search, mode: "insensitive" } },
+            { siteName: { contains: search, mode: "insensitive" } },
+            { brand: { contains: search, mode: "insensitive" } },
+            { model: { contains: search, mode: "insensitive" } },
+            { serialNo: { contains: search, mode: "insensitive" } },
+            { itemCategory: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        const list = await equipDelegate.findMany({
+          where,
+          include: {
+            customer: { select: { id: true, customerCode: true, customerName: true } },
+            site: { select: { id: true, siteCode: true, siteName: true } },
+            serial: { select: { id: true, serialNo: true, itemName: true } },
+          },
+          orderBy: { id: "asc" },
+        });
+
+        const enriched = list.map((e: any) => ({
+          ...e,
+          customer: e.customer ? e.customer.customerName : e.customerName || "—",
+          site: e.site ? e.site.siteName : e.siteName || "—",
+          serial: e.serial ? e.serial.serialNo : e.serialNo || "—",
+        }));
+
+        return new Response(JSON.stringify({ success: true, equipments: enriched }), { status: 200, headers });
+      }
+
+      if (method === "POST") {
+        const body = await request.json();
+        const equipmentId = String(body.equipmentId || "").trim();
+        if (!equipmentId) {
+          return new Response(JSON.stringify({ error: "Equipment ID is required" }), { status: 400, headers });
+        }
+
+        let customerId = body.customerId ? Number(body.customerId) : undefined;
+        let customerName = body.customerName ? String(body.customerName).trim() : "";
+        if (!customerId && (body.customer || body.customerName)) {
+          const custStr = String(body.customer || body.customerName).trim();
+          const matchedCust = await (prisma as any).customer.findFirst({
+            where: {
+              OR: [
+                { customerName: { contains: custStr, mode: "insensitive" } },
+                { customerCode: { equals: custStr.split(" ")[0], mode: "insensitive" } },
+              ],
+            },
+          });
+          if (matchedCust) {
+            customerId = matchedCust.id;
+            customerName = matchedCust.customerName;
+          }
+        }
+
+        let siteId = body.siteId ? Number(body.siteId) : undefined;
+        let siteName = body.siteName ? String(body.siteName).trim() : "";
+        if (!siteId && (body.site || body.siteName)) {
+          const siteStr = String(body.site || body.siteName).trim();
+          const matchedSite = await (prisma as any).site.findFirst({
+            where: {
+              siteName: { contains: siteStr, mode: "insensitive" },
+            },
+          });
+          if (matchedSite) {
+            siteId = matchedSite.id;
+            siteName = matchedSite.siteName;
+          }
+        }
+
+        let serialId = body.serialId ? Number(body.serialId) : undefined;
+        let serialNo = body.serialNo || body.serial ? String(body.serialNo || body.serial).trim() : "";
+        if (!serialId && serialNo) {
+          const matchedSerial = await (prisma as any).serialRegister.findFirst({
+            where: {
+              serialNo: { equals: serialNo, mode: "insensitive" },
+            },
+          });
+          if (matchedSerial) {
+            serialId = matchedSerial.id;
+            serialNo = matchedSerial.serialNo;
+          }
+        }
+
+        const id = body.id ? Number(body.id) : undefined;
+        let existing;
+        if (id) {
+          existing = await equipDelegate.findUnique({ where: { id } });
+        }
+        if (!existing) {
+          existing = await equipDelegate.findUnique({ where: { equipmentId } });
+        }
+
+        const payloadData = {
+          equipmentId,
+          customerId: customerId || null,
+          customerName: customerName || null,
+          siteId: siteId || null,
+          siteName: siteName || null,
+          itemCategory: body.itemCategory || "General Equipment",
+          brand: body.brand || "Carrier",
+          model: body.model || null,
+          serialId: serialId || null,
+          serialNo: serialNo || null,
+          origin: body.origin || "Telesonic-originated",
+          serviceProvider: body.serviceProvider || "Telesonic In-House SRE",
+          installedDate: body.installedDate || null,
+          commissionedDate: body.commissionedDate || null,
+          warrantyTo: body.warrantyTo || null,
+          relationship: body.relationship || "Active Under Warranty",
+          systemId: body.systemId || null,
+          meterReading: body.meterReading !== undefined && body.meterReading !== null ? Number(body.meterReading) : 0,
+          status: body.status || "Installed",
+        };
+
+        let saved: any;
+        if (existing) {
+          saved = await equipDelegate.update({
+            where: { id: existing.id },
+            data: payloadData,
+            include: { customer: true, site: true, serial: true },
+          });
+        } else {
+          saved = await equipDelegate.create({
+            data: payloadData,
+            include: { customer: true, site: true, serial: true },
+          });
+        }
+
+        const enriched = {
+          ...saved,
+          customer: saved.customer ? saved.customer.customerName : saved.customerName || "—",
+          site: saved.site ? saved.site.siteName : saved.siteName || "—",
+          serial: saved.serial ? saved.serial.serialNo : saved.serialNo || "—",
+        };
+
+        return new Response(JSON.stringify({ success: true, equipment: enriched }), { status: 201, headers });
+      }
+
+      if (method === "DELETE") {
+        const id = urlParams.get("id");
+        const equipmentId = urlParams.get("equipmentId");
+
+        if (id) {
+          await equipDelegate.deleteMany({ where: { id: Number(id) } });
+          return new Response(JSON.stringify({ success: true, message: "Equipment deleted" }), { status: 200, headers });
+        } else if (equipmentId) {
+          await equipDelegate.deleteMany({ where: { equipmentId } });
+          return new Response(JSON.stringify({ success: true, message: "Equipment deleted" }), { status: 200, headers });
+        } else {
+          return new Response(JSON.stringify({ error: "Equipment ID is required" }), { status: 400, headers });
+        }
+      }
+    }
+
+
 
     // 19. /api/masters — Unified CRUD for all Master Screens (MST-13 to MST-31) in PostgreSQL
     if (path === "/api/masters") {

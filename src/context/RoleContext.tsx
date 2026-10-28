@@ -9,6 +9,11 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useSyncManager } from "@/hooks/useSyncManager";
+import {
+  saveOfflineAuthSession,
+  getOfflineAuthSession,
+  clearOfflineAuthSession,
+} from "@/lib/offline-db";
 
 export type UserRole = string;
 
@@ -25,8 +30,12 @@ export interface UserProfile {
 interface RoleContextType {
   role: UserRole;
   user: UserProfile;
+  isAuthenticated: boolean;
+  authReady: boolean;
   setRole: (role: UserRole) => void;
   setUser: (user: UserProfile) => void;
+  loginUser: (user: UserProfile, token: string, rememberMe: boolean) => Promise<void>;
+  logoutUser: () => Promise<void>;
   toggleRole: () => void;
 }
 
@@ -50,45 +59,253 @@ const TECH_PROFILE: UserProfile = {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-export function RoleProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(ADMIN_PROFILE);
-  const [role, setRoleState] = useState<UserRole>("ADMIN");
+function getInitialAuthState(isVitest: boolean): {
+  user: UserProfile;
+  role: UserRole;
+  isAuthenticated: boolean;
+  authReady: boolean;
+} {
+  if (typeof window === "undefined") {
+    return {
+      user: ADMIN_PROFILE,
+      role: "ADMIN",
+      isAuthenticated: isVitest,
+      authReady: isVitest,
+    };
+  }
+  try {
+    const sessionUserRaw = sessionStorage.getItem("auth_user");
+    const sessionToken = sessionStorage.getItem("auth_token");
+    if (sessionUserRaw && sessionToken) {
+      const parsed = JSON.parse(sessionUserRaw) as UserProfile;
+      if (parsed && parsed.name) {
+        return {
+          user: parsed,
+          role: parsed.role || "ADMIN",
+          isAuthenticated: true,
+          authReady: true,
+        };
+      }
+    }
 
-  // Load from localStorage only after mounting on the client to avoid SSR hydration mismatch
+    const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
+    const localUserRaw = localStorage.getItem("auth_user");
+    const localToken = localStorage.getItem("auth_token");
+    if (isRemembered && localUserRaw && localToken) {
+      const parsed = JSON.parse(localUserRaw) as UserProfile;
+      if (parsed && parsed.name) {
+        sessionStorage.setItem("auth_user", localUserRaw);
+        sessionStorage.setItem("auth_token", localToken);
+        sessionStorage.setItem("mobile_authenticated", "true");
+        sessionStorage.setItem("mobile_tech_id", parsed.name);
+        return {
+          user: parsed,
+          role: parsed.role || "ADMIN",
+          isAuthenticated: true,
+          authReady: true,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {
+    user: ADMIN_PROFILE,
+    role: "ADMIN",
+    isAuthenticated: isVitest,
+    authReady: isVitest,
+  };
+}
+
+export function RoleProvider({ children }: { children: ReactNode }) {
+  const isVitest = typeof process !== "undefined" && process.env["VITEST"] === "true";
+  const initial = getInitialAuthState(isVitest);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(initial.user);
+  const [role, setRoleState] = useState<UserRole>(initial.role);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initial.isAuthenticated);
+  const [authReady, setAuthReady] = useState<boolean>(initial.authReady);
+
+  // Restore session on mount:
+  // 1) Active tab session in sessionStorage
+  // 2) Persistent "Keep me signed in" session in localStorage (telesonic_remember_session === "true")
+  // 3) Offline PWA Dexie.js session in offlineMeta ("saved_auth_session")
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const savedUser = localStorage.getItem("auth_user");
-    if (savedUser) {
+
+    let cancelled = false;
+    const restoreAuth = async () => {
       try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed) {
-          setCurrentUser(parsed);
-          if (parsed.role) setRoleState(parsed.role);
-          return;
+        // 1. Check active tab sessionStorage first
+        const sessionUserRaw = sessionStorage.getItem("auth_user");
+        const sessionToken = sessionStorage.getItem("auth_token");
+        if (sessionUserRaw && sessionToken) {
+          const parsed = JSON.parse(sessionUserRaw) as UserProfile;
+          if (parsed && parsed.name && !cancelled) {
+            setCurrentUser(parsed);
+            if (parsed.role) setRoleState(parsed.role);
+            setIsAuthenticated(true);
+            setAuthReady(true);
+            window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: parsed }));
+            return;
+          }
         }
-      } catch {}
-    }
-    const savedRole = localStorage.getItem("app_user_role");
-    if (savedRole) {
-      setRoleState(savedRole);
-    }
-  }, []);
+
+        // 2. Check persistent localStorage if user checked "Keep me signed in"
+        const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
+        const localUserRaw = localStorage.getItem("auth_user");
+        const localToken = localStorage.getItem("auth_token");
+
+        if (isRemembered && localUserRaw && localToken) {
+          const parsed = JSON.parse(localUserRaw) as UserProfile;
+          if (parsed && parsed.name && !cancelled) {
+            sessionStorage.setItem("auth_user", localUserRaw);
+            sessionStorage.setItem("auth_token", localToken);
+            sessionStorage.setItem("mobile_authenticated", "true");
+            sessionStorage.setItem("mobile_tech_id", parsed.name);
+            setCurrentUser(parsed);
+            if (parsed.role) setRoleState(parsed.role);
+            setIsAuthenticated(true);
+            setAuthReady(true);
+            window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: parsed }));
+            return;
+          }
+        } else if (!isRemembered) {
+          // Clean up any legacy un-remembered localStorage keys so fresh startup goes to Login
+          localStorage.removeItem("auth_user");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("mobile_tech_id");
+        }
+
+        // 3. Check Dexie.js offlineMeta for Mobile PWA offline auto-login
+        const dexieSession = await getOfflineAuthSession();
+        if (dexieSession && dexieSession.rememberMe && dexieSession.user && !cancelled) {
+          const parsed = dexieSession.user as unknown as UserProfile;
+          if (parsed && parsed.name) {
+            const userJson = JSON.stringify(parsed);
+            localStorage.setItem("telesonic_remember_session", "true");
+            localStorage.setItem("auth_user", userJson);
+            localStorage.setItem("auth_token", dexieSession.token);
+            sessionStorage.setItem("auth_user", userJson);
+            sessionStorage.setItem("auth_token", dexieSession.token);
+            sessionStorage.setItem("mobile_authenticated", "true");
+            sessionStorage.setItem("mobile_tech_id", parsed.name);
+            setCurrentUser(parsed);
+            if (parsed.role) setRoleState(parsed.role);
+            setIsAuthenticated(true);
+            setAuthReady(true);
+            window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: parsed }));
+            return;
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+
+      if (!cancelled) {
+        setIsAuthenticated(isVitest);
+        setAuthReady(true);
+      }
+    };
+
+    void restoreAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, [isVitest]);
 
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);
     if (typeof window !== "undefined") {
-      localStorage.setItem("app_user_role", newRole);
+      sessionStorage.setItem("app_user_role", newRole);
+      if (localStorage.getItem("telesonic_remember_session") === "true") {
+        localStorage.setItem("app_user_role", newRole);
+      }
     }
   };
 
   const setUser = (newUser: UserProfile) => {
     setCurrentUser(newUser);
+    setIsAuthenticated(true);
     if (typeof window !== "undefined") {
-      localStorage.setItem("auth_user", JSON.stringify(newUser));
+      const userJson = JSON.stringify(newUser);
+      sessionStorage.setItem("auth_user", userJson);
+      sessionStorage.setItem("mobile_authenticated", "true");
+      sessionStorage.setItem("mobile_tech_id", newUser.name);
       if (newUser.role) {
-        localStorage.setItem("app_user_role", newUser.role);
+        sessionStorage.setItem("app_user_role", newUser.role);
         setRoleState(newUser.role);
       }
+      if (localStorage.getItem("telesonic_remember_session") === "true") {
+        localStorage.setItem("auth_user", userJson);
+        localStorage.setItem("mobile_tech_id", newUser.name);
+        if (newUser.role) {
+          localStorage.setItem("app_user_role", newUser.role);
+        }
+      }
+      window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: newUser }));
+    }
+  };
+
+  const loginUser = async (newUser: UserProfile, token: string, rememberMe: boolean) => {
+    setCurrentUser(newUser);
+    if (newUser.role) {
+      setRoleState(newUser.role);
+    }
+    setIsAuthenticated(true);
+    setAuthReady(true);
+
+    if (typeof window !== "undefined") {
+      const userJson = JSON.stringify(newUser);
+      sessionStorage.setItem("auth_user", userJson);
+      sessionStorage.setItem("auth_token", token);
+      sessionStorage.setItem("mobile_authenticated", "true");
+      sessionStorage.setItem("mobile_tech_id", newUser.name);
+      if (newUser.role) {
+        sessionStorage.setItem("app_user_role", newUser.role);
+      }
+
+      if (rememberMe) {
+        localStorage.setItem("telesonic_remember_session", "true");
+        localStorage.setItem("auth_user", userJson);
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("mobile_tech_id", newUser.name);
+        if (newUser.role) {
+          localStorage.setItem("app_user_role", newUser.role);
+        }
+        await saveOfflineAuthSession({
+          token,
+          user: newUser as unknown as Record<string, unknown>,
+          rememberMe: true,
+          savedAt: new Date().toISOString(),
+        });
+      } else {
+        localStorage.removeItem("telesonic_remember_session");
+        localStorage.removeItem("auth_user");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("mobile_tech_id");
+        localStorage.removeItem("app_user_role");
+        await clearOfflineAuthSession();
+      }
+
+      window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: newUser }));
+    }
+  };
+
+  const logoutUser = async () => {
+    setIsAuthenticated(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("auth_user");
+      sessionStorage.removeItem("auth_token");
+      sessionStorage.removeItem("mobile_authenticated");
+      sessionStorage.removeItem("mobile_tech_id");
+      sessionStorage.removeItem("app_user_role");
+      localStorage.removeItem("telesonic_remember_session");
+      localStorage.removeItem("auth_user");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("mobile_tech_id");
+      localStorage.removeItem("app_user_role");
+      await clearOfflineAuthSession();
+      window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: null }));
     }
   };
 
@@ -102,23 +319,42 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
 
     const handleStorage = () => {
-      const savedUser = localStorage.getItem("auth_user");
+      const savedUser =
+        sessionStorage.getItem("auth_user") ||
+        (localStorage.getItem("telesonic_remember_session") === "true"
+          ? localStorage.getItem("auth_user")
+          : null);
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
           setCurrentUser(parsed);
           if (parsed.role) setRoleState(parsed.role);
+          setIsAuthenticated(true);
         } catch {}
+      } else if (!isVitest) {
+        setIsAuthenticated(false);
       }
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+  }, [isVitest]);
 
   const user = currentUser;
 
   return (
-    <RoleContext.Provider value={{ role, user, setRole, setUser, toggleRole }}>
+    <RoleContext.Provider
+      value={{
+        role,
+        user,
+        isAuthenticated,
+        authReady,
+        setRole,
+        setUser,
+        loginUser,
+        logoutUser,
+        toggleRole,
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );

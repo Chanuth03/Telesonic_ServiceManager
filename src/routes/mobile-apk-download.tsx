@@ -40,7 +40,7 @@ function MobileApkDownloadPage() {
     setManualInstall(null);
 
     if (isStandalonePwa()) {
-      navigate({ to: "/mobile/login" });
+      navigate({ to: "/mobile" });
       return;
     }
 
@@ -64,7 +64,7 @@ function MobileApkDownloadPage() {
       const outcome = await promptPwaInstall();
       if (outcome === "accepted") {
         setIsInstalled(true);
-        navigate({ to: "/mobile/login" });
+        navigate({ to: "/mobile" });
         return;
       }
       if (outcome === "dismissed") {

@@ -189,6 +189,45 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       return;
     }
 
+    // 7. MST-05: Item Serial & Batch Register
+    if (meta.code === "MST-05" || meta.id === "O1-SCR-MST-05") {
+      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
+        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
+      });
+      apiFetch("/api/items").then((r) => r.json()).then((d) => {
+        if (d?.items) setItemOptions(d.items.map((i: any) => ({ id: i.id, code: i.itemCode, name: i.itemName })));
+      });
+      return;
+    }
+
+    // 8. MST-06: Equipment / Installed Base
+    if (meta.code === "MST-06" || meta.id === "O1-SCR-MST-06") {
+      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
+        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
+      });
+      apiFetch("/api/sites").then((r) => r.json()).then((d) => {
+        if (d?.sites) setSiteOptions(d.sites.map((s: any) => ({ id: s.id, code: s.siteCode, name: s.siteName, customerId: s.customerId })));
+      });
+      apiFetch("/api/equipments").then((r) => r.json()).then((d) => {
+        if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
+      });
+      return;
+    }
+
+    // 9. MST-07: Other-Brand / Competitor Equipment
+    if (meta.code === "MST-07" || meta.id === "O1-SCR-MST-07") {
+      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
+        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
+      });
+      apiFetch("/api/sites").then((r) => r.json()).then((d) => {
+        if (d?.sites) setSiteOptions(d.sites.map((s: any) => ({ id: s.id, code: s.siteCode, name: s.siteName, customerId: s.customerId })));
+      });
+      apiFetch("/api/other-brand-equipments").then((r) => r.json()).then((d) => {
+        if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
+      });
+      return;
+    }
+
     // 10. MST-08: Multi-Component Equipment System
     if (meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") {
       apiFetch("/api/customers").then((r) => r.json()).then((d) => {

@@ -1,4 +1,4 @@
-﻿import { Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
 import {
   Search,
@@ -16,14 +16,15 @@ import { Avatar } from "./Badges";
 import { Button } from "@/components/ui/button";
 import { themes, applyTheme, getSavedTheme } from "@/lib/theme";
 import { useRole } from "@/context/RoleContext";
-import { useRouterState } from "@tanstack/react-router";
+import { useRouterState, useNavigate } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState(false);
   const [notif, setNotif] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [theme, setTheme] = useState("indigo");
-  const { role, user } = useRole();
+  const { role, user, logoutUser } = useRole();
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
@@ -179,13 +180,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                       {l}
                     </Button>
                   ))}
-                  <Link
-                    to="/login"
-                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 hover:bg-muted"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setProfile(false);
+                      await logoutUser();
+                      navigate({ to: "/login", replace: true });
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 hover:bg-muted text-left cursor-pointer"
                   >
                     <LogOut size={15} />
                     Sign out
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>

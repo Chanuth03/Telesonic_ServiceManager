@@ -5,6 +5,7 @@ import {
   ShieldCheck,
   CheckCircle,
   AlertTriangle,
+  AlertCircle,
   XCircle,
   FileText,
   Building,
@@ -12,7 +13,7 @@ import {
 import {
   getMobileJobById,
   saveJobInspection,
-  MOCK_TECHNICIAN_NAME,
+  getActiveTechnicianName,
   type MobileJob,
   type SiteInspectionPoint,
 } from "@/lib/mobile-data";
@@ -118,7 +119,7 @@ function MobileSiteInspectionScreen() {
     saveJobInspection(job.id, {
       id: `INS-${Date.now().toString().slice(-4)}`,
       inspectedAt: new Date().toLocaleString(),
-      technicianName: MOCK_TECHNICIAN_NAME,
+      technicianName: getActiveTechnicianName(),
       overallStatus,
       points,
       generalNotes,

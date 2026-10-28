@@ -19,10 +19,12 @@ import {
   getMobileJobs,
   subscribeMobileJobs,
   updateMobileJobStatus,
-  MOCK_TECHNICIAN_NAME,
+  getActiveTechnicianName,
+  getLocalTodayDateString,
   type MobileJob,
   type MobileJobStatus,
 } from "@/lib/mobile-data";
+import { useRole } from "@/context/RoleContext";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mobile/jobs")({
@@ -71,6 +73,7 @@ const priorityBadgeStyle = {
 };
 
 function MobileJobListScreen() {
+  const { user } = useRole();
   const [jobs, setJobs] = useState<MobileJob[]>(() => getMobileJobs());
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,12 +82,23 @@ function MobileJobListScreen() {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [selectedJobPreview, setSelectedJobPreview] = useState<MobileJob | null>(null);
 
-  const todayStr = "2026-10-13"; // Mock system date
+  const todayStr = getLocalTodayDateString();
+  const activeTechName = user?.name || getActiveTechnicianName();
 
   useEffect(() => {
-    setJobs(getMobileJobs());
-    return subscribeMobileJobs(() => setJobs(getMobileJobs()));
-  }, []);
+    const syncJobs = () => setJobs(getMobileJobs());
+    syncJobs();
+    const unsub = subscribeMobileJobs(syncJobs);
+    window.addEventListener("telesonic:auth-changed", syncJobs);
+    window.addEventListener("telesonic:dexie-update", syncJobs);
+    window.addEventListener("telesonic:sync-complete", syncJobs);
+    return () => {
+      unsub();
+      window.removeEventListener("telesonic:auth-changed", syncJobs);
+      window.removeEventListener("telesonic:dexie-update", syncJobs);
+      window.removeEventListener("telesonic:sync-complete", syncJobs);
+    };
+  }, [user?.name]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -128,7 +142,7 @@ function MobileJobListScreen() {
             <div className="min-w-0">
               <h2 className="text-sm font-bold leading-none truncate">Job List</h2>
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                {MOCK_TECHNICIAN_NAME}
+                {activeTechName}
               </p>
             </div>
           </div>

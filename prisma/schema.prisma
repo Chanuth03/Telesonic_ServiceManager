@@ -1847,3 +1847,22 @@ model IncentiveDivision {
 
 
 
+
+model TransactionRecord {
+  id          Int      @id @default(autoincrement())
+  processKey  String   @map("process_key")
+  recordNo    String   @map("record_no")
+  customer    String?
+  site        String?
+  equipment   String?
+  callNo      String?  @map("call_no")
+  requestNo   String?  @map("request_no")
+  status      String   @default("Draft")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([processKey, recordNo])
+  @@index([processKey], map: "idx_trx_process_key")
+  @@map("transaction_records")
+}

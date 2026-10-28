@@ -15,7 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/itsm/AppShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
-import { RoleProvider } from "@/context/RoleContext";
+import { RoleProvider, useRole } from "@/context/RoleContext";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
 import { isStandalonePwa } from "@/lib/pwa";
 import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
@@ -122,7 +122,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
+            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");if(rem&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
           }}
         />
         <HeadContent />
@@ -132,6 +132,43 @@ function RootShell({ children }: { children: ReactNode }) {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function RootAuthGate({ bare }: { bare: boolean }) {
+  const { isAuthenticated, authReady } = useRole();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isPublicRoute =
+    pathname === "/login" ||
+    pathname === "/mobile/login" ||
+    pathname === "/mobile-apk-download";
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!isAuthenticated && !isPublicRoute) {
+      if (pathname.startsWith("/mobile")) {
+        void router.navigate({ to: "/mobile/login", replace: true });
+      } else {
+        void router.navigate({ to: "/login", replace: true });
+      }
+    }
+  }, [authReady, isAuthenticated, isPublicRoute, pathname, router]);
+
+  if (!isPublicRoute && (!authReady || !isAuthenticated)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  return bare ? (
+    <Outlet />
+  ) : (
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 }
 
@@ -147,7 +184,11 @@ function RootComponent() {
     return () => media.removeEventListener("change", sync);
   }, []);
   const installedMobile = standalone && pathname.startsWith("/mobile");
-  const bare = pathname === "/login" || pathname === "/mobile-apk-download" || installedMobile;
+  const bare =
+    pathname === "/login" ||
+    pathname === "/mobile/login" ||
+    pathname === "/mobile-apk-download" ||
+    installedMobile;
   useEffect(() => {
     applyTheme(getSavedTheme());
     void startMobileOfflineBridge();
@@ -168,13 +209,7 @@ function RootComponent() {
     <RoleProvider>
       <QueryClientProvider client={queryClient}>
         <UnsyncedDataGuard />
-        {bare ? (
-          <Outlet />
-        ) : (
-          <AppShell>
-            <Outlet />
-          </AppShell>
-        )}
+        <RootAuthGate bare={bare} />
       </QueryClientProvider>
     </RoleProvider>
   );
