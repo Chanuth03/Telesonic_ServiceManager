@@ -1,3 +1,4 @@
+import { getMasterDropdownOptions } from "@/lib/master-options-db";
 import {
   getAllServiceRequests,
   getServiceRequestById,
@@ -384,6 +385,13 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     if (path.startsWith("/api/service-requests")) {
       const subPath = path.replace("/api/service-requests", "").replace(/^\//, "");
 
+      
+      // GET /api/service-requests/master-options - Fetch lookup dropdowns from Masters
+      if (subPath === "master-options" && method === "GET") {
+        const options = await getMasterDropdownOptions();
+        return new Response(JSON.stringify({ success: true, options }), { status: 200, headers });
+      }
+
       // GET /api/service-requests/:id
       if (subPath && method === "GET") {
         const item = await getServiceRequestById(subPath);
@@ -409,7 +417,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 
       // POST /api/service-requests
       if (!subPath && method === "POST") {
-        const body = await req.json();
+        const body = await request.json();
         const created = await createServiceRequest(body);
         return new Response(
           JSON.stringify({
@@ -423,7 +431,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 
       // PUT /api/service-requests/:id
       if (subPath && method === "PUT") {
-        const body = await req.json();
+        const body = await request.json();
         const updated = await updateServiceRequest(subPath, body);
         if (!updated) {
           return new Response(JSON.stringify({ error: "Service Request not found" }), { status: 404, headers });
