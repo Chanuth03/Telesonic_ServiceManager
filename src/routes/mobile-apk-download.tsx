@@ -1,7 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Smartphone, Download, ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
+import { Smartphone, Download, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  isInAppBrowser,
+  isIosDevice,
+  isStandalonePwa,
+  openInDeviceBrowser,
+  promptPwaInstall,
+  waitForInstallPrompt,
+} from "@/lib/pwa";
 
 export const Route = createFileRoute("/mobile-apk-download")({
   head: () => ({
@@ -16,69 +24,57 @@ export const Route = createFileRoute("/mobile-apk-download")({
   component: MobileApkDownloadPage,
 });
 
-// Store deferred install prompt globally
-let deferredInstallPrompt: any = null;
-
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-  });
-}
-
 function MobileApkDownloadPage() {
   const navigate = useNavigate();
   const [isLaunching, setIsLaunching] = useState(false);
-  const [canInstallPWA, setCanInstallPWA] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [manualInstall, setManualInstall] = useState<"ios" | "android" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // Check if running in standalone mode (already installed as PWA)
-    if (
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true
-    ) {
-      setIsInstalled(true);
-    }
-
-    if (deferredInstallPrompt) {
-      setCanInstallPWA(true);
-    }
-
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      setCanInstallPWA(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+    setIsInstalled(isStandalonePwa());
   }, []);
 
   const handleDownloadAndInstall = async () => {
-    setIsLaunching(true);
+    setMessage(null);
+    setManualInstall(null);
 
-    // 1. If native PWA install prompt is available, trigger it
-    if (deferredInstallPrompt) {
-      try {
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        if (choice.outcome === "accepted") {
-          setIsInstalled(true);
-        }
-        deferredInstallPrompt = null;
-        setCanInstallPWA(false);
-      } catch (err) {
-        console.error("Install prompt error:", err);
-      }
+    if (isStandalonePwa()) {
+      navigate({ to: "/mobile/login" });
+      return;
     }
 
-    // 2. Direct to the shared universal Login screen
-    setTimeout(() => {
-      navigate({ to: "/login" });
-    }, 800);
+    if (isIosDevice()) {
+      setManualInstall("ios");
+      return;
+    }
+
+    if (isInAppBrowser()) {
+      openInDeviceBrowser();
+      return;
+    }
+
+    setIsLaunching(true);
+    try {
+      const ready = await waitForInstallPrompt(4000);
+      if (!ready) {
+        setManualInstall("android");
+        return;
+      }
+      const outcome = await promptPwaInstall();
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+        navigate({ to: "/mobile/login" });
+        return;
+      }
+      if (outcome === "dismissed") {
+        setMessage("Installation was cancelled. Tap Download again when you want the app on this phone.");
+      } else {
+        setManualInstall("android");
+      }
+    } finally {
+      setIsLaunching(false);
+    }
   };
 
   return (
@@ -127,6 +123,49 @@ function MobileApkDownloadPage() {
             </div>
           </div>
 
+          {manualInstall && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+              <div className="w-full max-w-md space-y-3 rounded-2xl bg-card p-5 shadow-2xl">
+                <div className="flex items-center gap-2 text-base font-bold">
+                  <Smartphone size={18} className="text-primary" />
+                  {manualInstall === "ios"
+                    ? "Add Telesonic on your iPhone"
+                    : "Install Telesonic on this phone"}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {manualInstall === "ios"
+                    ? "iPhone does not download an app file. Safari adds the icon to your home screen."
+                    : "Chrome did not open the install popup. Add the app from the browser menu."}
+                </p>
+                <ol className="list-decimal space-y-1.5 pl-4 text-sm">
+                  {manualInstall === "ios" ? (
+                    <>
+                      <li>Open this page in Safari, not inside WhatsApp or Chrome.</li>
+                      <li>Tap the Share button.</li>
+                      <li>Tap Add to Home Screen, then Add.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Open this page in Chrome, not inside WhatsApp.</li>
+                      <li>Tap the three-dot menu at the top right.</li>
+                      <li>Tap Install app or Add to Home screen, then Install.</li>
+                    </>
+                  )}
+                </ol>
+                <Button className="w-full" onClick={() => setManualInstall(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {message && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <span>{message}</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-3 border-t pt-5">
             <Button
@@ -143,7 +182,7 @@ function MobileApkDownloadPage() {
               ) : (
                 <>
                   <Download size={18} />
-                  {isInstalled ? "Open Mobile Application" : "Download & Install Mobile App"}
+                  {isInstalled ? "Open Mobile Application" : "Download Mobile App"}
                 </>
               )}
             </Button>
