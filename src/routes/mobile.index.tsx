@@ -59,30 +59,9 @@ function MobileOverviewPage() {
 
   return (
     <div className="space-y-3.5 max-w-full overflow-hidden pb-4">
-      {/* Mobile Welcome & Overview Card */}
-      <div className="rounded-xl border bg-card p-4 shadow-xs space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Option 01 Field Console</p>
-            <h2 className="text-lg font-bold text-foreground">Welcome, Nimal</h2>
-          </div>
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary">
-            <Smartphone size={20} />
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Telesonic Service Manager Option 01 mobile app for on-site field technicians. Linked with
-          SAP Business One backend.
-        </p>
-        <div className="flex items-center gap-2 pt-1 text-[11px] font-mono text-muted-foreground border-t">
-          <span>
-            Tech ID: <strong className="text-foreground">TECH-0092</strong>
-          </span>
-          <span>·</span>
-          <span>
-            Role: <strong className="text-foreground">Field Lead</strong>
-          </span>
-        </div>
+      {/* Mobile Welcome Heading */}
+      <div className="px-0.5 pt-0.5">
+        <h2 className="text-lg font-bold text-foreground">Welcome, Nimal</h2>
       </div>
 
       {/* Technician Workflow Quick Summary Cards */}

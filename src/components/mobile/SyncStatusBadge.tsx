@@ -71,7 +71,7 @@ export function SyncStatusBadge() {
       <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/40 text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <HardDrive size={11} className="text-blue-500" />
-          <span>Dexie.js Storage:</span>
+          <span>Local Storage:</span>
           {pendingCount > 0 ? (
             <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
               {pendingCount} unsynced

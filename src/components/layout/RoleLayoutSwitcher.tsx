@@ -191,7 +191,7 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
       {/* Workspace Header with PostgreSQL Status */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Welcome back, {user.name}</p>
+          <p className="text-sm font-medium text-muted-foreground">Welcome, {user.name}</p>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Your workspace</h1>
         </div>
       </div>

@@ -68,7 +68,9 @@ function MobileApkDownloadPage() {
         return;
       }
       if (outcome === "dismissed") {
-        setMessage("Installation was cancelled. Tap Download again when you want the app on this phone.");
+        setMessage(
+          "Installation was cancelled. Tap Download again when you want the app on this phone.",
+        );
       } else {
         setManualInstall("android");
       }
@@ -101,7 +103,7 @@ function MobileApkDownloadPage() {
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-info to-primary" />
 
           {/* App Header & Branding */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b pb-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-5">
             <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md">
               <Smartphone size={32} />
             </div>
@@ -140,13 +142,13 @@ function MobileApkDownloadPage() {
                 <ol className="list-decimal space-y-1.5 pl-4 text-sm">
                   {manualInstall === "ios" ? (
                     <>
-                      <li>Open this page in Safari, not inside WhatsApp or Chrome.</li>
+                      <li>Open this page in Safari, not inside Chrome or other browsers.</li>
                       <li>Tap the Share button.</li>
                       <li>Tap Add to Home Screen, then Add.</li>
                     </>
                   ) : (
                     <>
-                      <li>Open this page in Chrome, not inside WhatsApp.</li>
+                      <li>Open this page in Chrome.</li>
                       <li>Tap the three-dot menu at the top right.</li>
                       <li>Tap Install app or Add to Home screen, then Install.</li>
                     </>
@@ -167,7 +169,7 @@ function MobileApkDownloadPage() {
           )}
 
           {/* Action Buttons */}
-          <div className="space-y-3 border-t pt-5">
+          <div className="space-y-3 pt-5">
             <Button
               onClick={handleDownloadAndInstall}
               disabled={isLaunching}

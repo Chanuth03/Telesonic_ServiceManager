@@ -37,8 +37,8 @@ import { apiFetch } from "@/lib/api-client";
 function MobileLoginPage() {
   const navigate = useNavigate();
   const { setRole, setUser } = useRole();
-  const [email, setEmail] = useState("admin@telesonic.lk");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,7 +84,15 @@ function MobileLoginPage() {
       sessionStorage.setItem("mobile_authenticated", "true");
       sessionStorage.setItem("mobile_tech_id", data.user?.name || email.trim());
 
-      navigate({ to: "/mobile" });
+      // Navigate according to user role from database
+      const userRole = String(data.user?.role || "")
+        .toUpperCase()
+        .trim();
+      if (userRole === "TECHNICIAN") {
+        navigate({ to: "/mobile" });
+      } else {
+        navigate({ to: "/" });
+      }
     } catch {
       setError("Something went wrong on the server");
     } finally {
@@ -104,12 +112,8 @@ function MobileLoginPage() {
             </span>
             <div>
               <h1 className="text-sm font-bold leading-tight">Telesonic Service Manager</h1>
-              <p className="text-[11px] opacity-80">Option 01 · Mobile Field Console</p>
             </div>
           </div>
-          <span className="text-[10px] font-mono bg-primary-foreground/20 px-2 py-0.5 rounded text-primary-foreground font-semibold">
-            MOB-01
-          </span>
         </div>
 
         {/* Screen Title & Body */}
@@ -117,7 +121,7 @@ function MobileLoginPage() {
           <div>
             <h2 className="text-lg font-bold text-foreground">Welcome back</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Sign in with the same email and password as the website.
+              Sign in with your email and password.
             </p>
           </div>
 
@@ -129,7 +133,7 @@ function MobileLoginPage() {
               <input
                 type="email"
                 className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                placeholder="you@company.com"
+                placeholder="Email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -143,7 +147,10 @@ function MobileLoginPage() {
                 <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <Lock size={13} className="text-muted-foreground" /> Password
                 </label>
-                <button type="button" className="text-[11px] font-medium text-primary hover:underline">
+                <button
+                  type="button"
+                  className="text-[11px] font-medium text-primary hover:underline"
+                >
                   Forgot password?
                 </button>
               </div>
@@ -151,7 +158,7 @@ function MobileLoginPage() {
                 <input
                   type={showPw ? "text" : "password"}
                   className="w-full rounded-lg border bg-background pl-3 pr-9 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                  placeholder="••••••••"
+                  placeholder="Password"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -190,40 +197,16 @@ function MobileLoginPage() {
               {isSubmitting ? (
                 <>
                   <Smartphone size={16} className="animate-spin" />
-                  Authenticating with Bcrypt & JWT...
+                  Authenticating...
                 </>
               ) : (
                 <>
-                  Sign in
+                  Sign in to Mobile App
                   <ArrowRight size={15} />
                 </>
               )}
             </Button>
           </form>
-
-          {/* Quick Flow Navigation Links */}
-          <div className="border-t pt-4 space-y-2 text-center text-xs">
-            <p className="text-muted-foreground text-[11px]">Need the app on this phone?</p>
-            <div className="flex items-center justify-center gap-3 text-xs font-medium">
-              <Link
-                to="/mobile-apk-download"
-                className="text-primary hover:underline inline-flex items-center gap-1"
-              >
-                <Download size={13} />
-                Download Mobile App
-              </Link>
-              <span className="text-muted-foreground">·</span>
-              <Link to="/login" className="text-muted-foreground hover:underline">
-                Website Login
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="bg-muted/50 px-4 py-2.5 border-t text-[10px] text-center text-muted-foreground flex items-center justify-between">
-          <span>O1-SCR-MOB-01 Mobile Sign In</span>
-          <span className="font-mono">Telesonic v2.4.0</span>
         </div>
       </div>
     </div>
