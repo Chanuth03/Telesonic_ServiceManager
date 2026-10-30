@@ -175,3 +175,54 @@ export function verifyJwtToken(token: string): JwtPayloadData | null {
     return null;
   }
 }
+
+/**
+ * GET /api/auth/session — confirm a bearer token with the server.
+ * Used when the device is online so a stored token is not trusted on its own.
+ */
+export async function handleSessionRequest(request: Request): Promise<Response> {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  });
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers });
+  }
+
+  const header = request.headers.get("Authorization") || "";
+  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  const payload = verifyJwtToken(token);
+  const userId = Number(payload?.userId);
+
+  if (!payload || !Number.isFinite(userId)) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+      status: 401,
+      headers,
+    });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || (user.status && user.status.toLowerCase() === "inactive")) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+      status: 401,
+      headers,
+    });
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    }),
+    { status: 200, headers },
+  );
+}

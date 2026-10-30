@@ -24,7 +24,7 @@ import bcrypt from "bcryptjs";
 
 import { prisma, PrismaJobRecord } from "@/lib/prisma";
 import { MobileJobStatus } from "./mobile-data";
-import { handleLoginRequest } from "./auth-handler";
+import { handleLoginRequest, handleSessionRequest } from "./auth-handler";
 import {
   getAllIncentiveSchemes,
   createIncentiveScheme,
@@ -243,6 +243,10 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     // 0. /api/auth/login or /api/login — Secure Authentication Endpoint
     if ((path === "/api/auth/login" || path === "/api/login") && method === "POST") {
       return await handleLoginRequest(request);
+    }
+
+    if (path === "/api/auth/session" && (method === "GET" || method === "POST")) {
+      return await handleSessionRequest(request);
     }
 
     // 1. /api/sync — Synchronization endpoint for Dexie.js offline records to PostgreSQL
