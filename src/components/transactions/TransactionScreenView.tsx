@@ -22,11 +22,7 @@ import { TransactionField } from "./TransactionField";
 import { TransactionAuditModal } from "./TransactionAuditModal";
 import { TransactionExportModal } from "./TransactionExportModal";
 import { AddPartModal } from "@/components/common/AddPartModal";
-import {
-  saveFormData,
-  loadSavedTabData,
-  saveTabData,
-} from "@/data/sparePartsCatalog";
+import { saveFormData, loadSavedTabData, saveTabData } from "@/data/sparePartsCatalog";
 import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
 
 interface TransactionScreenViewProps {
@@ -77,7 +73,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         freshRecord[f.key] = "No";
       } else if (f.key === "version" || f.key === "proposals" || f.key === "visitsPerYear") {
         freshRecord[f.key] = 1;
-      } else if (f.key === "rescheduleCount" || f.key === "daysHeld" || f.key === "toleranceVariance") {
+      } else if (
+        f.key === "rescheduleCount" ||
+        f.key === "daysHeld" ||
+        f.key === "toleranceVariance"
+      ) {
         freshRecord[f.key] = 0;
       } else if (f.key === "totalScore") {
         freshRecord[f.key] = 94;
@@ -94,18 +94,15 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           targetScreen: string;
           data: Record<string, unknown>;
         };
-        if (
-          parsed.targetScreen === currentMeta.id ||
-          parsed.targetScreen === currentMeta.code
-        ) {
+        if (parsed.targetScreen === currentMeta.id || parsed.targetScreen === currentMeta.code) {
           sessionStorage.removeItem(HANDOFF_STORAGE_KEY);
           return {
             ...freshRecord,
             ...parsed.data,
-            [cfg.primaryField]:
-              currentMeta.fields.find((fl) => fl.key === cfg.primaryField)?.readOnly
-                ? generatedNo
-                : parsed.data[cfg.primaryField] || freshRecord[cfg.primaryField],
+            [cfg.primaryField]: currentMeta.fields.find((fl) => fl.key === cfg.primaryField)
+              ?.readOnly
+              ? generatedNo
+              : parsed.data[cfg.primaryField] || freshRecord[cfg.primaryField],
             recordNo: generatedNo,
           };
         }
@@ -118,9 +115,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   };
 
   // Form data state: always start fresh on page load/refresh (or from cross-screen handoff)
-  const [formData, setFormData] = useState<Record<string, unknown>>(() =>
-    createFreshRecord(meta),
-  );
+  const [formData, setFormData] = useState<Record<string, unknown>>(() => createFreshRecord(meta));
 
   const [activeTabId, setActiveTabId] = useState<string>("saved-requests");
   const [isAuditOpen, setIsAuditOpen] = useState(false);
@@ -147,7 +142,13 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     }>;
     contacts: Array<string | { label: string; contactName?: string; customerCode?: string | null }>;
     sites: Array<
-      string | { label: string; siteName?: string; customerCode?: string | null; customerId?: number | null }
+      | string
+      | {
+          label: string;
+          siteName?: string;
+          customerCode?: string | null;
+          customerId?: number | null;
+        }
     >;
     technicians: string[];
     equipment: Array<
@@ -386,7 +387,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       }
 
       // 3. When Service Request (requestNo) is selected (e.g. on TRX-02) -> auto-fill Customer, Site, Equipment, Priority
-      if (key === "requestNo" && strVal && !meta.fields.find((f) => f.key === "requestNo")?.readOnly) {
+      if (
+        key === "requestNo" &&
+        strVal &&
+        !meta.fields.find((f) => f.key === "requestNo")?.readOnly
+      ) {
         const cleanReq = strVal.split("—")[0]?.trim() || strVal;
         const matchedSr = masterOptions.serviceRequests.find(
           (sr) => sr.requestNo === cleanReq || sr.label === strVal,
@@ -401,7 +406,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           if (matchedSr.priority) next["priority"] = matchedSr.priority;
           if (matchedSr.entitlement) next["entitlement"] = matchedSr.entitlement;
           if (meta.fields.some((f) => f.key === "slaDue")) {
-            next["slaDue"] = `${new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ")} (4h Response)`;
+            next["slaDue"] =
+              `${new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ")} (4h Response)`;
           }
         }
       }
@@ -454,9 +460,12 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         if (matchedPrj) {
           if (meta.fields.some((f) => f.key === "name")) next["name"] = matchedPrj.projectName;
           if (meta.fields.some((f) => f.key === "customer")) next["customer"] = matchedPrj.customer;
-          if (meta.fields.some((f) => f.key === "budgetLkr")) next["budgetLkr"] = matchedPrj.budgetLkr;
-          if (meta.fields.some((f) => f.key === "actualLkr")) next["actualLkr"] = matchedPrj.actualLkr;
-          if (meta.fields.some((f) => f.key === "committedLkr")) next["committedLkr"] = matchedPrj.committedLkr;
+          if (meta.fields.some((f) => f.key === "budgetLkr"))
+            next["budgetLkr"] = matchedPrj.budgetLkr;
+          if (meta.fields.some((f) => f.key === "actualLkr"))
+            next["actualLkr"] = matchedPrj.actualLkr;
+          if (meta.fields.some((f) => f.key === "committedLkr"))
+            next["committedLkr"] = matchedPrj.committedLkr;
         }
       }
 
@@ -502,7 +511,10 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         const dIn = new Date(String(next["inDate"] || ""));
         const dOut = new Date(String(next["outDate"] || new Date().toISOString().split("T")[0]));
         if (!Number.isNaN(dIn.getTime()) && !Number.isNaN(dOut.getTime())) {
-          const diff = Math.max(0, Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 3600 * 24)));
+          const diff = Math.max(
+            0,
+            Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 3600 * 24)),
+          );
           next["daysHeld"] = diff;
         }
       }
@@ -565,9 +577,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         "",
     );
     if (
-      !window.confirm(
-        `Are you sure you want to delete record "${recId}" from PostgreSQL database?`,
-      )
+      !window.confirm(`Are you sure you want to delete record "${recId}" from PostgreSQL database?`)
     ) {
       return;
     }
@@ -629,7 +639,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   };
 
   // Save full transaction to PostgreSQL (with optional status override)
-  const handleSaveTransaction = async (statusOverride?: string): Promise<Record<string, unknown> | null> => {
+  const handleSaveTransaction = async (
+    statusOverride?: string,
+  ): Promise<Record<string, unknown> | null> => {
     setIsSaving(true);
     const effectiveFormData: Record<string, unknown> = {
       ...formData,
@@ -677,9 +689,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         const savedRec = (json.record || json.request || payload) as Record<string, unknown>;
         const now = new Date().toLocaleTimeString();
         setLastSavedTime(now);
-        showToast(
-          `${meta.code} Record "${recordId}" successfully saved to PostgreSQL database!`,
-        );
+        showToast(`${meta.code} Record "${recordId}" successfully saved to PostgreSQL database!`);
         await fetchSavedRecords();
         await fetchMasterOptions();
         setIsSaving(false);
@@ -696,7 +706,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
   };
 
   // Helper to hand off context to another transaction screen and navigate
-  const handoffAndNavigate = (targetScreenId: string, contextData: Record<string, unknown>, msg: string) => {
+  const handoffAndNavigate = (
+    targetScreenId: string,
+    contextData: Record<string, unknown>,
+    msg: string,
+  ) => {
     try {
       sessionStorage.setItem(
         HANDOFF_STORAGE_KEY,
@@ -904,7 +918,11 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       await handleSaveTransaction("Submitted");
       return;
     }
-    if (action.includes("Approve") || action.includes("Activate") || action.includes("Commission")) {
+    if (
+      action.includes("Approve") ||
+      action.includes("Activate") ||
+      action.includes("Commission")
+    ) {
       await handleSaveTransaction("Approved");
       return;
     }
@@ -920,7 +938,12 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       await handleSaveTransaction("Closed");
       return;
     }
-    if (action.includes("Cancel") || action.includes("Terminate") || action.includes("Reject") || action.includes("Revoke")) {
+    if (
+      action.includes("Cancel") ||
+      action.includes("Terminate") ||
+      action.includes("Reject") ||
+      action.includes("Revoke")
+    ) {
       if (!window.confirm(`Are you sure you want to execute "${action}" on this record?`)) {
         return;
       }
@@ -940,7 +963,9 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
   // Resolve dropdown options for ANY field across all 35 screens from PostgreSQL masterOptions
   const getFieldDropdownOptions = (fieldKey: string): string[] | undefined => {
-    const selectedCustStr = String(formData["customer"] || "").trim().toLowerCase();
+    const selectedCustStr = String(formData["customer"] || "")
+      .trim()
+      .toLowerCase();
 
     if (fieldKey === "customer") {
       return masterOptions.customers;
@@ -978,8 +1003,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           const cName = (e.customerName || "").toLowerCase();
           const cCode = (e.customerCode || "").toLowerCase();
           return (
-            (cName && selectedCustStr.includes(cName)) ||
-            (cCode && selectedCustStr.includes(cCode))
+            (cName && selectedCustStr.includes(cName)) || (cCode && selectedCustStr.includes(cCode))
           );
         });
         return (matched.length > 0 ? matched : allEquip).map((m) => m.label);
@@ -992,8 +1016,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
           const cName = (s.customerName || "").toLowerCase();
           const cCode = (s.customerCode || "").toLowerCase();
           return (
-            (cName && selectedCustStr.includes(cName)) ||
-            (cCode && selectedCustStr.includes(cCode))
+            (cName && selectedCustStr.includes(cName)) || (cCode && selectedCustStr.includes(cCode))
           );
         });
         return (matched.length > 0 ? matched : masterOptions.systems).map((s) => s.label);
@@ -1010,7 +1033,12 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     ) {
       return masterOptions.technicians;
     }
-    if (fieldKey === "serial" || fieldKey === "oldSerial" || fieldKey === "newSerial" || fieldKey === "unitSerial") {
+    if (
+      fieldKey === "serial" ||
+      fieldKey === "oldSerial" ||
+      fieldKey === "newSerial" ||
+      fieldKey === "unitSerial"
+    ) {
       return masterOptions.serials;
     }
     if (fieldKey === "item") {
@@ -1084,9 +1112,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
   // Dynamic columns for the Saved Records Directory table based on the active screen's fields
   const directoryColumns = useMemo(() => {
-    const cols = meta.fields
-      .filter((f) => f.key !== "status" && f.key !== "signature")
-      .slice(0, 4);
+    const cols = meta.fields.filter((f) => f.key !== "status" && f.key !== "signature").slice(0, 4);
     return cols;
   }, [meta.fields]);
 
@@ -1126,12 +1152,6 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">
-                  {meta.code}
-                </span>
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  API: {processConfig.apiPath}
-                </span>
                 {lastSavedTime && (
                   <span className="text-[11px] text-muted-foreground font-mono">
                     · Saved at {lastSavedTime}
@@ -1226,12 +1246,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       <div className="bg-card border border-border p-5 sm:p-6 rounded-xl shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b pb-3 border-border">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-bold text-foreground">
-              Transaction Header Information
-            </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-              Ref: {String(formData[processConfig.primaryField] || formData["recordNo"] || "NEW")}
-            </span>
+            <h2 className="text-sm font-bold text-foreground">Transaction Header Information</h2>
           </div>
           <span className="text-xs font-mono text-muted-foreground">
             Current Status:{" "}
@@ -1270,9 +1285,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() =>
-                    handleSaveTransaction("Auto-Suggested (BCR-20)")
-                  }
+                  onClick={() => handleSaveTransaction("Auto-Suggested (BCR-20)")}
                   className="px-2.5 py-1 text-xs rounded bg-card border border-border hover:bg-muted font-medium text-foreground cursor-pointer"
                 >
                   Auto-suggest
@@ -1286,7 +1299,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Select branch, team, and service type above and click Save Record or Confirm Appointments to persist dispatch schedule to PostgreSQL.
+              Select branch, team, and service type above and click Save Record or Confirm
+              Appointments to persist dispatch schedule to PostgreSQL.
             </p>
           </div>
         )}
@@ -1444,10 +1458,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <span>Saved {meta.name} Records</span>
-                  <span className="text-xs font-mono text-muted-foreground font-normal">
-                    ({filteredSavedRecords.length} of {savedRecords.length} records in PostgreSQL)
-                  </span>
+                  <span>Saved Records</span>
                 </h3>
               </div>
 
@@ -1491,7 +1502,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                           No saved records found for {meta.name}.
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Enter details in the form above and click &ldquo;Save Record&rdquo; to store in PostgreSQL.
+                          Enter details in the form above and click &ldquo;Save Record&rdquo; to
+                          store in PostgreSQL.
                         </p>
                       </td>
                     </tr>
@@ -1615,7 +1627,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                         colSpan={activeTab.columns.length + 1}
                         className="p-6 text-center text-muted-foreground"
                       >
-                        No entries in {activeTab.label}. Click &ldquo;Add Line / Entry&rdquo; to add one.
+                        No entries in {activeTab.label}. Click &ldquo;Add Line / Entry&rdquo; to add
+                        one.
                       </td>
                     </tr>
                   ) : (
@@ -1697,7 +1710,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                 <div>
                   <h3 className="text-sm font-bold text-foreground">Link Payment Reference</h3>
                   <p className="text-[11px] text-muted-foreground font-mono">
-                    {String(formData["requestNo"] || formData["recordNo"] || "Service Request")} · Ready for SAP B1 Integration
+                    {String(formData["requestNo"] || formData["recordNo"] || "Service Request")} ·
+                    Ready for SAP B1 Integration
                   </p>
                 </div>
               </div>
