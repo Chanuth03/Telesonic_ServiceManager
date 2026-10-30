@@ -14,6 +14,7 @@ import {
   getOfflineAuthSession,
   clearOfflineAuthSession,
 } from "@/lib/offline-db";
+import { isUsableJwt } from "@/lib/app-initializer";
 
 export type UserRole = string;
 
@@ -76,7 +77,7 @@ function getInitialAuthState(isVitest: boolean): {
   try {
     const sessionUserRaw = sessionStorage.getItem("auth_user");
     const sessionToken = sessionStorage.getItem("auth_token");
-    if (sessionUserRaw && sessionToken) {
+    if (sessionUserRaw && isUsableJwt(sessionToken)) {
       const parsed = JSON.parse(sessionUserRaw) as UserProfile;
       if (parsed && parsed.name) {
         return {
@@ -91,7 +92,7 @@ function getInitialAuthState(isVitest: boolean): {
     const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
     const localUserRaw = localStorage.getItem("auth_user");
     const localToken = localStorage.getItem("auth_token");
-    if (isRemembered && localUserRaw && localToken) {
+    if (isRemembered && localUserRaw && isUsableJwt(localToken)) {
       const parsed = JSON.parse(localUserRaw) as UserProfile;
       if (parsed && parsed.name) {
         sessionStorage.setItem("auth_user", localUserRaw);
@@ -138,7 +139,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         // 1. Check active tab sessionStorage first
         const sessionUserRaw = sessionStorage.getItem("auth_user");
         const sessionToken = sessionStorage.getItem("auth_token");
-        if (sessionUserRaw && sessionToken) {
+        if (sessionUserRaw && isUsableJwt(sessionToken)) {
           const parsed = JSON.parse(sessionUserRaw) as UserProfile;
           if (parsed && parsed.name && !cancelled) {
             setCurrentUser(parsed);
@@ -155,7 +156,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         const localUserRaw = localStorage.getItem("auth_user");
         const localToken = localStorage.getItem("auth_token");
 
-        if (isRemembered && localUserRaw && localToken) {
+        if (isRemembered && localUserRaw && isUsableJwt(localToken)) {
           const parsed = JSON.parse(localUserRaw) as UserProfile;
           if (parsed && parsed.name && !cancelled) {
             sessionStorage.setItem("auth_user", localUserRaw);
@@ -178,7 +179,13 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
         // 3. Check Dexie.js offlineMeta for Mobile PWA offline auto-login
         const dexieSession = await getOfflineAuthSession();
-        if (dexieSession && dexieSession.rememberMe && dexieSession.user && !cancelled) {
+        if (
+          dexieSession &&
+          dexieSession.rememberMe &&
+          dexieSession.user &&
+          isUsableJwt(dexieSession.token) &&
+          !cancelled
+        ) {
           const parsed = dexieSession.user as unknown as UserProfile;
           if (parsed && parsed.name) {
             const userJson = JSON.stringify(parsed);

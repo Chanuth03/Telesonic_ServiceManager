@@ -122,7 +122,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");if(rem&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
+            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");var token=localStorage.getItem("auth_token")||"";var jwtOk=false;try{var parts=token.split(".");if(parts.length===3){var b64=parts[1].replace(/-/g,"+").replace(/_/g,"/");while(b64.length%4)b64+="=";var body=JSON.parse(atob(b64));jwtOk=!body.exp||body.exp*1000>Date.now();}}catch(err){jwtOk=false;}if(navigator.onLine===false&&rem&&jwtOk&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
           }}
         />
         <HeadContent />

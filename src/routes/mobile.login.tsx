@@ -13,30 +13,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRole } from "@/context/RoleContext";
 import { apiFetch } from "@/lib/api-client";
+import { readStoredTechnicianSession } from "@/lib/app-initializer";
+import { isOfflineForTransactions } from "@/lib/offline-db";
 import { refreshMobileJobsFromServer } from "@/lib/mobile-offline-bridge";
 
-function hasSavedBrowserSession(): boolean {
+function hasOfflineBypassSession(): boolean {
   if (typeof window === "undefined") return false;
-  try {
-    if (sessionStorage.getItem("auth_user") && sessionStorage.getItem("auth_token")) {
-      return true;
-    }
-    if (
-      localStorage.getItem("telesonic_remember_session") === "true" &&
-      localStorage.getItem("auth_user") &&
-      localStorage.getItem("auth_token")
-    ) {
-      return true;
-    }
-  } catch {
-    // ignore
-  }
-  return false;
+  if (!isOfflineForTransactions()) return false;
+  return readStoredTechnicianSession() != null;
 }
 
 export const Route = createFileRoute("/mobile/login")({
   beforeLoad: () => {
-    if (hasSavedBrowserSession()) {
+    if (hasOfflineBypassSession()) {
       throw redirect({ to: "/mobile", replace: true });
     }
   },
@@ -75,7 +64,7 @@ function MobileLoginPage() {
     }
   }, [authReady, isAuthenticated, navigate]);
 
-  if (!authReady || isAuthenticated || hasSavedBrowserSession()) {
+  if (!authReady || isAuthenticated) {
     return null;
   }
 
