@@ -1,26 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   Navigation,
   MapPin,
-  Clock,
   Gauge,
   CheckCircle2,
   FileText,
   AlertCircle,
   ShieldCheck,
-  Phone,
-  Compass,
   Bell,
   RefreshCw,
   AlertTriangle,
   RotateCcw,
-  Wifi,
-  Database,
   Radio,
   Check,
   Zap,
+  ExternalLink,
 } from "lucide-react";
 import {
   getMobileJobById,
@@ -45,6 +41,18 @@ export const Route = createFileRoute("/mobile/jobs/$jobId/travel")({
   component: MobileTravelCheckInScreen,
 });
 
+function isLegacyMockGps(coordStr?: string): boolean {
+  if (!coordStr) return true;
+  // Filter out the old hardcoded mock coordinate 6.9821° N, 79.9312° E
+  return coordStr.startsWith("6.98") && coordStr.includes("79.93");
+}
+
+function formatLatLng(lat: number, lng: number): string {
+  const latDir = lat >= 0 ? "N" : "S";
+  const lngDir = lng >= 0 ? "E" : "W";
+  return `${Math.abs(lat).toFixed(6)}° ${latDir}, ${Math.abs(lng).toFixed(6)}° ${lngDir}`;
+}
+
 function MobileTravelCheckInScreen() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
@@ -56,20 +64,31 @@ function MobileTravelCheckInScreen() {
     job?.travel?.status || "Not Started",
   );
 
-  const [startOdometer, setStartOdometer] = useState<number>(job?.travel?.startOdometer || 142580);
-  const [endOdometer, setEndOdometer] = useState<number>(
-    job?.travel?.endOdometer || (job?.travel?.startOdometer || 142580) + 18,
+  const [startOdometer, setStartOdometer] = useState<number | undefined>(
+    job?.travel?.startOdometer,
+  );
+  const [endOdometer, setEndOdometer] = useState<number | undefined>(
+    job?.travel?.endOdometer,
   );
   const [travelStartTime, setTravelStartTime] = useState<string>(
     job?.travel?.travelStartTime || "",
   );
   const [arrivalTime, setArrivalTime] = useState<string>(job?.travel?.arrivalTime || "");
-  const [gpsCoordinates, setGpsCoordinates] = useState<string | undefined>(
-    job?.travel?.gpsCoordinates || "6.9821° N, 79.9312° E",
-  );
+
+  const initialGps =
+    job?.travel?.gpsCoordinates && !isLegacyMockGps(job.travel.gpsCoordinates)
+      ? job.travel.gpsCoordinates
+      : undefined;
+
+  const [gpsCoordinates, setGpsCoordinates] = useState<string | undefined>(initialGps);
   const [gpsAccuracy, setGpsAccuracy] = useState<string | undefined>(
-    job?.travel?.gpsAccuracy || "±4m",
+    initialGps ? job?.travel?.gpsAccuracy : undefined,
   );
+  const [rawLatLng, setRawLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [detectedAddress, setDetectedAddress] = useState<string | null>(null);
+  const [isAcquiringGps, setIsAcquiringGps] = useState<boolean>(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
   const [customerNotified, setCustomerNotified] = useState<boolean>(
     job?.travel?.customerNotified || false,
   );
@@ -83,10 +102,126 @@ function MobileTravelCheckInScreen() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [simulatedBanner, setSimulatedBanner] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   const idempotencyKey =
     job?.travel?.idempotencyKey ||
     `IDEMP-TRV-${(job?.id || "001").replace(/[^A-Z0-9]/gi, "")}-987123`;
+
+  // Reverse geocode coordinates when online so technician can see the exact detected street/place name
+  const reverseGeocodeLocation = useCallback(async (lat: number, lng: number) => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.display_name) {
+          setDetectedAddress(String(data.display_name));
+        }
+      }
+    } catch {
+      // Offline or reverse geocode unavailable — coordinates still work 100%
+    }
+  }, []);
+
+  // Acquire 100% real device location using navigator.geolocation
+  const acquireRealDeviceGPS = useCallback(
+    (showToast: boolean = true): Promise<{ coords: string; acc: string } | null> => {
+      return new Promise((resolve) => {
+        if (typeof window === "undefined" || !("geolocation" in navigator)) {
+          const msg = "Geolocation is not supported by this browser/device.";
+          setGpsError(msg);
+          resolve(null);
+          return;
+        }
+
+        setIsAcquiringGps(true);
+        setGpsError(null);
+
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        }
+
+        const handleSuccess = (position: GeolocationPosition) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracyMeters = Math.max(1, Math.round(position.coords.accuracy || 5));
+
+          const coords = formatLatLng(lat, lng);
+          const acc = `±${accuracyMeters}m`;
+
+          setRawLatLng({ lat, lng });
+          setGpsCoordinates(coords);
+          setGpsAccuracy(acc);
+          setIsAcquiringGps(false);
+          setGpsError(null);
+
+          updateMobileJobTravel(jobId, {
+            gpsCoordinates: coords,
+            gpsAccuracy: acc,
+          });
+
+          void reverseGeocodeLocation(lat, lng);
+
+          if (showToast) {
+            setFeedback(`Live Device GPS Locked: ${coords} (${acc})`);
+            setTimeout(() => setFeedback(null), 4000);
+          }
+
+          resolve({ coords, acc });
+        };
+
+        const handleError = (err: GeolocationPositionError) => {
+          setIsAcquiringGps(false);
+          let errMsg = "Unable to retrieve your location.";
+          if (err.code === err.PERMISSION_DENIED) {
+            errMsg =
+              "Location permission denied. Please allow Location access in your browser/device settings.";
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            errMsg = "Location information is unavailable. Please turn on device GPS / Location.";
+          } else if (err.code === err.TIMEOUT) {
+            errMsg = "GPS lock timed out. Please move to an area with clear signal and retry.";
+          }
+          setGpsError(errMsg);
+          resolve(null);
+        };
+
+        // First try high-accuracy hardware GPS with 0 cache (fresh reading)
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          (highAccErr) => {
+            // If high accuracy times out (e.g. indoor desktop), fallback to network/Wi-Fi geolocation
+            if (
+              highAccErr.code === highAccErr.TIMEOUT ||
+              highAccErr.code === highAccErr.POSITION_UNAVAILABLE
+            ) {
+              navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 0,
+              });
+            } else {
+              handleError(highAccErr);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          },
+        );
+      });
+    },
+    [jobId, reverseGeocodeLocation],
+  );
 
   // Subscribe to store updates
   useEffect(() => {
@@ -94,13 +229,14 @@ function MobileTravelCheckInScreen() {
     setJob(current);
     if (current?.travel) {
       setTravelStatus(current.travel.status || "Not Started");
-      if (current.travel.startOdometer !== undefined)
-        setStartOdometer(current.travel.startOdometer);
-      if (current.travel.endOdometer !== undefined) setEndOdometer(current.travel.endOdometer);
+      setStartOdometer(current.travel.startOdometer);
+      setEndOdometer(current.travel.endOdometer);
       if (current.travel.travelStartTime) setTravelStartTime(current.travel.travelStartTime);
       if (current.travel.arrivalTime) setArrivalTime(current.travel.arrivalTime);
-      if (current.travel.gpsCoordinates) setGpsCoordinates(current.travel.gpsCoordinates);
-      if (current.travel.gpsAccuracy) setGpsAccuracy(current.travel.gpsAccuracy);
+      if (current.travel.gpsCoordinates && !isLegacyMockGps(current.travel.gpsCoordinates)) {
+        setGpsCoordinates(current.travel.gpsCoordinates);
+        if (current.travel.gpsAccuracy) setGpsAccuracy(current.travel.gpsAccuracy);
+      }
       if (current.travel.customerNotified) setCustomerNotified(current.travel.customerNotified);
       if (current.travel.customerNotifiedAt)
         setCustomerNotifiedAt(current.travel.customerNotifiedAt);
@@ -117,6 +253,20 @@ function MobileTravelCheckInScreen() {
     });
   }, [jobId]);
 
+  // Automatically acquire real device GPS on mount
+  useEffect(() => {
+    void acquireRealDeviceGPS(false);
+    return () => {
+      if (
+        watchIdRef.current !== null &&
+        typeof navigator !== "undefined" &&
+        "geolocation" in navigator
+      ) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, [acquireRealDeviceGPS]);
+
   if (!job) {
     return (
       <div className="p-4 text-center space-y-3">
@@ -129,8 +279,12 @@ function MobileTravelCheckInScreen() {
     );
   }
 
-  const distanceTraveled = Math.max(0, endOdometer - startOdometer);
-  const isOdometerInvalid = endOdometer < startOdometer;
+  const distanceTraveled =
+    startOdometer !== undefined && endOdometer !== undefined
+      ? Math.max(0, endOdometer - startOdometer)
+      : 0;
+  const isOdometerInvalid =
+    startOdometer !== undefined && endOdometer !== undefined && endOdometer < startOdometer;
 
   // Handler: Start Travel
   const handleStartTravel = () => {
@@ -156,61 +310,23 @@ function MobileTravelCheckInScreen() {
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  // Handler: GPS Capture
+  // Handler: GPS Capture Button
   const handleRecordGPS = () => {
-    const lat = (6.9821 + (Math.random() - 0.5) * 0.01).toFixed(4);
-    const lng = (79.9312 + (Math.random() - 0.5) * 0.01).toFixed(4);
-    const coords = `${lat}° N, ${lng}° E`;
-    const acc = `±${Math.floor(Math.random() * 3 + 3)}m`;
-
-    setGpsCoordinates(coords);
-    setGpsAccuracy(acc);
-
-    updateMobileJobTravel(job.id, {
-      gpsCoordinates: coords,
-      gpsAccuracy: acc,
-    });
-
-    setFeedback(`GPS sensor locked: ${coords} (${acc}) · Geofence verified`);
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  // Handler: Customer Notification Simulation
-  const handleNotifyCustomer = () => {
-    const nowStr = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    setCustomerNotified(true);
-    setCustomerNotifiedAt(nowStr);
-
-    updateMobileJobTravel(job.id, {
-      customerNotified: true,
-      customerNotifiedAt: nowStr,
-    });
-
-    setSimulatedBanner(
-      `⚡ Customer SMS / WhatsApp Alert sent to ${job.customerName} (${job.customerContact || "Contact Person"}). [Simulated]`,
-    );
-    setTimeout(() => setSimulatedBanner(null), 5000);
+    void acquireRealDeviceGPS(true);
   };
 
   // Handler: Site Check-in
-  const handleSiteArrival = () => {
+  const handleSiteArrival = async () => {
     const nowStr = new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
     });
 
-    let currentGps = gpsCoordinates;
-    let currentAcc = gpsAccuracy;
-    if (!currentGps) {
-      currentGps = "6.9821° N, 79.9312° E";
-      currentAcc = "±4m";
-      setGpsCoordinates(currentGps);
-      setGpsAccuracy(currentAcc);
-    }
+    // Always acquire fresh real GPS on site arrival check-in
+    const freshGps = await acquireRealDeviceGPS(false);
+    const currentGps = freshGps?.coords || gpsCoordinates;
+    const currentAcc = freshGps?.acc || gpsAccuracy;
 
     setTravelStatus("Arrived");
     setArrivalTime(nowStr);
@@ -230,29 +346,9 @@ function MobileTravelCheckInScreen() {
     setFeedback(`Site arrival checked in at ${nowStr}. Job status updated to 'In Progress'.`);
   };
 
-  // Handler: Save & Return
-  const handleSaveDraft = () => {
-    updateMobileJobTravel(job.id, {
-      status: travelStatus,
-      startOdometer,
-      endOdometer,
-      travelStartTime,
-      arrivalTime,
-      gpsCoordinates,
-      gpsAccuracy,
-      customerNotified,
-      customerNotifiedAt,
-      trafficCondition,
-      travelNotes,
-      idempotencyKey,
-    });
-    setFeedback("Draft saved locally to offline queue.");
-    setTimeout(() => setFeedback(null), 3000);
-  };
-
-  const handleCompleteAndReturn = () => {
+  const handleCompleteAndReturn = async () => {
     if (travelStatus !== "Arrived") {
-      handleSiteArrival();
+      await handleSiteArrival();
     } else {
       updateMobileJobTravel(job.id, {
         status: "Arrived",
@@ -287,27 +383,12 @@ function MobileTravelCheckInScreen() {
           <span className="font-mono text-xs font-bold text-primary bg-primary-soft px-2 py-0.5 rounded border border-primary/20">
             {job.id}
           </span>
-          <p className="text-[10px] font-mono text-muted-foreground mt-0.5">O1-SCR-MOB-04</p>
-        </div>
-      </div>
-
-      {/* Offline Sync Banner & Idempotency Key */}
-      <div className="flex items-center justify-between bg-muted/70 px-3 py-1.5 rounded-lg border text-[11px] text-muted-foreground">
-        <div className="flex items-center gap-1.5 font-medium text-foreground">
-          <Wifi size={13} className="text-emerald-500 shrink-0" />
-          <span>Offline Queue Ready</span>
-        </div>
-        <div
-          className="font-mono text-[10px] text-muted-foreground truncate max-w-[170px]"
-          title={idempotencyKey}
-        >
-          Key: <span className="text-foreground font-semibold">{idempotencyKey}</span>
         </div>
       </div>
 
       {/* Main Job Context Header Card */}
-      <div className="card-surface p-3.5 space-y-3 border shadow-xs">
-        <div className="flex items-start justify-between gap-2 border-b pb-2.5">
+      <div className="card-surface p-3.5 space-y-3 shadow-xs">
+        <div className="flex items-start justify-between gap-2 pb-2.5">
           <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-2">
               <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground shrink-0 font-bold text-xs shadow-2xs">
@@ -341,45 +422,9 @@ function MobileTravelCheckInScreen() {
                   : "Not Started"}
             </span>
             <span className="text-[10px] font-mono text-muted-foreground bg-muted/80 px-1.5 py-0.5 rounded border">
-              Window: {job.scheduledWindow || "09:00 - 11:00"}
+              Window: {job.scheduledWindow || job.window}
             </span>
           </div>
-        </div>
-
-        {/* Quick Contacts */}
-        <div className="flex items-center justify-between text-xs pt-0.5">
-          <div className="text-[11px] text-muted-foreground">
-            Role:{" "}
-            <strong className="text-foreground font-semibold">
-              {job.technicianRole || "Lead Technician"}
-            </strong>
-          </div>
-          {job.customerContact && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setFeedback(`Calling contact: ${job.customerContact}`);
-                  setTimeout(() => setFeedback(null), 3000);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-muted hover:bg-muted/80 text-foreground text-[11px] font-medium border transition-colors"
-              >
-                <Phone size={12} className="text-primary" />
-                <span>Call</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFeedback(`Opening turn-by-turn navigation for ${job.siteAddress}`);
-                  setTimeout(() => setFeedback(null), 3000);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-muted hover:bg-muted/80 text-foreground text-[11px] font-medium border transition-colors"
-              >
-                <Compass size={12} className="text-primary" />
-                <span>Nav</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -428,9 +473,7 @@ function MobileTravelCheckInScreen() {
           ) : (
             <div className="flex items-center justify-between text-xs bg-muted/50 p-2.5 rounded-lg border">
               <span className="text-muted-foreground font-medium">Departure Clock:</span>
-              <span className="font-mono font-bold text-foreground">
-                {travelStartTime || "09:15:22 AM"}
-              </span>
+              <span className="font-mono font-bold text-foreground">{travelStartTime}</span>
             </div>
           )}
 
@@ -446,8 +489,13 @@ function MobileTravelCheckInScreen() {
             <div className="relative">
               <input
                 type="number"
-                value={startOdometer}
-                onChange={(e) => setStartOdometer(Number(e.target.value))}
+                value={startOdometer ?? ""}
+                placeholder="Enter start KM..."
+                onChange={(e) => {
+                  const val = e.target.value === "" ? undefined : Number(e.target.value);
+                  setStartOdometer(val);
+                  updateMobileJobTravel(job.id, { startOdometer: val });
+                }}
                 className="input-field py-2 px-3 text-xs font-mono font-bold w-full pr-12"
               />
               <span className="absolute right-3 top-2.5 text-xs font-bold text-muted-foreground">
@@ -455,24 +503,6 @@ function MobileTravelCheckInScreen() {
               </span>
             </div>
           </div>
-
-          {/* Automated Customer En Route Alert Button */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={`w-full text-xs h-9 border font-semibold transition-colors ${
-              customerNotified
-                ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-200"
-                : "bg-card text-foreground hover:bg-muted"
-            }`}
-            onClick={handleNotifyCustomer}
-          >
-            <Bell size={14} className="mr-2 text-primary" />
-            {customerNotified
-              ? `✓ Alert Sent at ${customerNotifiedAt || "09:15 AM"} [Simulated]`
-              : "Send 'On The Way' Alert to Customer (SMS / WhatsApp)"}
-          </Button>
         </div>
       </div>
 
@@ -504,8 +534,13 @@ function MobileTravelCheckInScreen() {
               <div className="relative">
                 <input
                   type="number"
-                  value={endOdometer}
-                  onChange={(e) => setEndOdometer(Number(e.target.value))}
+                  value={endOdometer ?? ""}
+                  placeholder="Enter arrival KM..."
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? undefined : Number(e.target.value);
+                    setEndOdometer(val);
+                    updateMobileJobTravel(job.id, { endOdometer: val });
+                  }}
                   className="input-field py-1.5 px-2.5 text-xs font-mono font-bold w-full pr-10"
                 />
                 <span className="absolute right-2.5 top-2 text-[11px] font-bold text-muted-foreground">
@@ -537,41 +572,76 @@ function MobileTravelCheckInScreen() {
             <div className="flex items-center justify-between">
               <span className="font-bold text-foreground flex items-center gap-1.5">
                 <MapPin size={14} className="text-primary" />
-                Device GPS Validation
+                Live Device GPS Sensor
               </span>
               <span className="text-[10px] font-mono bg-card px-1.5 py-0.5 rounded border text-muted-foreground">
-                Accuracy: {gpsAccuracy || "±4m"}
+                Accuracy: {gpsAccuracy || (isAcquiringGps ? "Locating..." : "Pending")}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-card p-2 rounded border font-mono text-xs font-bold text-foreground truncate">
-                {gpsCoordinates || "Click Acquire GPS"}
+                {isAcquiringGps
+                  ? "Acquiring real device GPS..."
+                  : gpsCoordinates || "Click Acquire GPS"}
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                disabled={isAcquiringGps}
                 className="h-8 text-[11px] shrink-0 bg-card font-semibold"
                 onClick={handleRecordGPS}
               >
-                <RefreshCw size={12} className="mr-1 text-primary" />
-                {gpsCoordinates ? "Refresh GPS" : "Acquire GPS"}
+                <RefreshCw
+                  size={12}
+                  className={`mr-1 text-primary ${isAcquiringGps ? "animate-spin" : ""}`}
+                />
+                {isAcquiringGps ? "Locating..." : gpsCoordinates ? "Refresh GPS" : "Acquire GPS"}
               </Button>
             </div>
 
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 p-1.5 rounded border border-emerald-200">
-              <Check size={12} className="text-emerald-600 shrink-0" />
-              <span>Geofence Verified: Within 50m of Customer Site</span>
-            </div>
+            {detectedAddress && (
+              <div className="text-[11px] text-muted-foreground bg-card/80 p-2 rounded border border-border/50 leading-snug">
+                <strong className="text-foreground">Detected Location:</strong> {detectedAddress}
+              </div>
+            )}
+
+            {rawLatLng && (
+              <div className="flex items-center justify-between">
+                <a
+                  href={`https://www.google.com/maps?q=${rawLatLng.lat},${rawLatLng.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                >
+                  <ExternalLink size={12} />
+                  <span>Verify Current Location on Google Maps</span>
+                </a>
+              </div>
+            )}
+
+            {gpsError && (
+              <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive-soft p-2 rounded border border-destructive/30">
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>{gpsError}</span>
+              </div>
+            )}
+
+            {gpsCoordinates && !gpsError && (
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 p-1.5 rounded border border-emerald-200">
+                <Check size={12} className="text-emerald-600 shrink-0" />
+                <span>Live Hardware Geolocation Locked ({gpsAccuracy || "High Accuracy"})</span>
+              </div>
+            )}
           </div>
 
           {/* Site Arrival Confirm Button */}
           {travelStatus !== "Arrived" ? (
             <Button
               className="w-full text-xs font-bold h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              disabled={isOdometerInvalid}
-              onClick={handleSiteArrival}
+              disabled={isOdometerInvalid || isAcquiringGps}
+              onClick={() => void handleSiteArrival()}
             >
               <CheckCircle2 size={16} className="mr-2" />
               Confirm Site Arrival & Check-In
@@ -588,8 +658,8 @@ function MobileTravelCheckInScreen() {
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Arrival: <strong className="text-foreground">{arrivalTime || "09:42:10 AM"}</strong>{" "}
-                · GPS: <strong className="text-foreground">{gpsCoordinates}</strong>
+                Arrival: <strong className="text-foreground">{arrivalTime || "Logged"}</strong> ·
+                GPS: <strong className="text-foreground">{gpsCoordinates || "Captured"}</strong>
               </p>
               <div className="pt-0.5 flex justify-end">
                 <Button
@@ -633,7 +703,10 @@ function MobileTravelCheckInScreen() {
               <button
                 key={opt}
                 type="button"
-                onClick={() => setTrafficCondition(opt)}
+                onClick={() => {
+                  setTrafficCondition(opt);
+                  updateMobileJobTravel(job.id, { trafficCondition: opt });
+                }}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-medium border text-left transition-colors flex items-center justify-between ${
                   trafficCondition === opt
                     ? "bg-primary text-primary-foreground border-primary font-bold"
@@ -655,39 +728,26 @@ function MobileTravelCheckInScreen() {
           </label>
           <textarea
             value={travelNotes}
-            onChange={(e) => setTravelNotes(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setTravelNotes(val);
+              updateMobileJobTravel(job.id, { travelNotes: val });
+            }}
             placeholder="e.g. Heavy traffic along Kandy Road due to road maintenance; site gate pass obtained."
             className="input-field text-xs min-h-[60px] py-2 px-3 w-full"
           />
         </div>
       </div>
 
-      {/* Main Action Buttons */}
-      <div className="space-y-2 pt-1">
+      {/* Main Action Button */}
+      <div className="pt-1">
         <Button
           className="w-full text-xs font-bold h-11 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-          onClick={handleCompleteAndReturn}
+          onClick={() => void handleCompleteAndReturn()}
         >
           <Zap size={15} className="mr-2" />
           COMPLETE CHECK-IN & START JOB
         </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full text-xs font-semibold h-9 bg-card text-foreground hover:bg-muted"
-          onClick={handleSaveDraft}
-        >
-          <Database size={14} className="mr-2 text-muted-foreground" />
-          Save Draft / Offline Update
-        </Button>
-      </div>
-
-      <div className="p-3 rounded-lg bg-muted/60 border border-border/40 text-center text-[10px] text-muted-foreground space-y-0.5">
-        <p className="font-semibold text-foreground">
-          Option 01 — Telesonic Mobile Travel & Site Check-in
-        </p>
-        <p>Real-time synchronization with Job Detail & Technician Dispatch Board</p>
       </div>
     </div>
   );

@@ -289,11 +289,125 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         };
       };
 
+      const persistRichMobileJobDetails = async (
+        jobId: string,
+        raw: Record<string, unknown>,
+        statusStr: string,
+      ) => {
+        try {
+          const hasExtendedFields =
+            raw["travel"] !== undefined ||
+            raw["parts"] !== undefined ||
+            raw["labourLogs"] !== undefined ||
+            raw["photos"] !== undefined ||
+            raw["inspection"] !== undefined ||
+            raw["holdRequests"] !== undefined ||
+            raw["completion"] !== undefined;
+
+          if (hasExtendedFields) {
+            await prisma
+              .$executeRawUnsafe(
+                `INSERT INTO "transaction_records" ("process_key", "record_no", "customer", "site", "call_no", "status", "data", "updated_at")
+                 VALUES ('mobile-job-details', $1, $2, $3, $1, $4, $5::jsonb, CURRENT_TIMESTAMP)
+                 ON CONFLICT ("process_key", "record_no") DO UPDATE SET
+                   "status" = EXCLUDED."status",
+                   "data" = "transaction_records"."data" || EXCLUDED."data",
+                   "updated_at" = CURRENT_TIMESTAMP`,
+                jobId,
+                String(raw["customerName"] || ""),
+                String(raw["siteAddress"] || raw["town"] || ""),
+                statusStr,
+                JSON.stringify(raw),
+              )
+              .catch(() => {});
+          }
+
+          if (Array.isArray(raw["labourLogs"])) {
+            await prisma.labourLog.deleteMany({ where: { jobId } }).catch(() => {});
+            for (const log of raw["labourLogs"] as Array<Record<string, unknown>>) {
+              await prisma.labourLog
+                .create({
+                  data: {
+                    jobId,
+                    technicianName: String(log["technicianName"] || "Technician"),
+                    date: String(log["date"] || new Date().toISOString().slice(0, 10)),
+                    hours: Number(log["hours"]) || 0,
+                    rateType: String(log["rateType"] || "Regular"),
+                    activityDescription: String(log["activityDescription"] || ""),
+                  },
+                })
+                .catch(() => {});
+            }
+          }
+
+          if (Array.isArray(raw["parts"])) {
+            await prisma.partUsed.deleteMany({ where: { jobId } }).catch(() => {});
+            for (const part of raw["parts"] as Array<Record<string, unknown>>) {
+              await prisma.partUsed
+                .create({
+                  data: {
+                    jobId,
+                    partCode: String(part["partCode"] || part["id"] || "PART"),
+                    name: String(part["name"] || "Spare Part"),
+                    qtyUsed: Number(part["qtyUsed"]) || 1,
+                    unitPrice: Number(part["unitPrice"]) || 0,
+                  },
+                })
+                .catch(() => {});
+            }
+          }
+
+          if (raw["inspection"] && typeof raw["inspection"] === "object") {
+            const insp = raw["inspection"] as Record<string, unknown>;
+            await prisma.inspection.deleteMany({ where: { jobId } }).catch(() => {});
+            await prisma.inspection
+              .create({
+                data: {
+                  jobId,
+                  technicianName: String(insp["technicianName"] || "Technician"),
+                  overallStatus: String(insp["overallStatus"] || "Pass"),
+                  generalNotes: insp["generalNotes"] ? String(insp["generalNotes"]) : null,
+                },
+              })
+              .catch(() => {});
+          }
+
+          if (Array.isArray(raw["holdRequests"])) {
+            await prisma.holdRequest.deleteMany({ where: { jobId } }).catch(() => {});
+            for (const hr of raw["holdRequests"] as Array<Record<string, unknown>>) {
+              await prisma.holdRequest
+                .create({
+                  data: {
+                    jobId,
+                    reason: String(hr["reason"] || "Awaiting Spare Parts"),
+                    notes: String(hr["notes"] || ""),
+                    estimatedDelayHours: Number(hr["estimatedDelayHours"]) || 24,
+                    status: String(hr["status"] || "Submitted"),
+                  },
+                })
+                .catch(() => {});
+            }
+          }
+        } catch {
+          // Non-blocking enrichment
+        }
+      };
+
       // 1. Process queued mutations
       if (body.queueItems && body.queueItems.length > 0) {
         for (const item of body.queueItems) {
           const payloadObj = (item.payload as Record<string, unknown> | undefined) || {};
           if (payloadObj["type"] === "STOCK_COUNT") {
+            await prisma
+              .$executeRawUnsafe(
+                `INSERT INTO "transaction_records" ("process_key", "record_no", "status", "data", "updated_at")
+                 VALUES ('mobile-stock-counts', 'VAN-STOCK', 'Synced', $1::jsonb, CURRENT_TIMESTAMP)
+                 ON CONFLICT ("process_key", "record_no") DO UPDATE SET
+                   "data" = EXCLUDED."data",
+                   "updated_at" = CURRENT_TIMESTAMP`,
+                JSON.stringify(payloadObj),
+              )
+              .catch(() => {});
             if (item.id) processedQueueIds.push(item.id);
             continue;
           }
@@ -312,9 +426,10 @@ export async function handleApiRequest(request: Request): Promise<Response> {
                 syncedAt: new Date(),
               },
             });
+            await persistRichMobileJobDetails(item.entityId, payloadObj, statusStr);
             await prisma
               .$executeRawUnsafe(
-                `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+                `UPDATE "transaction_records" SET "status" = $1, "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{formData,status}', to_jsonb($1::text)), "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
                 statusStr,
                 item.entityId,
               )
@@ -338,9 +453,10 @@ export async function handleApiRequest(request: Request): Promise<Response> {
                 updatedAt: new Date(),
               },
             });
+            await persistRichMobileJobDetails(item.entityId, payloadObj, safeJob.status);
             await prisma
               .$executeRawUnsafe(
-                `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+                `UPDATE "transaction_records" SET "status" = $1, "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{formData,status}', to_jsonb($1::text)), "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
                 safeJob.status,
                 item.entityId,
               )
@@ -359,7 +475,8 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       // 2. Process pending full job records
       if (body.pendingJobs && body.pendingJobs.length > 0) {
         for (const job of body.pendingJobs) {
-          const safeJob = toSafeJobData(job as unknown as Record<string, unknown>, job.id);
+          const rawJob = job as unknown as Record<string, unknown>;
+          const safeJob = toSafeJobData(rawJob, job.id);
           await prisma.job.upsert({
             where: { id: job.id },
             create: safeJob,
@@ -374,9 +491,10 @@ export async function handleApiRequest(request: Request): Promise<Response> {
               updatedAt: new Date(),
             },
           });
+          await persistRichMobileJobDetails(job.id, rawJob, safeJob.status);
           await prisma
             .$executeRawUnsafe(
-              `UPDATE "transaction_records" SET "status" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
+              `UPDATE "transaction_records" SET "status" = $1, "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{formData,status}', to_jsonb($1::text)), "updated_at" = CURRENT_TIMESTAMP WHERE "process_key" = 'service-calls' AND "record_no" = $2`,
               safeJob.status,
               job.id,
             )
@@ -418,16 +536,46 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     // 2. /api/jobs — Fetch or mutate Jobs from PostgreSQL
     if (path === "/api/jobs") {
       if (method === "GET") {
-        const jobs = await prisma.job.findMany({
-          orderBy: { updatedAt: "desc" },
+        const [jobs, detailRows] = await Promise.all([
+          prisma.job.findMany({
+            orderBy: { updatedAt: "desc" },
+          }),
+          prisma
+            .$queryRawUnsafe<Array<{ record_no: string; data: Record<string, unknown> }>>(
+              `SELECT "record_no", "data" FROM "transaction_records" WHERE "process_key" = 'mobile-job-details'`,
+            )
+            .catch(() => []),
+        ]);
+
+        const detailMap = new Map<string, Record<string, unknown>>();
+        for (const row of detailRows) {
+          if (row.record_no && row.data && typeof row.data === "object") {
+            detailMap.set(row.record_no, row.data);
+          }
+        }
+
+        const enrichedJobs = jobs.map((j) => {
+          const ext = detailMap.get(j.id);
+          if (!ext) return j;
+          return {
+            ...ext,
+            ...j,
+            travel: ext["travel"],
+            parts: ext["parts"],
+            labourLogs: ext["labourLogs"],
+            photos: ext["photos"],
+            inspection: ext["inspection"],
+            holdRequests: ext["holdRequests"],
+            completion: ext["completion"],
+          };
         });
 
         return new Response(
           JSON.stringify({
             success: true,
             source: "PostgreSQL (via Prisma)",
-            count: jobs.length,
-            jobs,
+            count: enrichedJobs.length,
+            jobs: enrichedJobs,
           }),
           { status: 200, headers },
         );

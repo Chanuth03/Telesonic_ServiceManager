@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   PauseCircle,
   AlertTriangle,
+  AlertCircle,
   CheckCircle,
   Clock,
   FileText,
@@ -16,6 +17,8 @@ import {
   type HoldRequestRecord,
 } from "@/lib/mobile-data";
 import { Button } from "@/components/ui/button";
+
+type HoldReason = HoldRequestRecord["reason"];
 
 export const Route = createFileRoute("/mobile/jobs/$jobId/hold")({
   head: ({ params }) => ({
@@ -35,7 +38,7 @@ function MobileHoldRequestScreen() {
   const navigate = useNavigate();
   const [job, setJob] = useState<MobileJob | undefined>(() => getMobileJobById(jobId));
 
-  const [reason, setReason] = useState<HoldRequestRecord["reason"]>("Awaiting Spare Parts");
+  const [reason, setReason] = useState<HoldReason>("Awaiting Spare Parts");
   const [notes, setNotes] = useState(
     "Compressor capacitor 45uF not available in van stock. Ordered from central warehouse.",
   );
@@ -99,7 +102,6 @@ function MobileHoldRequestScreen() {
         </Link>
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-primary">{job.id}</span>
-          <p className="text-[10px] font-mono text-muted-foreground">O1-SCR-MOB-13</p>
         </div>
       </div>
 
@@ -110,7 +112,6 @@ function MobileHoldRequestScreen() {
           </span>
           <div>
             <h1 className="text-sm font-bold">Request Job Hold</h1>
-            <p className="text-[11px] text-muted-foreground">Option 01 Hold Request Submission</p>
           </div>
         </div>
 

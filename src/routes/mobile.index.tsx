@@ -37,7 +37,7 @@ export const Route = createFileRoute("/mobile/")({
 });
 
 function MobileOverviewPage() {
-  const { user, logoutUser } = useRole();
+  const { user, role, logoutUser } = useRole();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState(() => getMobileJobs());
   const [notifications, setNotifications] = useState(() => getMobileNotifications());
@@ -184,18 +184,20 @@ function MobileOverviewPage() {
         </div>
       </div>
 
-      {/* Quick Action Return to Workspace Button */}
-      <div className="rounded-xl border bg-muted/40 p-3.5 text-center space-y-2">
-        <p className="text-xs text-muted-foreground">
-          Need full ITSM administrative tools or Service Desk?
-        </p>
-        <Button asChild variant="outline" size="sm" className="w-full text-xs font-semibold">
-          <Link to="/">
-            <ArrowLeft size={14} className="mr-1.5" />
-            Return to Desktop Workspace
-          </Link>
-        </Button>
-      </div>
+      {/* Quick Action Return to Workspace Button (only for Admin / Desktop Roles) */}
+      {role !== "TECHNICIAN" && (
+        <div className="rounded-xl border bg-muted/40 p-3.5 text-center space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Need full ITSM administrative tools or Service Desk?
+          </p>
+          <Button asChild variant="outline" size="sm" className="w-full text-xs font-semibold">
+            <Link to="/">
+              <ArrowLeft size={14} className="mr-1.5" />
+              Return to Desktop Workspace
+            </Link>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

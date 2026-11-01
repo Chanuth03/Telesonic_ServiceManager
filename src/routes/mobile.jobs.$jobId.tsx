@@ -225,10 +225,6 @@ function MobileJobDetailScreen() {
           <ArrowLeft size={14} />
           <span>Back to Jobs</span>
         </Link>
-
-        <span className="text-[10px] font-mono font-semibold text-muted-foreground bg-muted px-2 py-1 rounded border border-border/50">
-          O1-SCR-MOB-03
-        </span>
       </div>
 
       {/* Main Job Card Header */}
@@ -393,9 +389,6 @@ function MobileJobDetailScreen() {
               <Layers size={14} className="text-primary" />
               <span>Related Equipment & Serial Units</span>
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground">
-              Option 01 SAP Linked
-            </span>
           </div>
 
           {!job.components || job.components.length === 0 ? (
@@ -471,9 +464,6 @@ function MobileJobDetailScreen() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Technician Workflow Actions
           </h2>
-          <span className="text-[10px] font-mono text-muted-foreground">
-            Option 01 Business Flow
-          </span>
         </div>
 
         <div className="grid grid-cols-1 gap-2">
@@ -530,9 +520,6 @@ function MobileJobDetailScreen() {
                       <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors truncate">
                         {wf.title}
                       </h3>
-                      <span className="text-[9px] bg-card px-1.5 py-0.5 rounded text-muted-foreground border font-mono shrink-0">
-                        {wf.code}
-                      </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground truncate">{wf.statusText}</p>
                   </div>
@@ -556,8 +543,6 @@ function MobileJobDetailScreen() {
           Field technician: {job.technicianName} · All status updates persist in session memory.
         </p>
       </div>
-
-      
     </div>
   );
 }

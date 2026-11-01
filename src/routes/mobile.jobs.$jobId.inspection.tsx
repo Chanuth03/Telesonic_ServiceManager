@@ -146,7 +146,6 @@ function MobileSiteInspectionScreen() {
         </Link>
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-primary">{job.id}</span>
-          <p className="text-[10px] font-mono text-muted-foreground">O1-SCR-MOB-11</p>
         </div>
       </div>
 
@@ -157,9 +156,6 @@ function MobileSiteInspectionScreen() {
           </span>
           <div>
             <h1 className="text-sm font-bold">Mobile Site Inspection Capture</h1>
-            <p className="text-[11px] text-muted-foreground">
-              {job.customerName} · {job.town}
-            </p>
           </div>
         </div>
 

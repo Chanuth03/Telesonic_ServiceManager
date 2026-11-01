@@ -17,17 +17,17 @@ export interface RelatedComponent {
 
 export interface TravelDetails {
   status: "Not Started" | "Traveling" | "Arrived";
-  startOdometer?: number;
-  endOdometer?: number;
-  travelStartTime?: string;
-  arrivalTime?: string;
-  gpsCoordinates?: string;
-  gpsAccuracy?: string;
-  customerNotified?: boolean;
-  customerNotifiedAt?: string;
-  trafficCondition?: string;
-  idempotencyKey?: string;
-  travelNotes?: string;
+  startOdometer?: number | undefined;
+  endOdometer?: number | undefined;
+  travelStartTime?: string | undefined;
+  arrivalTime?: string | undefined;
+  gpsCoordinates?: string | undefined;
+  gpsAccuracy?: string | undefined;
+  customerNotified?: boolean | undefined;
+  customerNotifiedAt?: string | undefined;
+  trafficCondition?: string | undefined;
+  idempotencyKey?: string | undefined;
+  travelNotes?: string | undefined;
 }
 
 export interface PartItem {
@@ -39,11 +39,11 @@ export interface PartItem {
   availableStock: number;
   qtyUsed: number;
   qtyReturned: number;
-  returnReason?: "Unused" | "Faulty/Damaged" | "Wrong Specification" | "Customer Cancelled";
-  serialNo?: string;
-  partSource?: "telesonic" | "external";
-  supplierName?: string;
-  remarks?: string;
+  returnReason?: "Unused" | "Faulty/Damaged" | "Wrong Specification" | "Customer Cancelled" | undefined;
+  serialNo?: string | undefined;
+  partSource?: "telesonic" | "external" | undefined;
+  supplierName?: string | undefined;
+  remarks?: string | undefined;
 }
 
 export interface LabourLog {
@@ -66,9 +66,9 @@ export interface JobPhoto {
 export interface JobCompletion {
   signerName: string;
   signerRole: string;
-  signatureDataUrl?: string;
+  signatureDataUrl?: string | undefined;
   ratingStars: number;
-  feedbackComments?: string;
+  feedbackComments?: string | undefined;
   completedAt: string;
   workSlipNumber: string;
 }
@@ -78,8 +78,8 @@ export interface SiteInspectionPoint {
   label: string;
   category: "Safety" | "Electrical" | "Environmental" | "Mechanical";
   status: "Pass" | "Fail" | "Attention Required" | "N/A";
-  measuredValue?: string;
-  notes?: string;
+  measuredValue?: string | undefined;
+  notes?: string | undefined;
 }
 
 export interface SiteInspectionReport {
@@ -88,7 +88,7 @@ export interface SiteInspectionReport {
   technicianName: string;
   overallStatus: "Pass" | "Fail" | "Conditional Pass";
   points: SiteInspectionPoint[];
-  generalNotes?: string;
+  generalNotes?: string | undefined;
 }
 
 export interface HoldRequestRecord {
@@ -111,7 +111,7 @@ export interface MobileNotification {
   time: string;
   read: boolean;
   type: "assignment" | "alert" | "system";
-  jobId?: string;
+  jobId?: string | undefined;
 }
 
 export interface StockCountItem {
@@ -121,39 +121,41 @@ export interface StockCountItem {
   binLocation: string;
   systemQty: number;
   countedQty: number;
-  varianceReason?: string;
+  varianceReason?: string | undefined;
   unitPrice: number;
 }
 
 export interface MobileJob {
   id: string; // e.g. SC-2026-20511
   customerName: string; // e.g. Kandy Lake Hotel
-  customerContact?: string;
+  customerContact?: string | undefined;
   town: string;
   window: string;
+  scheduledWindow?: string | undefined;
   priority: MobileJobPriority;
   role: string;
+  technicianRole?: string | undefined;
   status: MobileJobStatus;
   category: string;
-  siteName?: string;
+  siteName?: string | undefined;
   siteAddress: string;
   technicianName: string;
   scheduledDate: string; // YYYY-MM-DD
-  specialConditions?: string;
-  declineReason?: string;
-  instructions?: string;
-  components?: RelatedComponent[];
-  serviceHistory?: ServiceHistoryItem[];
-  lastServiceDate?: string;
+  specialConditions?: string | undefined;
+  declineReason?: string | undefined;
+  instructions?: string | undefined;
+  components?: RelatedComponent[] | undefined;
+  serviceHistory?: ServiceHistoryItem[] | undefined;
+  lastServiceDate?: string | undefined;
 
   // Extended Technician Workflow Data
-  travel?: TravelDetails;
-  parts?: PartItem[];
-  labourLogs?: LabourLog[];
-  photos?: JobPhoto[];
-  completion?: JobCompletion;
-  inspection?: SiteInspectionReport;
-  holdRequests?: HoldRequestRecord[];
+  travel?: TravelDetails | undefined;
+  parts?: PartItem[] | undefined;
+  labourLogs?: LabourLog[] | undefined;
+  photos?: JobPhoto[] | undefined;
+  completion?: JobCompletion | undefined;
+  inspection?: SiteInspectionReport | undefined;
+  holdRequests?: HoldRequestRecord[] | undefined;
 }
 
 export const MOCK_TECHNICIAN_NAME = "Nimal Perera (Mock Field Lead)";
@@ -302,7 +304,6 @@ export const initialMobileJobs: MobileJob[] = [
     ],
     travel: {
       status: "Not Started",
-      startOdometer: 142300,
     },
     parts: [
       {
