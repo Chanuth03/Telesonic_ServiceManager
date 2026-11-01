@@ -1,15 +1,17 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ClipboardList, Home, ScanLine, Bell, ArrowLeft } from "lucide-react";
+import { useRole } from "@/context/RoleContext";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { role } = useRole();
 
   const navItems = [
     {
       to: "/mobile",
       label: "Overview",
       icon: Home,
-      activeMatch: (p: string) => p === "/mobile" || p === "/mobile/",
+      activeMatch: (p: string) => p === "/" || p === "/mobile" || p === "/mobile/",
     },
     {
       to: "/mobile/jobs",
@@ -56,14 +58,16 @@ export function MobileNav() {
           );
         })}
 
-        <Link
-          to="/"
-          className="flex flex-1 flex-col items-center justify-center py-2 px-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-          title="Return to Desktop Workspace"
-        >
-          <ArrowLeft size={18} />
-          <span className="mt-1">Workspace</span>
-        </Link>
+        {role !== "TECHNICIAN" && (
+          <Link
+            to="/"
+            className="flex flex-1 flex-col items-center justify-center py-2 px-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+            title="Return to Desktop Workspace"
+          >
+            <ArrowLeft size={18} />
+            <span className="mt-1">Workspace</span>
+          </Link>
+        )}
       </div>
     </nav>
   );

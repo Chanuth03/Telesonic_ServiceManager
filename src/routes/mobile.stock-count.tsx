@@ -77,7 +77,10 @@ function MobileStockCountScreen() {
   };
 
   const handleSimulateBarcodeScan = () => {
-    const randomItem = items[Math.floor(Math.random() * items.length)];
+    if (items.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * items.length);
+    const randomItem = items[randomIndex];
+    if (!randomItem) return;
     setScannedSku(randomItem.sku);
     setSearchQuery(randomItem.sku);
     setFeedback(`Simulated Barcode Scan: ${randomItem.sku} (${randomItem.name}) detected.`);
@@ -107,7 +110,6 @@ function MobileStockCountScreen() {
         </Link>
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-primary">Van Inventory</span>
-          <p className="text-[10px] font-mono text-muted-foreground">O1-SCR-MOB-12</p>
         </div>
       </div>
 

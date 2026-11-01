@@ -4,9 +4,11 @@ import { Headset, ArrowLeft, Bell, ScanLine, LogOut } from "lucide-react";
 import { SyncStatusBadge } from "./SyncStatusBadge";
 import { MobileNav } from "./MobileNav";
 import { getMobileNotifications, subscribeMobileJobs } from "@/lib/mobile-data";
+import { useRole } from "@/context/RoleContext";
 
 export function MobileShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const { role, logoutUser } = useRole();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -18,10 +20,11 @@ export function MobileShell({ children }: { children: ReactNode }) {
     return subscribeMobileJobs(updateUnread);
   }, []);
 
-  const handleMobileLogout = () => {
+  const handleMobileLogout = async () => {
     sessionStorage.removeItem("mobile_authenticated");
     sessionStorage.removeItem("mobile_tech_id");
-    navigate({ to: "/mobile/login" });
+    await logoutUser();
+    navigate({ to: "/mobile/login", replace: true });
   };
 
   return (
@@ -70,20 +73,22 @@ export function MobileShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={handleMobileLogout}
-              className="p-1.5 rounded-lg border bg-destructive-soft text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+              className="p-1.5 rounded-lg border bg-destructive-soft text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors cursor-pointer"
               title="Sign Out of Mobile App (O1-SCR-MOB-01)"
             >
               <LogOut size={15} />
             </button>
 
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Return to Workspace"
-            >
-              <ArrowLeft size={13} />
-              <span className="hidden sm:inline">Workspace</span>
-            </Link>
+            {role !== "TECHNICIAN" && (
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Return to Workspace"
+              >
+                <ArrowLeft size={13} />
+                <span className="hidden sm:inline">Workspace</span>
+              </Link>
+            )}
           </div>
         </header>
 

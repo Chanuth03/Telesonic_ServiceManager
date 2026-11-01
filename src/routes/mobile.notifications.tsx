@@ -49,20 +49,22 @@ function MobileNotificationsPage() {
 
   const filtered = notifications.filter((item) => {
     if (filter === "unread") return !item.read;
-    if (filter === "Job Assignment") return item.type === "Job Assignment";
-    if (filter === "Alert") return item.type === "Alert" || item.type === "System";
+    const t = (item.type || "").toLowerCase();
+    if (filter === "Job Assignment") return t === "assignment";
+    if (filter === "Alert") return t === "alert" || t === "system";
     return true;
   });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "Job Assignment":
+    const t = (type || "").toLowerCase();
+    switch (t) {
+      case "assignment":
         return <Briefcase className="w-5 h-5 text-sky-600" />;
-      case "Alert":
+      case "alert":
         return <ShieldAlert className="w-5 h-5 text-amber-600" />;
-      case "System":
+      case "system":
         return <Info className="w-5 h-5 text-purple-600" />;
       default:
         return <Bell className="w-5 h-5 text-slate-600" />;
@@ -174,7 +176,7 @@ function MobileNotificationsPage() {
                     <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {item.timestamp}
+                        {item.time}
                       </span>
                       {item.jobId && (
                         <Link

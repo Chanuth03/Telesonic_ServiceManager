@@ -105,7 +105,39 @@ export async function getTransactionRecordsByProcess(
       `SELECT * FROM "transaction_records" WHERE "process_key" = $1 ORDER BY "updated_at" DESC`,
       processKey,
     );
-    return rows.map(formatRowForClient);
+    const detailsMap = new Map<string, Record<string, unknown>>();
+    if (processKey === "service-calls") {
+      try {
+        const details = await prisma.$queryRawUnsafe<
+          Array<{ record_no: string; data: Record<string, unknown> }>
+        >(
+          `SELECT "record_no", "data" FROM "transaction_records" WHERE "process_key" = 'mobile-job-details'`,
+        );
+        for (const d of details) {
+          detailsMap.set(d.record_no, d.data || {});
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return rows.map((r) => {
+      const formatted = formatRowForClient(r);
+      const ext = detailsMap.get(r.record_no);
+      if (ext) {
+        const comp = ext["completion"] as Record<string, unknown> | undefined;
+        return {
+          ...formatted,
+          mobileDetails: ext,
+          completion: comp,
+          workSlipNumber: comp ? comp["workSlipNumber"] : undefined,
+          signerName: comp ? comp["signerName"] : undefined,
+          ratingStars: comp ? comp["ratingStars"] : undefined,
+          signatureDataUrl: comp ? comp["signatureDataUrl"] : undefined,
+          completedAt: comp ? comp["completedAt"] : undefined,
+        };
+      }
+      return formatted;
+    });
   } catch (err) {
     console.error(`[PostgreSQL] Error fetching transaction_records for ${processKey}:`, err);
     return [];
@@ -123,7 +155,32 @@ export async function getTransactionRecordByNo(
       recordNo,
     );
     if (!rows[0]) return null;
-    return formatRowForClient(rows[0]);
+    const formatted = formatRowForClient(rows[0]);
+    if (processKey === "service-calls") {
+      try {
+        const details = await prisma.$queryRawUnsafe<Array<{ data: Record<string, unknown> }>>(
+          `SELECT "data" FROM "transaction_records" WHERE "process_key" = 'mobile-job-details' AND "record_no" = $1 LIMIT 1`,
+          recordNo,
+        );
+        if (details[0]?.data) {
+          const ext = details[0].data;
+          const comp = ext["completion"] as Record<string, unknown> | undefined;
+          return {
+            ...formatted,
+            mobileDetails: ext,
+            completion: comp,
+            workSlipNumber: comp ? comp["workSlipNumber"] : undefined,
+            signerName: comp ? comp["signerName"] : undefined,
+            ratingStars: comp ? comp["ratingStars"] : undefined,
+            signatureDataUrl: comp ? comp["signatureDataUrl"] : undefined,
+            completedAt: comp ? comp["completedAt"] : undefined,
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return formatted;
   } catch (err) {
     console.error(`[PostgreSQL] Error fetching single transaction_record:`, err);
     return null;

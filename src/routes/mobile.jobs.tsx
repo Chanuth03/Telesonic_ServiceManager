@@ -81,6 +81,8 @@ function MobileJobListScreen() {
   const [statusFilter, setStatusFilter] = useState<"All" | MobileJobStatus>("All");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [selectedJobPreview, setSelectedJobPreview] = useState<MobileJob | null>(null);
+  const [declineModalJob, setDeclineModalJob] = useState<MobileJob | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const todayStr = getLocalTodayDateString();
   const activeTechName = user?.name || getActiveTechnicianName();
@@ -127,6 +129,18 @@ function MobileJobListScreen() {
   const handleAcceptJob = (jobId: string) => {
     updateMobileJobStatus(jobId, "Accepted");
     setFeedbackMessage(`Job ${jobId} saved on this device. It will upload when you are online.`);
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
+  const handleDeclineJob = (jobId: string) => {
+    updateMobileJobStatus(
+      jobId,
+      "Declined",
+      declineReason.trim() || "Technician unavailable / outside service area",
+    );
+    setFeedbackMessage(`Job ${jobId} declined.`);
+    setDeclineModalJob(null);
+    setDeclineReason("");
     setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
@@ -535,6 +549,56 @@ function MobileJobListScreen() {
             >
               Close Preview
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Decline Confirmation Modal */}
+      {declineModalJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-xl border bg-card p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="text-sm font-bold text-destructive flex items-center gap-1.5">
+                <XCircle size={16} />
+                <span>Decline Job {declineModalJob.id}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDeclineModalJob(null)}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Please provide a reason for declining this job assignment:
+            </p>
+
+            <textarea
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g. Schedule conflict, outside operating radius, parts unavailable..."
+              className="input-field text-xs min-h-[60px]"
+            />
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={() => setDeclineModalJob(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => handleDeclineJob(declineModalJob.id)}
+              >
+                Confirm Decline
+              </Button>
+            </div>
           </div>
         </div>
       )}

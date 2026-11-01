@@ -6,10 +6,10 @@ type SyncQueueItem = {
   id?: number;
   action: string;
   entityId: string;
-  payload?: Record<string, unknown>;
+  payload?: any;
 };
 
-type SyncJob = Record<string, unknown> & { id: string };
+type SyncJob = any;
 
 type ColumnInfo = {
   name: string;
@@ -21,8 +21,8 @@ let pool: Pool | null = null;
 const columnCache = new Map<string, ColumnInfo[]>();
 
 function readDatabaseUrl(): string | null {
-  if (process.env.VITEST) return null;
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env["VITEST"]) return null;
+  if (process.env["DATABASE_URL"]) return process.env["DATABASE_URL"];
   try {
     const envPath = path.resolve(process.cwd(), ".env");
     const text = fs.readFileSync(envPath, "utf8");
@@ -195,14 +195,14 @@ async function jobForeignKey(client: PoolClient, table: string): Promise<string 
   return null;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+function asRecord(value: unknown): any {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  return value as any;
 }
 
-function asRecords(value: unknown): Record<string, unknown>[] {
+function asRecords(value: unknown): any[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is Record<string, unknown> => !!item && typeof item === "object");
+  return value.filter((item): item is any => !!item && typeof item === "object");
 }
 
 function collectJobs(pendingJobs: SyncJob[], queueItems: SyncQueueItem[]): SyncJob[] {
@@ -281,7 +281,7 @@ async function writeChildren(client: PoolClient, job: SyncJob) {
       put(row, columns, ["supplier_name", "supplierName"], part.supplierName);
       put(row, columns, ["return_reason", "returnReason"], part.returnReason);
       put(row, columns, ["remarks"], part.remarks);
-      if (row.id) await upsert(client, "parts_used", "id", row);
+      if (row["id"]) await upsert(client, "parts_used", "id", row);
     }
   }
 
@@ -297,7 +297,7 @@ async function writeChildren(client: PoolClient, job: SyncJob) {
       put(row, columns, ["hours"], log.hours);
       put(row, columns, ["rate_type", "rateType"], log.rateType);
       put(row, columns, ["activity_description", "activityDescription"], log.activityDescription);
-      if (row.id) await upsert(client, "labour_logs", "id", row);
+      if (row["id"]) await upsert(client, "labour_logs", "id", row);
     }
   }
 
@@ -313,7 +313,7 @@ async function writeChildren(client: PoolClient, job: SyncJob) {
     put(row, columns, ["overall_status", "overallStatus"], inspection.overallStatus);
     put(row, columns, ["general_notes", "generalNotes"], inspection.generalNotes);
     put(row, columns, ["points", "checklist"], inspection.points);
-    if (row.id) await upsert(client, "inspections", "id", row);
+    if (row["id"]) await upsert(client, "inspections", "id", row);
   }
 
   const holdKey = await jobForeignKey(client, "hold_requests");
@@ -328,7 +328,7 @@ async function writeChildren(client: PoolClient, job: SyncJob) {
       put(row, columns, ["estimated_delay_hours", "estimatedDelayHours"], hold.estimatedDelayHours);
       put(row, columns, ["requested_at", "requestedAt"], hold.requestedAt);
       put(row, columns, ["status"], hold.status);
-      if (row.id) await upsert(client, "hold_requests", "id", row);
+      if (row["id"]) await upsert(client, "hold_requests", "id", row);
     }
   }
 }

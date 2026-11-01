@@ -140,7 +140,6 @@ function MobileLabourScreen() {
         </Link>
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-primary">{job.id}</span>
-          <p className="text-[10px] font-mono text-muted-foreground">O1-SCR-MOB-07</p>
         </div>
       </div>
 
@@ -151,7 +150,6 @@ function MobileLabourScreen() {
           </span>
           <div>
             <h1 className="text-sm font-bold">Labour & Work Time Log</h1>
-            <p className="text-[11px] text-muted-foreground">Technician Time Recording</p>
           </div>
         </div>
 

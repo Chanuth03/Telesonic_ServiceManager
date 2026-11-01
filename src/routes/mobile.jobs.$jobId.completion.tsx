@@ -7,10 +7,9 @@ import {
   AlertCircle,
   Star,
   FileCheck,
-  Printer,
   ShieldCheck,
-  User,
-  Briefcase,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import {
   getMobileJobById,
@@ -46,16 +45,58 @@ function MobileCompletionScreen() {
   const [comments, setComments] = useState(
     job?.completion?.feedbackComments || "Job completed satisfactorily. All test runs passed.",
   );
-  const [isSigned, setIsSigned] = useState(!!job?.completion?.completedAt);
+  const [isSigned, setIsSigned] = useState(
+    !!job?.completion?.signatureDataUrl || !!job?.completion?.completedAt,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Canvas Signature Simulation
+  // Canvas Signature state & ref
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     setJob(getMobileJobById(jobId));
   }, [jobId]);
+
+  // Set up crisp canvas backing store resolution on mount & resize
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const setupCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.round(rect.width) || 320;
+      const h = Math.round(rect.height) || 128;
+
+      if (canvas.width === w * 2 && canvas.height === h * 2) return;
+
+      // Preserve previous drawing if resizing
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext("2d");
+      const hadContent = canvas.width > 0 && canvas.height > 0;
+      if (tempCtx && hadContent) {
+        tempCtx.drawImage(canvas, 0, 0);
+      }
+
+      canvas.width = w * 2;
+      canvas.height = h * 2;
+
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (hadContent && tempCanvas.width > 0 && tempCanvas.height > 0) {
+          ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+        }
+      }
+    };
+
+    setupCanvas();
+    window.addEventListener("resize", setupCanvas);
+    return () => window.removeEventListener("resize", setupCanvas);
+  }, [job?.id]);
 
   if (!job) {
     return (
@@ -75,32 +116,119 @@ function MobileCompletionScreen() {
   const hasLabourLogged = (job.labourLogs?.length || 0) > 0;
   const hasPhotos = (job.photos?.length || 0) > 0;
 
-  const handleStartDraw = () => setIsDrawing(true);
-  const handleStopDraw = () => setIsDrawing(false);
+  // Accurately map touch/mouse coordinate from viewport to canvas pixel buffer
+  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / (rect.width || 1);
+    const scaleY = canvas.height / (rect.height || 1);
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // safe ignore in environments that do not support pointer capture
+    }
+
+    setIsDrawing(true);
+    setIsSigned(true);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = "#1e3a8a"; // Executive deep ink blue
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const pt = getCanvasPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
+    // Draw immediate dot in case user just taps
+    ctx.lineTo(pt.x + 0.1, pt.y + 0.1);
+    ctx.stroke();
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const pt = getCanvasPoint(e);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch {
+      // safe ignore
+    }
+    setIsDrawing(false);
+  };
+
   const handleClearSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+      }
     }
     setIsSigned(false);
   };
 
   const handleSimulateAutoSign = () => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = "#1d4ed8";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(30, 40);
-        ctx.quadraticCurveTo(80, 10, 130, 40);
-        ctx.quadraticCurveTo(170, 70, 220, 30);
-        ctx.stroke();
-      }
-    }
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Realistic cursive signature simulation
+    ctx.beginPath();
+    ctx.moveTo(w * 0.12, h * 0.65);
+    ctx.bezierCurveTo(w * 0.2, h * 0.15, w * 0.32, h * 0.1, w * 0.36, h * 0.7);
+    ctx.bezierCurveTo(w * 0.42, h * 0.28, w * 0.5, h * 0.22, w * 0.56, h * 0.62);
+    ctx.bezierCurveTo(w * 0.62, h * 0.38, w * 0.7, h * 0.35, w * 0.76, h * 0.55);
+    ctx.quadraticCurveTo(w * 0.83, h * 0.7, w * 0.9, h * 0.42);
+    ctx.stroke();
+
+    // Bottom flourish
+    ctx.beginPath();
+    ctx.moveTo(w * 0.15, h * 0.82);
+    ctx.quadraticCurveTo(w * 0.52, h * 0.75, w * 0.88, h * 0.82);
+    ctx.stroke();
+
     setIsSigned(true);
   };
 
@@ -110,12 +238,24 @@ function MobileCompletionScreen() {
       return;
     }
 
+    if (!isSigned) {
+      setFeedback("Please ask the customer to sign in the signature pad before submitting.");
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    let signatureDataUrl: string | undefined = undefined;
+    if (canvas && isSigned) {
+      signatureDataUrl = canvas.toDataURL("image/png");
+    }
+
     const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const workSlipNo = `WS-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
     completeMobileJob(job.id, {
       signerName,
       signerRole,
+      signatureDataUrl,
       ratingStars: rating,
       feedbackComments: comments,
       completedAt: `${getLocalTodayDateString()} ${timeStr}`,
@@ -237,7 +377,7 @@ function MobileCompletionScreen() {
               </span>
             </div>
 
-            <div className="space-y-1 text-muted-foreground">
+            <div className="space-y-1.5 text-muted-foreground">
               <p>
                 <strong className="text-foreground">Signed by:</strong> {job.completion.signerName}{" "}
                 ({job.completion.signerRole})
@@ -254,10 +394,21 @@ function MobileCompletionScreen() {
                 <strong className="text-foreground">Feedback:</strong> "
                 {job.completion.feedbackComments}"
               </p>
-            </div>
 
-            <div className="p-2 rounded bg-card border text-[10px] text-center text-muted-foreground">
-              Digital work slip synced to Option 01 SAP Service Contract records.
+              {job.completion.signatureDataUrl && (
+                <div className="pt-2 border-t border-success/20">
+                  <span className="text-[10px] font-semibold text-foreground block mb-1">
+                    Captured Customer Signature:
+                  </span>
+                  <div className="bg-white rounded-lg p-2 border border-success/30 inline-block shadow-2xs">
+                    <img
+                      src={job.completion.signatureDataUrl}
+                      alt={`Signature of ${job.completion.signerName}`}
+                      className="h-14 max-w-[240px] object-contain rounded"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -329,40 +480,64 @@ function MobileCompletionScreen() {
               />
             </div>
 
-            {/* Signature Canvas Box */}
-            <div className="space-y-1 text-xs">
+            {/* Signature Canvas Box with Finger & Stylus Drawing */}
+            <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <label className="block text-[10px] font-semibold text-muted-foreground">
-                  Customer On-Screen Signature
+                <label className="block text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                  <PenTool size={13} className="text-primary" />
+                  <span>Customer Signature on Screen *</span>
                 </label>
-                <div className="flex gap-2 text-[10px]">
-                  <button onClick={handleSimulateAutoSign} className="text-primary hover:underline">
-                    Simulate Sign
-                  </button>
+                <div className="flex items-center gap-2 text-[11px]">
                   <button
-                    onClick={handleClearSignature}
-                    className="text-muted-foreground hover:text-foreground"
+                    type="button"
+                    onClick={handleSimulateAutoSign}
+                    className="text-primary font-medium hover:underline flex items-center gap-1"
                   >
-                    Clear
+                    <Sparkles size={11} />
+                    <span>Auto-Sign</span>
+                  </button>
+                  <span className="text-muted-foreground/40">•</span>
+                  <button
+                    type="button"
+                    onClick={handleClearSignature}
+                    className="text-muted-foreground hover:text-destructive transition-colors font-medium flex items-center gap-1"
+                  >
+                    <RotateCcw size={11} />
+                    <span>Clear</span>
                   </button>
                 </div>
               </div>
 
-              <div className="border-2 border-dashed rounded-lg p-1 bg-card text-center relative">
+              <div className="border-2 border-dashed border-primary/30 rounded-xl p-1 bg-white relative overflow-hidden shadow-xs">
                 <canvas
                   ref={canvasRef}
-                  width={280}
-                  height={90}
-                  onMouseDown={handleStartDraw}
-                  onMouseUp={handleStopDraw}
-                  className="w-full h-20 touch-none bg-background rounded"
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  className="w-full h-32 touch-none bg-white rounded-lg cursor-crosshair block select-none"
+                  style={{ touchAction: "none" }}
                 />
                 {!isSigned && (
-                  <p className="text-[10px] text-muted-foreground/60 absolute inset-0 grid place-items-center pointer-events-none">
-                    Sign on screen or click 'Simulate Sign'
-                  </p>
+                  <div className="text-[11px] text-slate-400 absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                    <PenTool size={20} className="mb-1 text-slate-400/60" />
+                    <span className="font-medium">Draw signature here with finger or stylus</span>
+                    <span className="text-[10px] text-slate-300">
+                      or click 'Auto-Sign' for quick test
+                    </span>
+                  </div>
+                )}
+                {isSigned && (
+                  <div className="absolute bottom-1 right-2 pointer-events-none">
+                    <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      ✓ Signature captured
+                    </span>
+                  </div>
                 )}
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                Touch and drag your finger across the box above to sign.
+              </p>
             </div>
 
             <Button

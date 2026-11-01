@@ -95,9 +95,7 @@ function MobilePartsScreen() {
       (p) => p.partCode === catPart.partCode && (p.partSource || "telesonic") === "telesonic",
     );
     if (existingIndex >= 0) {
-      const updated = [...parts];
-      updated[existingIndex].qtyUsed += 1;
-      setParts(updated);
+      setParts(parts.map((p, i) => (i === existingIndex ? { ...p, qtyUsed: p.qtyUsed + 1 } : p)));
     } else {
       const newPart: PartItem = {
         ...catPart,
@@ -166,17 +164,13 @@ function MobilePartsScreen() {
   };
 
   const handleUpdateQty = (index: number, field: "qtyUsed" | "qtyReturned", delta: number) => {
-    const updated = [...parts];
-    const currentVal = updated[index][field];
-    const newVal = Math.max(0, currentVal + delta);
-    updated[index][field] = newVal;
-    setParts(updated);
+    setParts(
+      parts.map((p, i) => (i === index ? { ...p, [field]: Math.max(0, p[field] + delta) } : p)),
+    );
   };
 
   const handleUpdateReturnReason = (index: number, reason: PartItem["returnReason"]) => {
-    const updated = [...parts];
-    updated[index].returnReason = reason;
-    setParts(updated);
+    setParts(parts.map((p, i) => (i === index ? { ...p, returnReason: reason } : p)));
   };
 
   const handleRemovePart = (index: number) => {
@@ -212,7 +206,6 @@ function MobilePartsScreen() {
         </Link>
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-primary">{job.id}</span>
-          <p className="text-[10px] font-mono text-muted-foreground">O1-SCR-MOB-06</p>
         </div>
       </div>
 
@@ -224,9 +217,6 @@ function MobilePartsScreen() {
             </span>
             <div>
               <h1 className="text-sm font-bold">Parts Used & Returned</h1>
-              <p className="text-[11px] text-muted-foreground">
-                Telesonic Stock & Outside Suppliers
-              </p>
             </div>
           </div>
 

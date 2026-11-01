@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -15,23 +15,21 @@ import {
   Database,
   Headphones,
   ArrowRightLeft,
-  RefreshCw,
-  Server,
-  Shield,
-  Smartphone,
   CheckCircle2,
-  Clock,
-  Wrench,
   ChevronRight,
-  Filter,
-  Plus,
+  Bell,
+  ScanLine,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRole, UserProfile } from "@/context/RoleContext";
-import { useSyncManager } from "@/hooks/useSyncManager";
 import { MobileShell } from "@/components/mobile/MobileShell";
-import { getDexieJobs, updateDexieJobStatus, DexieJob } from "@/lib/offline-db";
-import { isJobAssignedToTechnician } from "@/lib/mobile-data";
+import {
+  getMobileJobs,
+  getMobileNotifications,
+  subscribeMobileJobs,
+  getActiveTechnicianName,
+} from "@/lib/mobile-data";
 import { PrismaJobRecord } from "@/lib/prisma";
 import { apiFetch } from "@/lib/api-client";
 
@@ -227,242 +225,161 @@ function AdminDesktopLayout({ user }: { user: UserProfile }) {
 
 /**
  * -------------------------------------------------------------
- * 2. TECHNICIAN MOBILE LAYOUT (MobileNav.tsx & MobileShell.tsx)
- * Fetches and saves data locally using Dexie.js!
+ * 2. TECHNICIAN MOBILE LAYOUT
+ * Redirects to /mobile and renders the exact Mobile Overview UI
  * -------------------------------------------------------------
  */
 function TechnicianMobileLayout() {
-  const { user } = useRole();
-  const [dexieJobs, setDexieJobs] = useState<DexieJob[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
-  const [isLoading, setIsLoading] = useState(true);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const { isOnline, pendingCount, triggerSync } = useSyncManager();
-
-  const loadLocalJobs = async () => {
-    setIsLoading(true);
-    try {
-      const jobs = await getDexieJobs();
-      setDexieJobs(jobs);
-    } catch (err) {
-      console.error("[Technician Mobile] Failed to read from Dexie.js:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { user, logoutUser } = useRole();
+  const navigate = useNavigate();
+  const [jobs, setJobs] = useState(() => getMobileJobs());
+  const [notifications, setNotifications] = useState(() => getMobileNotifications());
 
   useEffect(() => {
-    loadLocalJobs();
+    navigate({ to: "/mobile", replace: true });
+  }, [navigate]);
 
-    // Listen to local Dexie updates
-    const handleDexieUpdate = () => {
-      loadLocalJobs();
+  useEffect(() => {
+    const syncState = () => {
+      setJobs(getMobileJobs());
+      setNotifications(getMobileNotifications());
     };
-
-    window.addEventListener("telesonic:dexie-update", handleDexieUpdate);
-    window.addEventListener("telesonic:sync-complete", handleDexieUpdate);
-    window.addEventListener("telesonic:auth-changed", handleDexieUpdate);
-
+    syncState();
+    const unsub = subscribeMobileJobs(syncState);
+    window.addEventListener("telesonic:auth-changed", syncState);
+    window.addEventListener("telesonic:dexie-update", syncState);
+    window.addEventListener("telesonic:sync-complete", syncState);
     return () => {
-      window.removeEventListener("telesonic:dexie-update", handleDexieUpdate);
-      window.removeEventListener("telesonic:sync-complete", handleDexieUpdate);
-      window.removeEventListener("telesonic:auth-changed", handleDexieUpdate);
+      unsub();
+      window.removeEventListener("telesonic:auth-changed", syncState);
+      window.removeEventListener("telesonic:dexie-update", syncState);
+      window.removeEventListener("telesonic:sync-complete", syncState);
     };
   }, [user?.name]);
 
-  const handleUpdateStatus = async (jobId: string, newStatus: DexieJob["status"]) => {
-    try {
-      await updateDexieJobStatus(jobId, newStatus);
-      setActionNotice(`Status updated to "${newStatus}" in local Dexie.js.`);
-      setTimeout(() => setActionNotice(null), 3000);
-      await loadLocalJobs();
+  const activeTechName = user?.name || getActiveTechnicianName();
 
-      // If online, dynamic sync manager can sync right away
-      if (isOnline) {
-        triggerSync("status_change");
-      }
-    } catch (err) {
-      console.error("Failed to update status in Dexie:", err);
-    }
-  };
-
-  const filteredJobs = dexieJobs.filter((job) => {
-    if (user?.name && !isJobAssignedToTechnician(job, user.name, user.email)) {
-      return false;
-    }
-    if (selectedStatus === "ALL") return true;
-    return job.status === selectedStatus;
-  });
+  const assignedJobs = jobs.filter((j) => j.status === "Assigned" || j.status === "Accepted");
+  const completedJobs = jobs.filter((j) => j.status === "Completed");
+  const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
     <MobileShell>
-      <div className="space-y-3.5 pb-6">
-        {/* Toast / Notification */}
-        {actionNotice && (
-          <div className="p-2.5 rounded-lg bg-foreground text-background text-xs font-semibold flex items-center justify-between animate-in fade-in">
-            <span>{actionNotice}</span>
-            <span className="text-[10px] text-emerald-400 font-bold">Stored in Dexie.js</span>
-          </div>
-        )}
-
-        {/* Technician Role & Storage Banner */}
-        <div className="rounded-xl border bg-card p-3.5 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
-                <HardDrive size={16} />
-              </span>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Field Technician Console
-                </span>
-                <h2 className="text-sm font-bold text-foreground">Dexie.js Offline Storage</h2>
-              </div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
-              IndexedDB
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            All technician jobs, time logs, and parts are persisted locally using Dexie.js. Work
-            completely offline; changes sync to PostgreSQL automatically upon network reconnection.
-          </p>
+      <div className="space-y-3.5 max-w-full overflow-hidden pb-4">
+        {/* Mobile Welcome Heading */}
+        <div className="px-0.5 pt-0.5 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-foreground truncate">Welcome, {activeTechName}</h2>
+          <button
+            type="button"
+            onClick={async () => {
+              await logoutUser();
+              navigate({ to: "/mobile/login", replace: true });
+            }}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-destructive transition-colors shrink-0 cursor-pointer"
+            title="Sign out of Mobile App"
+          >
+            <LogOut size={13} />
+            <span>Sign out</span>
+          </button>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-          {["ALL", "Assigned", "In Progress", "On Hold", "Completed"].map((status) => (
-            <button
-              key={status}
-              onClick={() => setSelectedStatus(status)}
-              className={`px-2.5 py-1 rounded-full whitespace-nowrap text-xs font-semibold transition-colors cursor-pointer ${
-                selectedStatus === status
-                  ? "bg-primary text-primary-foreground shadow-2xs"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
+        {/* Technician Workflow Quick Summary Cards */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link
+            to="/mobile/jobs"
+            className="rounded-xl border bg-card p-3.5 shadow-2xs hover:border-primary/50 transition-colors block space-y-1"
+          >
+            <div className="flex items-center gap-2 text-primary">
+              <ClipboardList size={16} />
+              <span className="text-xs font-semibold">Assigned Jobs</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground font-mono">{assignedJobs.length}</p>
+            <p className="text-[10px] text-muted-foreground">Work orders awaiting site action</p>
+          </Link>
+
+          <Link
+            to="/mobile/jobs"
+            className="rounded-xl border bg-card p-3.5 shadow-2xs hover:border-primary/50 transition-colors block space-y-1"
+          >
+            <div className="flex items-center gap-2 text-success">
+              <CheckCircle2 size={16} />
+              <span className="text-xs font-semibold">Completed</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground font-mono">{completedJobs.length}</p>
+            <p className="text-[10px] text-muted-foreground">Work completion slips signed</p>
+          </Link>
+        </div>
+
+        {/* Additional Option 01 Workflow Hub Tiles */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
+            Field Technician Modules
+          </h3>
+
+          <div className="grid grid-cols-1 gap-2">
+            {/* Stock Count Scan */}
+            <Link
+              to="/mobile/stock-count"
+              className="p-3 rounded-xl border bg-card hover:border-primary/50 transition-colors flex items-center justify-between gap-3 shadow-2xs group"
             >
-              {status}
-            </button>
-          ))}
-        </div>
-
-        {/* Local Dexie.js Jobs List */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              Local Jobs ({filteredJobs.length})
-            </span>
-            <span>
-              {pendingCount > 0 ? (
-                <span className="text-amber-600 font-bold">{pendingCount} pending push</span>
-              ) : (
-                <span className="text-emerald-600 font-medium">All synced</span>
-              )}
-            </span>
-          </div>
-
-          {isLoading ? (
-            <div className="p-8 text-center text-xs text-muted-foreground">
-              <RefreshCw className="w-5 h-5 animate-spin mx-auto text-primary mb-2" />
-              <span>Loading local jobs from Dexie.js...</span>
-            </div>
-          ) : filteredJobs.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-              No jobs matching filter in local Dexie database.
-            </div>
-          ) : (
-            filteredJobs.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2.5 hover:border-primary/40 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold text-primary">{job.id}</span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                          job.priority === "Critical"
-                            ? "bg-destructive/10 text-destructive"
-                            : "bg-muted text-foreground"
-                        }`}
-                      >
-                        {job.priority}
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-xs text-foreground mt-0.5">{job.customerName}</h3>
-                    <p className="text-[11px] text-muted-foreground">{job.siteAddress}</p>
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <ScanLine size={18} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                      Van Stock Count Scan
+                    </h4>
+                    <span className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded border">
+                      O1-SCR-MOB-12
+                    </span>
                   </div>
-
-                  {/* Sync status chip */}
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
-                      job.syncStatus === "pending"
-                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                    }`}
-                  >
-                    {job.syncStatus === "pending" ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                        <span>Pending Sync</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={10} />
-                        <span>Synced</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-
-                {/* Status change action buttons (Dexie.js Offline Mutator) */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-1 flex-wrap">
-                  <div className="text-[11px] font-mono text-muted-foreground">
-                    Status: <strong className="text-foreground">{job.status}</strong>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    {job.status !== "In Progress" && job.status !== "Completed" && (
-                      <button
-                        onClick={() => handleUpdateStatus(job.id, "In Progress")}
-                        className="px-2 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold transition-colors cursor-pointer"
-                      >
-                        Start Job
-                      </button>
-                    )}
-
-                    {job.status === "In Progress" && (
-                      <>
-                        <button
-                          onClick={() => handleUpdateStatus(job.id, "On Hold")}
-                          className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25 text-[10px] font-bold transition-colors cursor-pointer"
-                        >
-                          Hold
-                        </button>
-                        <button
-                          onClick={() => handleUpdateStatus(job.id, "Completed")}
-                          className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25 text-[10px] font-bold transition-colors cursor-pointer"
-                        >
-                          Complete
-                        </button>
-                      </>
-                    )}
-
-                    <Link
-                      to="/mobile/jobs/$jobId"
-                      params={{ jobId: job.id }}
-                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted text-[10px] font-semibold flex items-center gap-0.5 transition-colors"
-                      title="Open full technician job details"
-                    >
-                      <span>Details</span>
-                      <ChevronRight size={12} />
-                    </Link>
-                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Audit mobile van inventory & barcode check
+                  </p>
                 </div>
               </div>
-            ))
-          )}
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors"
+              />
+            </Link>
+
+            {/* Notifications Inbox */}
+            <Link
+              to="/mobile/notifications"
+              className="p-3 rounded-xl border bg-card hover:border-primary/50 transition-colors flex items-center justify-between gap-3 shadow-2xs group"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors relative">
+                  <Bell size={18} />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive" />
+                  )}
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                      Notifications Inbox
+                    </h4>
+                    <span className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded border">
+                      O1-SCR-MOB-14
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {unreadNotifications > 0
+                      ? `${unreadNotifications} unread dispatch alerts`
+                      : "Dispatch notices & alerts"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors"
+              />
+            </Link>
+          </div>
         </div>
       </div>
     </MobileShell>

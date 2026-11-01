@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api-client";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, authReady, loginUser } = useRole();
+  const { isAuthenticated, authReady, role, loginUser } = useRole();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,12 +27,12 @@ function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If user already has a saved login session ("Keep me signed in"), go straight to workspace
+  // If user already has a saved login session ("Keep me signed in"), go straight to workspace (or mobile for technicians)
   useEffect(() => {
     if (authReady && isAuthenticated) {
-      navigate({ to: "/", replace: true });
+      navigate({ to: role === "TECHNICIAN" ? "/mobile" : "/", replace: true });
     }
-  }, [authReady, isAuthenticated, navigate]);
+  }, [authReady, isAuthenticated, role, navigate]);
 
   if (!authReady || isAuthenticated) {
     return null;
@@ -74,7 +74,8 @@ function LoginPage() {
         await loginUser(data.user, data.token || "session-token", rememberMe);
       }
 
-      navigate({ to: "/" });
+      const isTech = String(data.user?.role || "").toUpperCase().trim() === "TECHNICIAN";
+      navigate({ to: isTech ? "/mobile" : "/" });
     } catch {
       setError("Something went wrong on the server");
     } finally {
