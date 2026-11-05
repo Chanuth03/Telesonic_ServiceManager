@@ -94,7 +94,7 @@ export const UnifiedServiceRequestScreen: React.FC<UnifiedServiceRequestScreenPr
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1"></div>
             <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <span>Unified Service Request with SAP Commercial Information Panel</span>
+              <span>Service Request</span>
             </h2>
           </div>
 

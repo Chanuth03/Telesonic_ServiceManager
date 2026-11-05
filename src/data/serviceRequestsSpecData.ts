@@ -663,7 +663,7 @@ export const SERVICE_REQUEST_MODULE_SCREENS = [
   {
     id: "O1-SCR-TRX-01",
     code: "TRX-01",
-    name: "Unified Service Request with SAP Commercial Panel",
+    name: "Service Request",
     type: "TRX",
     priority: "P1",
     integration: "SAP B1 BP + Equip + Item + Invoice Read + Create",

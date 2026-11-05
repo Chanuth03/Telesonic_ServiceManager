@@ -38,10 +38,16 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
   const [showSpecDetails, setShowSpecDetails] = useState(false);
   const [b1Syncing, setB1Syncing] = useState(false);
   const [dynamicRoleOptions, setDynamicRoleOptions] = useState<string[]>([]);
-  const [customerOptions, setCustomerOptions] = useState<{ id: number; code: string; name: string }[]>([]);
+  const [customerOptions, setCustomerOptions] = useState<
+    { id: number; code: string; name: string }[]
+  >([]);
   const [itemOptions, setItemOptions] = useState<{ id: number; code: string; name: string }[]>([]);
-  const [siteOptions, setSiteOptions] = useState<{ id: number; code: string; name: string; customerId: number }[]>([]);
-  const [serialOptions, setSerialOptions] = useState<{ id: number; serialNo: string; itemName?: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<
+    { id: number; code: string; name: string; customerId: number }[]
+  >([]);
+  const [serialOptions, setSerialOptions] = useState<
+    { id: number; serialNo: string; itemName?: string }[]
+  >([]);
 
   // Side popup notification state
   const [sidePopup, setSidePopup] = useState<{
@@ -128,7 +134,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 id: c.id,
                 code: c.customerCode,
                 name: c.customerName,
-              }))
+              })),
             );
           }
         })
@@ -158,7 +164,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 id: c.id,
                 code: c.customerCode,
                 name: c.customerName,
-              }))
+              })),
             );
           }
         })
@@ -191,238 +197,361 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
 
     // 7. MST-05: Item Serial & Batch Register
     if (meta.code === "MST-05" || meta.id === "O1-SCR-MST-05") {
-      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
-        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
-      });
-      apiFetch("/api/items").then((r) => r.json()).then((d) => {
-        if (d?.items) setItemOptions(d.items.map((i: any) => ({ id: i.id, code: i.itemCode, name: i.itemName })));
-      });
+      apiFetch("/api/customers")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.customers)
+            setCustomerOptions(
+              d.customers.map((c: any) => ({
+                id: c.id,
+                code: c.customerCode,
+                name: c.customerName,
+              })),
+            );
+        });
+      apiFetch("/api/items")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.items)
+            setItemOptions(
+              d.items.map((i: any) => ({ id: i.id, code: i.itemCode, name: i.itemName })),
+            );
+        });
       return;
     }
 
     // 8. MST-06: Equipment / Installed Base
     if (meta.code === "MST-06" || meta.id === "O1-SCR-MST-06") {
-      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
-        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
-      });
-      apiFetch("/api/sites").then((r) => r.json()).then((d) => {
-        if (d?.sites) setSiteOptions(d.sites.map((s: any) => ({ id: s.id, code: s.siteCode, name: s.siteName, customerId: s.customerId })));
-      });
-      apiFetch("/api/equipments").then((r) => r.json()).then((d) => {
-        if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
-      });
+      apiFetch("/api/customers")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.customers)
+            setCustomerOptions(
+              d.customers.map((c: any) => ({
+                id: c.id,
+                code: c.customerCode,
+                name: c.customerName,
+              })),
+            );
+        });
+      apiFetch("/api/sites")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.sites)
+            setSiteOptions(
+              d.sites.map((s: any) => ({
+                id: s.id,
+                code: s.siteCode,
+                name: s.siteName,
+                customerId: s.customerId,
+              })),
+            );
+        });
+      apiFetch("/api/equipments")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
+        });
       return;
     }
 
     // 9. MST-07: Other-Brand / Competitor Equipment
     if (meta.code === "MST-07" || meta.id === "O1-SCR-MST-07") {
-      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
-        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
-      });
-      apiFetch("/api/sites").then((r) => r.json()).then((d) => {
-        if (d?.sites) setSiteOptions(d.sites.map((s: any) => ({ id: s.id, code: s.siteCode, name: s.siteName, customerId: s.customerId })));
-      });
-      apiFetch("/api/other-brand-equipments").then((r) => r.json()).then((d) => {
-        if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
-      });
+      apiFetch("/api/customers")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.customers)
+            setCustomerOptions(
+              d.customers.map((c: any) => ({
+                id: c.id,
+                code: c.customerCode,
+                name: c.customerName,
+              })),
+            );
+        });
+      apiFetch("/api/sites")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.sites)
+            setSiteOptions(
+              d.sites.map((s: any) => ({
+                id: s.id,
+                code: s.siteCode,
+                name: s.siteName,
+                customerId: s.customerId,
+              })),
+            );
+        });
+      apiFetch("/api/other-brand-equipments")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.equipments && Array.isArray(d.equipments)) setSavedRecords(d.equipments);
+        });
       return;
     }
 
     // 10. MST-08: Multi-Component Equipment System
     if (meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") {
-      apiFetch("/api/customers").then((r) => r.json()).then((d) => {
-        if (d?.customers) setCustomerOptions(d.customers.map((c: any) => ({ id: c.id, code: c.customerCode, name: c.customerName })));
-      });
-      apiFetch("/api/sites").then((r) => r.json()).then((d) => {
-        if (d?.sites) setSiteOptions(d.sites.map((s: any) => ({ id: s.id, code: s.siteCode, name: s.siteName, customerId: s.customerId })));
-      });
-      apiFetch("/api/equipment-systems").then((r) => r.json()).then((d) => {
-        if (d?.systems) setSavedRecords(d.systems);
-      });
+      apiFetch("/api/customers")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.customers)
+            setCustomerOptions(
+              d.customers.map((c: any) => ({
+                id: c.id,
+                code: c.customerCode,
+                name: c.customerName,
+              })),
+            );
+        });
+      apiFetch("/api/sites")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.sites)
+            setSiteOptions(
+              d.sites.map((s: any) => ({
+                id: s.id,
+                code: s.siteCode,
+                name: s.siteName,
+                customerId: s.customerId,
+              })),
+            );
+        });
+      apiFetch("/api/equipment-systems")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.systems) setSavedRecords(d.systems);
+        });
       return;
     }
 
     // 11. MST-09: Employee / Technician
     if (meta.code === "MST-09" || meta.id === "O1-SCR-MST-09") {
-      apiFetch("/api/technicians").then((r) => r.json()).then((d) => {
-        if (d?.technicians) setSavedRecords(d.technicians);
-      });
+      apiFetch("/api/technicians")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.technicians) setSavedRecords(d.technicians);
+        });
       return;
     }
 
     // 12. MST-10: Subcontractors
     if (meta.code === "MST-10" || meta.id === "O1-SCR-MST-10") {
-      apiFetch("/api/subcontractors").then((r) => r.json()).then((d) => {
-        if (d?.subcontractors) setSavedRecords(d.subcontractors);
-      });
+      apiFetch("/api/subcontractors")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.subcontractors) setSavedRecords(d.subcontractors);
+        });
       return;
     }
 
     // 13. MST-11: Service Role Master
     if (meta.code === "MST-11" || meta.id === "O1-SCR-MST-11") {
-      apiFetch("/api/service-roles").then((r) => r.json()).then((d) => {
-        if (d?.roles) setSavedRecords(d.roles);
-      });
+      apiFetch("/api/service-roles")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.roles) setSavedRecords(d.roles);
+        });
       return;
     }
 
     // 14. MST-12: Service Type / Reason / Priority / Status
     if (meta.code === "MST-12" || meta.id === "O1-SCR-MST-12") {
-      apiFetch("/api/service-types").then((r) => r.json()).then((d) => {
-        if (d?.serviceTypes) setSavedRecords(d.serviceTypes);
-      });
+      apiFetch("/api/service-types")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.serviceTypes) setSavedRecords(d.serviceTypes);
+        });
       return;
     }
 
     // 15. MST-13: Hold Reasons
     if (meta.code === "MST-13" || meta.id === "O1-SCR-MST-13") {
-      apiFetch("/api/hold-reasons").then((r) => r.json()).then((d) => {
-        if (d?.holdReasons) setSavedRecords(d.holdReasons);
-      });
+      apiFetch("/api/hold-reasons")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.holdReasons) setSavedRecords(d.holdReasons);
+        });
       return;
     }
 
     // 16. MST-14: Repeat Reasons and Detection Period
     if (meta.code === "MST-14" || meta.id === "O1-SCR-MST-14") {
-      apiFetch("/api/repeat-reasons").then((r) => r.json()).then((d) => {
-        if (d?.repeatReasons) setSavedRecords(d.repeatReasons);
-      });
+      apiFetch("/api/repeat-reasons")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.repeatReasons) setSavedRecords(d.repeatReasons);
+        });
       return;
     }
 
     // 17. MST-15: SLA Rules and Working Calendar
     if (meta.code === "MST-15" || meta.id === "O1-SCR-MST-15") {
-      apiFetch("/api/sla-rules").then((r) => r.json()).then((d) => {
-        if (d?.slaRules) setSavedRecords(d.slaRules);
-      });
+      apiFetch("/api/sla-rules")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.slaRules) setSavedRecords(d.slaRules);
+        });
       return;
     }
 
     // 18. MST-16: Checklist Templates
     if (meta.code === "MST-16" || meta.id === "O1-SCR-MST-16") {
-      apiFetch("/api/checklist-templates").then((r) => r.json()).then((d) => {
-        if (d?.checklistTemplates) setSavedRecords(d.checklistTemplates);
-      });
+      apiFetch("/api/checklist-templates")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.checklistTemplates) setSavedRecords(d.checklistTemplates);
+        });
       return;
     }
 
     // 19. MST-17: Warranty Rules
     if (meta.code === "MST-17" || meta.id === "O1-SCR-MST-17") {
-      apiFetch("/api/warranty-rules").then((r) => r.json()).then((d) => {
-        if (d?.warrantyRules) setSavedRecords(d.warrantyRules);
-      });
+      apiFetch("/api/warranty-rules")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.warrantyRules) setSavedRecords(d.warrantyRules);
+        });
       return;
     }
 
     // 20. MST-18: Free Service Plan
     if (meta.code === "MST-18" || meta.id === "O1-SCR-MST-18") {
-      apiFetch("/api/free-service-plans").then((r) => r.json()).then((d) => {
-        if (d?.plans) setSavedRecords(d.plans);
-      });
+      apiFetch("/api/free-service-plans")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.plans) setSavedRecords(d.plans);
+        });
       return;
     }
 
     // 21. MST-19: Contract Templates
     if (meta.code === "MST-19" || meta.id === "O1-SCR-MST-19") {
-      apiFetch("/api/contract-templates").then((r) => r.json()).then((d) => {
-        if (d?.templates) setSavedRecords(d.templates);
-      });
+      apiFetch("/api/contract-templates")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.templates) setSavedRecords(d.templates);
+        });
       return;
     }
 
     // 22. MST-20: Relationship Stages / Reasons
     if (meta.code === "MST-20" || meta.id === "O1-SCR-MST-20") {
-      apiFetch("/api/relationship-stages").then((r) => r.json()).then((d) => {
-        if (d?.stages) setSavedRecords(d.stages);
-      });
+      apiFetch("/api/relationship-stages")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.stages) setSavedRecords(d.stages);
+        });
       return;
     }
 
     // 23. MST-21: Reminder Rules and Intervals
     if (meta.code === "MST-21" || meta.id === "O1-SCR-MST-21") {
-      apiFetch("/api/reminder-rules").then((r) => r.json()).then((d) => {
-        if (d?.reminderRules) setSavedRecords(d.reminderRules);
-      });
+      apiFetch("/api/reminder-rules")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.reminderRules) setSavedRecords(d.reminderRules);
+        });
       return;
     }
 
     // 24. MST-22: Notification Templates
     if (meta.code === "MST-22" || meta.id === "O1-SCR-MST-22") {
-      apiFetch("/api/notification-templates").then((r) => r.json()).then((d) => {
-        if (d?.templates) setSavedRecords(d.templates);
-      });
+      apiFetch("/api/notification-templates")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.templates) setSavedRecords(d.templates);
+        });
       return;
     }
 
     // 25. MST-23: Project and G/L Budget
     if (meta.code === "MST-23" || meta.id === "O1-SCR-MST-23") {
-      apiFetch("/api/project-budgets").then((r) => r.json()).then((d) => {
-        if (d?.budgets) setSavedRecords(d.budgets);
-      });
+      apiFetch("/api/project-budgets")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.budgets) setSavedRecords(d.budgets);
+        });
       return;
     }
 
     // 26. MST-24: Cost Element / G/L Mapping
     if (meta.code === "MST-24" || meta.id === "O1-SCR-MST-24") {
-      apiFetch("/api/cost-element-mappings").then((r) => r.json()).then((d) => {
-        if (d?.mappings) setSavedRecords(d.mappings);
-      });
+      apiFetch("/api/cost-element-mappings")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.mappings) setSavedRecords(d.mappings);
+        });
       return;
     }
 
     // 27. MST-25: Labour Rates
     if (meta.code === "MST-25" || meta.id === "O1-SCR-MST-25") {
-      apiFetch("/api/labour-rates").then((r) => r.json()).then((d) => {
-        if (d?.rates) setSavedRecords(d.rates);
-      });
+      apiFetch("/api/labour-rates")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.rates) setSavedRecords(d.rates);
+        });
       return;
     }
 
     // 28. MST-26: Franchise and Franchise Warehouse
     if (meta.code === "MST-26" || meta.id === "O1-SCR-MST-26") {
-      apiFetch("/api/franchise-warehouses").then((r) => r.json()).then((d) => {
-        if (d?.warehouses) setSavedRecords(d.warehouses);
-      });
+      apiFetch("/api/franchise-warehouses")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.warehouses) setSavedRecords(d.warehouses);
+        });
       return;
     }
 
     // 29. MST-27: Deviation Reasons
     if (meta.code === "MST-27" || meta.id === "O1-SCR-MST-27") {
-      apiFetch("/api/deviation-reasons").then((r) => r.json()).then((d) => {
-        if (d?.reasons) setSavedRecords(d.reasons);
-      });
+      apiFetch("/api/deviation-reasons")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.reasons) setSavedRecords(d.reasons);
+        });
       return;
     }
 
     // 30. MST-28: Export Permissions
     if (meta.code === "MST-28" || meta.id === "O1-SCR-MST-28") {
-      apiFetch("/api/export-permissions").then((r) => r.json()).then((d) => {
-        if (d?.permissions) setSavedRecords(d.permissions);
-      });
+      apiFetch("/api/export-permissions")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.permissions) setSavedRecords(d.permissions);
+        });
       return;
     }
 
     // 31. MST-29: Google Meet Settings
     if (meta.code === "MST-29" || meta.id === "O1-SCR-MST-29") {
-      apiFetch("/api/google-meet-settings").then((r) => r.json()).then((d) => {
-        if (d?.settings) setSavedRecords(d.settings);
-      });
+      apiFetch("/api/google-meet-settings")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.settings) setSavedRecords(d.settings);
+        });
       return;
     }
 
     // 32. MST-30: Equipment Category Attributes
     if (meta.code === "MST-30" || meta.id === "O1-SCR-MST-30") {
-      apiFetch("/api/equipment-category-attributes").then((r) => r.json()).then((d) => {
-        if (d?.categories) setSavedRecords(d.categories);
-      });
+      apiFetch("/api/equipment-category-attributes")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.categories) setSavedRecords(d.categories);
+        });
       return;
     }
 
     // 33. MST-31: Tools, Tool Boxes and Vehicles
     if (meta.code === "MST-31" || meta.id === "O1-SCR-MST-31") {
-      apiFetch("/api/tool-vehicle-assets").then((r) => r.json()).then((d) => {
-        if (d?.assets) setSavedRecords(d.assets);
-      });
+      apiFetch("/api/tool-vehicle-assets")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.assets) setSavedRecords(d.assets);
+        });
       return;
     }
 
@@ -452,10 +581,13 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     setFormData((prev) => ({ ...prev, [key]: val }));
 
     // If on MST-02 and Customer changed, filter/load that customer's contact persons
-    if ((meta.code === "MST-02" || meta.id === "O1-SCR-MST-02") && (key === "customerName" || key === "customerId")) {
+    if (
+      (meta.code === "MST-02" || meta.id === "O1-SCR-MST-02") &&
+      (key === "customerName" || key === "customerId")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/contacts?customerId=${matched.id}`)
@@ -470,10 +602,13 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     }
 
     // If on MST-03 and Customer changed, filter/load that customer's sites
-    if ((meta.code === "MST-03" || meta.id === "O1-SCR-MST-03") && (key === "customerName" || key === "customer")) {
+    if (
+      (meta.code === "MST-03" || meta.id === "O1-SCR-MST-03") &&
+      (key === "customerName" || key === "customer")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/sites?customerId=${matched.id}`)
@@ -488,10 +623,13 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     }
 
     // If on MST-08 and Customer changed, filter/load that customer's systems
-    if ((meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") && (key === "customer" || key === "customerName")) {
+    if (
+      (meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") &&
+      (key === "customer" || key === "customerName")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/equipment-systems?customerId=${matched.id}`)
@@ -503,10 +641,13 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     }
 
     // If on MST-07 and Customer changed, filter/load that customer's equipments
-    if ((meta.code === "MST-07" || meta.id === "O1-SCR-MST-07") && (key === "customer" || key === "customerName")) {
+    if (
+      (meta.code === "MST-07" || meta.id === "O1-SCR-MST-07") &&
+      (key === "customer" || key === "customerName")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/other-brand-equipments?customerId=${matched.id}`)
@@ -516,15 +657,20 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
               setSavedRecords(data.equipments);
             }
           })
-          .catch((err) => console.error("Failed to load other-brand equipments for customer:", err));
+          .catch((err) =>
+            console.error("Failed to load other-brand equipments for customer:", err),
+          );
       }
     }
 
     // If on MST-06 and Customer changed, filter/load that customer's equipments
-    if ((meta.code === "MST-06" || meta.id === "O1-SCR-MST-06") && (key === "customer" || key === "customerName")) {
+    if (
+      (meta.code === "MST-06" || meta.id === "O1-SCR-MST-06") &&
+      (key === "customer" || key === "customerName")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/equipments?customerId=${matched.id}`)
@@ -539,10 +685,13 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     }
 
     // If on MST-05 and Customer changed, filter/load that customer's serials
-    if ((meta.code === "MST-05" || meta.id === "O1-SCR-MST-05") && (key === "customer" || key === "customerName")) {
+    if (
+      (meta.code === "MST-05" || meta.id === "O1-SCR-MST-05") &&
+      (key === "customer" || key === "customerName")
+    ) {
       const selectedName = String(val).trim();
       const matched = customerOptions.find(
-        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName
+        (c) => c.name.toLowerCase() === selectedName.toLowerCase() || String(c.id) === selectedName,
       );
       if (matched) {
         apiFetch(`/api/serials?customerId=${matched.id}`)
@@ -631,8 +780,10 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
     // Auto-sync status with active field if active is present
     const activeFieldPresent = meta.fields.some((f) => f.key === "active");
     const computedStatus = activeFieldPresent
-      ? (String(formData["active"] || "Yes").toLowerCase() === "no" ? "Inactive" : "Active")
-      : (formData["status"] || "Active");
+      ? String(formData["active"] || "Yes").toLowerCase() === "no"
+        ? "Inactive"
+        : "Active"
+      : formData["status"] || "Active";
 
     const payload = {
       ...formData,
@@ -719,12 +870,14 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         // Find customer by customerName or customerId
         let rawCustName = String(formData["customerName"] || formData["customerId"] || "").trim();
         let matchedOption = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCustName.toLowerCase() || String(c.id) === rawCustName
+          (c) => c.name.toLowerCase() === rawCustName.toLowerCase() || String(c.id) === rawCustName,
         );
 
         let resolvedCustId = matchedOption ? matchedOption.id : Number(rawCustName) || 1;
         let resolvedCustName = matchedOption ? matchedOption.name : rawCustName;
-        let resolvedCustCode = matchedOption ? `${matchedOption.code} (${matchedOption.name})` : undefined;
+        let resolvedCustCode = matchedOption
+          ? `${matchedOption.code} (${matchedOption.name})`
+          : undefined;
 
         const contactPayload = {
           ...formData,
@@ -747,7 +900,10 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (c) =>
                     c["id"] !== result.contact["id"] &&
-                    !(c["customerId"] === result.contact["customerId"] && c["contactName"] === result.contact["contactName"]),
+                    !(
+                      c["customerId"] === result.contact["customerId"] &&
+                      c["contactName"] === result.contact["contactName"]
+                    ),
                 ),
               ]);
             }
@@ -757,7 +913,7 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         // Find customer by customerName or customer
         let rawCustName = String(formData["customerName"] || formData["customer"] || "").trim();
         let matchedOption = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCustName.toLowerCase() || String(c.id) === rawCustName
+          (c) => c.name.toLowerCase() === rawCustName.toLowerCase() || String(c.id) === rawCustName,
         );
 
         let resolvedCustId = matchedOption ? matchedOption.id : Number(rawCustName) || 1;
@@ -785,7 +941,8 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (s) =>
                     s["id"] !== result.site["id"] &&
-                    String(s["siteCode"]).toUpperCase() !== String(result.site["siteCode"]).toUpperCase(),
+                    String(s["siteCode"]).toUpperCase() !==
+                      String(result.site["siteCode"]).toUpperCase(),
                 ),
               ]);
             }
@@ -806,7 +963,8 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (i) =>
                     i["id"] !== result.item["id"] &&
-                    String(i["itemCode"]).toUpperCase() !== String(result.item["itemCode"]).toUpperCase(),
+                    String(i["itemCode"]).toUpperCase() !==
+                      String(result.item["itemCode"]).toUpperCase(),
                 ),
               ]);
             }
@@ -815,11 +973,14 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       } else if (meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") {
         let rawCust = String(formData["customer"] || formData["customerName"] || "").trim();
         let matchedCust = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust
+          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust,
         );
         let rawSite = String(formData["site"] || formData["siteName"] || "").trim();
         let matchedSite = siteOptions.find(
-          (s) => s.name.toLowerCase() === rawSite.toLowerCase() || s.code.toLowerCase() === rawSite.toLowerCase() || String(s.id) === rawSite
+          (s) =>
+            s.name.toLowerCase() === rawSite.toLowerCase() ||
+            s.code.toLowerCase() === rawSite.toLowerCase() ||
+            String(s.id) === rawSite,
         );
         const sysPayload = {
           ...formData,
@@ -832,252 +993,494 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(sysPayload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.system) {
-            setSavedRecords((prev) => [result.system, ...prev.filter((s) => s["id"] !== result.system["id"] && String(s["systemId"]).toUpperCase() !== String(result.system["systemId"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.system) {
+              setSavedRecords((prev) => [
+                result.system,
+                ...prev.filter(
+                  (s) =>
+                    s["id"] !== result.system["id"] &&
+                    String(s["systemId"]).toUpperCase() !==
+                      String(result.system["systemId"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-09" || meta.id === "O1-SCR-MST-09") {
         apiFetch("/api/technicians", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
-        }).then((res) => res.json()).then((result) => {
-          if (result.technician) {
-            setSavedRecords((prev) => [result.technician, ...prev.filter((t) => t["id"] !== result.technician["id"] && String(t["employeeId"]).toUpperCase() !== String(result.technician["employeeId"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.technician) {
+              setSavedRecords((prev) => [
+                result.technician,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.technician["id"] &&
+                    String(t["employeeId"]).toUpperCase() !==
+                      String(result.technician["employeeId"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-10" || meta.id === "O1-SCR-MST-10") {
         apiFetch("/api/subcontractors", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
-        }).then((res) => res.json()).then((result) => {
-          if (result.subcontractor) {
-            setSavedRecords((prev) => [result.subcontractor, ...prev.filter((s) => s["id"] !== result.subcontractor["id"] && String(s["vendorCode"]).toUpperCase() !== String(result.subcontractor["vendorCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.subcontractor) {
+              setSavedRecords((prev) => [
+                result.subcontractor,
+                ...prev.filter(
+                  (s) =>
+                    s["id"] !== result.subcontractor["id"] &&
+                    String(s["vendorCode"]).toUpperCase() !==
+                      String(result.subcontractor["vendorCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-11" || meta.id === "O1-SCR-MST-11") {
         apiFetch("/api/service-roles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
-        }).then((res) => res.json()).then((result) => {
-          if (result.role) {
-            setSavedRecords((prev) => [result.role, ...prev.filter((r) => r["id"] !== result.role["id"] && String(r["roleCode"]).toUpperCase() !== String(result.role["roleCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.role) {
+              setSavedRecords((prev) => [
+                result.role,
+                ...prev.filter(
+                  (r) =>
+                    r["id"] !== result.role["id"] &&
+                    String(r["roleCode"]).toUpperCase() !==
+                      String(result.role["roleCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-12" || meta.id === "O1-SCR-MST-12") {
         apiFetch("/api/service-types", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
-        }).then((res) => res.json()).then((result) => {
-          if (result.serviceType) {
-            setSavedRecords((prev) => [result.serviceType, ...prev.filter((t) => t["id"] !== result.serviceType["id"] && String(t["code"]).toUpperCase() !== String(result.serviceType["code"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.serviceType) {
+              setSavedRecords((prev) => [
+                result.serviceType,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.serviceType["id"] &&
+                    String(t["code"]).toUpperCase() !==
+                      String(result.serviceType["code"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-13" || meta.id === "O1-SCR-MST-13") {
         apiFetch("/api/hold-reasons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.holdReason) {
-            setSavedRecords((prev) => [result.holdReason, ...prev.filter((t) => t["id"] !== result.holdReason["id"] && String(t["reasonCode"]).toUpperCase() !== String(result.holdReason["reasonCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.holdReason) {
+              setSavedRecords((prev) => [
+                result.holdReason,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.holdReason["id"] &&
+                    String(t["reasonCode"]).toUpperCase() !==
+                      String(result.holdReason["reasonCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-14" || meta.id === "O1-SCR-MST-14") {
         apiFetch("/api/repeat-reasons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.repeatReason) {
-            setSavedRecords((prev) => [result.repeatReason, ...prev.filter((t) => t["id"] !== result.repeatReason["id"] && String(t["reasonCode"]).toUpperCase() !== String(result.repeatReason["reasonCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.repeatReason) {
+              setSavedRecords((prev) => [
+                result.repeatReason,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.repeatReason["id"] &&
+                    String(t["reasonCode"]).toUpperCase() !==
+                      String(result.repeatReason["reasonCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-15" || meta.id === "O1-SCR-MST-15") {
         apiFetch("/api/sla-rules", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.slaRule) {
-            setSavedRecords((prev) => [result.slaRule, ...prev.filter((t) => t["id"] !== result.slaRule["id"] && String(t["ruleCode"]).toUpperCase() !== String(result.slaRule["ruleCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.slaRule) {
+              setSavedRecords((prev) => [
+                result.slaRule,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.slaRule["id"] &&
+                    String(t["ruleCode"]).toUpperCase() !==
+                      String(result.slaRule["ruleCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-16" || meta.id === "O1-SCR-MST-16") {
         apiFetch("/api/checklist-templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.checklistTemplate) {
-            setSavedRecords((prev) => [result.checklistTemplate, ...prev.filter((t) => t["id"] !== result.checklistTemplate["id"] && String(t["templateCode"]).toUpperCase() !== String(result.checklistTemplate["templateCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.checklistTemplate) {
+              setSavedRecords((prev) => [
+                result.checklistTemplate,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.checklistTemplate["id"] &&
+                    String(t["templateCode"]).toUpperCase() !==
+                      String(result.checklistTemplate["templateCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-17" || meta.id === "O1-SCR-MST-17") {
         apiFetch("/api/warranty-rules", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.warrantyRule) {
-            setSavedRecords((prev) => [result.warrantyRule, ...prev.filter((t) => t["id"] !== result.warrantyRule["id"] && String(t["ruleCode"]).toUpperCase() !== String(result.warrantyRule["ruleCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.warrantyRule) {
+              setSavedRecords((prev) => [
+                result.warrantyRule,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.warrantyRule["id"] &&
+                    String(t["ruleCode"]).toUpperCase() !==
+                      String(result.warrantyRule["ruleCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-18" || meta.id === "O1-SCR-MST-18") {
         apiFetch("/api/free-service-plans", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.plan) {
-            setSavedRecords((prev) => [result.plan, ...prev.filter((t) => t["id"] !== result.plan["id"] && String(t["planCode"]).toUpperCase() !== String(result.plan["planCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.plan) {
+              setSavedRecords((prev) => [
+                result.plan,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.plan["id"] &&
+                    String(t["planCode"]).toUpperCase() !==
+                      String(result.plan["planCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-19" || meta.id === "O1-SCR-MST-19") {
         apiFetch("/api/contract-templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.template) {
-            setSavedRecords((prev) => [result.template, ...prev.filter((t) => t["id"] !== result.template["id"] && String(t["template"]).toUpperCase() !== String(result.template["template"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.template) {
+              setSavedRecords((prev) => [
+                result.template,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.template["id"] &&
+                    String(t["template"]).toUpperCase() !==
+                      String(result.template["template"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-20" || meta.id === "O1-SCR-MST-20") {
         apiFetch("/api/relationship-stages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.stage) {
-            setSavedRecords((prev) => [result.stage, ...prev.filter((t) => t["id"] !== result.stage["id"] && String(t["code"]).toUpperCase() !== String(result.stage["code"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.stage) {
+              setSavedRecords((prev) => [
+                result.stage,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.stage["id"] &&
+                    String(t["code"]).toUpperCase() !== String(result.stage["code"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-21" || meta.id === "O1-SCR-MST-21") {
         apiFetch("/api/reminder-rules", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.reminderRule) {
-            setSavedRecords((prev) => [result.reminderRule, ...prev.filter((t) => t["id"] !== result.reminderRule["id"] && String(t["ruleCode"]).toUpperCase() !== String(result.reminderRule["ruleCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.reminderRule) {
+              setSavedRecords((prev) => [
+                result.reminderRule,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.reminderRule["id"] &&
+                    String(t["ruleCode"]).toUpperCase() !==
+                      String(result.reminderRule["ruleCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-22" || meta.id === "O1-SCR-MST-22") {
         apiFetch("/api/notification-templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.template) {
-            setSavedRecords((prev) => [result.template, ...prev.filter((t) => t["id"] !== result.template["id"] && String(t["templateId"]).toUpperCase() !== String(result.template["templateId"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.template) {
+              setSavedRecords((prev) => [
+                result.template,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.template["id"] &&
+                    String(t["templateId"]).toUpperCase() !==
+                      String(result.template["templateId"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-23" || meta.id === "O1-SCR-MST-23") {
         apiFetch("/api/project-budgets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.budget) {
-            setSavedRecords((prev) => [result.budget, ...prev.filter((t) => t["id"] !== result.budget["id"] && String(t["projectCode"]).toUpperCase() !== String(result.budget["projectCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.budget) {
+              setSavedRecords((prev) => [
+                result.budget,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.budget["id"] &&
+                    String(t["projectCode"]).toUpperCase() !==
+                      String(result.budget["projectCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-24" || meta.id === "O1-SCR-MST-24") {
         apiFetch("/api/cost-element-mappings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.mapping) {
-            setSavedRecords((prev) => [result.mapping, ...prev.filter((t) => t["id"] !== result.mapping["id"] && String(t["costElement"]).toUpperCase() !== String(result.mapping["costElement"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.mapping) {
+              setSavedRecords((prev) => [
+                result.mapping,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.mapping["id"] &&
+                    String(t["costElement"]).toUpperCase() !==
+                      String(result.mapping["costElement"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-25" || meta.id === "O1-SCR-MST-25") {
         apiFetch("/api/labour-rates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.rate) {
-            setSavedRecords((prev) => [result.rate, ...prev.filter((t) => t["id"] !== result.rate["id"] && String(t["rateCode"]).toUpperCase() !== String(result.rate["rateCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.rate) {
+              setSavedRecords((prev) => [
+                result.rate,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.rate["id"] &&
+                    String(t["rateCode"]).toUpperCase() !==
+                      String(result.rate["rateCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-26" || meta.id === "O1-SCR-MST-26") {
         apiFetch("/api/franchise-warehouses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.warehouse) {
-            setSavedRecords((prev) => [result.warehouse, ...prev.filter((t) => t["id"] !== result.warehouse["id"] && String(t["franchiseBp"]).toUpperCase() !== String(result.warehouse["franchiseBp"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.warehouse) {
+              setSavedRecords((prev) => [
+                result.warehouse,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.warehouse["id"] &&
+                    String(t["franchiseBp"]).toUpperCase() !==
+                      String(result.warehouse["franchiseBp"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-27" || meta.id === "O1-SCR-MST-27") {
         apiFetch("/api/deviation-reasons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.reason) {
-            setSavedRecords((prev) => [result.reason, ...prev.filter((t) => t["id"] !== result.reason["id"] && String(t["reasonCode"]).toUpperCase() !== String(result.reason["reasonCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.reason) {
+              setSavedRecords((prev) => [
+                result.reason,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.reason["id"] &&
+                    String(t["reasonCode"]).toUpperCase() !==
+                      String(result.reason["reasonCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-28" || meta.id === "O1-SCR-MST-28") {
         apiFetch("/api/export-permissions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.permission) {
-            setSavedRecords((prev) => [result.permission, ...prev.filter((t) => t["id"] !== result.permission["id"] && (String(t["role"]) !== String(result.permission["role"]) || String(t["reportGrid"]) !== String(result.permission["reportGrid"])))]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.permission) {
+              setSavedRecords((prev) => [
+                result.permission,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.permission["id"] &&
+                    (String(t["role"]) !== String(result.permission["role"]) ||
+                      String(t["reportGrid"]) !== String(result.permission["reportGrid"])),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-29" || meta.id === "O1-SCR-MST-29") {
         apiFetch("/api/google-meet-settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.setting) {
-            setSavedRecords((prev) => [result.setting, ...prev.filter((t) => t["id"] !== result.setting["id"] && String(t["workspaceDomain"]).toUpperCase() !== String(result.setting["workspaceDomain"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.setting) {
+              setSavedRecords((prev) => [
+                result.setting,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.setting["id"] &&
+                    String(t["workspaceDomain"]).toUpperCase() !==
+                      String(result.setting["workspaceDomain"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-30" || meta.id === "O1-SCR-MST-30") {
         apiFetch("/api/equipment-category-attributes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.category) {
-            setSavedRecords((prev) => [result.category, ...prev.filter((t) => t["id"] !== result.category["id"] && String(t["categoryCode"]).toUpperCase() !== String(result.category["categoryCode"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.category) {
+              setSavedRecords((prev) => [
+                result.category,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.category["id"] &&
+                    String(t["categoryCode"]).toUpperCase() !==
+                      String(result.category["categoryCode"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-31" || meta.id === "O1-SCR-MST-31") {
         apiFetch("/api/tool-vehicle-assets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }).then((res) => res.json()).then((result) => {
-          if (result.asset) {
-            setSavedRecords((prev) => [result.asset, ...prev.filter((t) => t["id"] !== result.asset["id"] && String(t["assetId"]).toUpperCase() !== String(result.asset["assetId"]).toUpperCase())]);
-          }
-        });
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.asset) {
+              setSavedRecords((prev) => [
+                result.asset,
+                ...prev.filter(
+                  (t) =>
+                    t["id"] !== result.asset["id"] &&
+                    String(t["assetId"]).toUpperCase() !==
+                      String(result.asset["assetId"]).toUpperCase(),
+                ),
+              ]);
+            }
+          });
       } else if (meta.code === "MST-07" || meta.id === "O1-SCR-MST-07") {
         // Resolve customer
         let rawCust = String(formData["customer"] || formData["customerName"] || "").trim();
         let matchedCust = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust
+          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust,
         );
 
         // Resolve site
         let rawSite = String(formData["site"] || formData["siteName"] || "").trim();
         let matchedSite = siteOptions.find(
-          (s) => s.name.toLowerCase() === rawSite.toLowerCase() || s.code.toLowerCase() === rawSite.toLowerCase() || String(s.id) === rawSite
+          (s) =>
+            s.name.toLowerCase() === rawSite.toLowerCase() ||
+            s.code.toLowerCase() === rawSite.toLowerCase() ||
+            String(s.id) === rawSite,
         );
 
         const otherPayload = {
@@ -1102,7 +1505,8 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (e) =>
                     e["id"] !== result.equipment["id"] &&
-                    String(e["equipmentId"]).toUpperCase() !== String(result.equipment["equipmentId"]).toUpperCase(),
+                    String(e["equipmentId"]).toUpperCase() !==
+                      String(result.equipment["equipmentId"]).toUpperCase(),
                 ),
               ]);
             }
@@ -1112,19 +1516,22 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         // Resolve customer
         let rawCust = String(formData["customer"] || formData["customerName"] || "").trim();
         let matchedCust = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust
+          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust,
         );
 
         // Resolve site
         let rawSite = String(formData["site"] || formData["siteName"] || "").trim();
         let matchedSite = siteOptions.find(
-          (s) => s.name.toLowerCase() === rawSite.toLowerCase() || s.code.toLowerCase() === rawSite.toLowerCase() || String(s.id) === rawSite
+          (s) =>
+            s.name.toLowerCase() === rawSite.toLowerCase() ||
+            s.code.toLowerCase() === rawSite.toLowerCase() ||
+            String(s.id) === rawSite,
         );
 
         // Resolve serial
         let rawSerial = String(formData["serial"] || formData["serialNo"] || "").trim();
         let matchedSerial = serialOptions.find(
-          (s) => s.serialNo.toLowerCase() === rawSerial.toLowerCase() || String(s.id) === rawSerial
+          (s) => s.serialNo.toLowerCase() === rawSerial.toLowerCase() || String(s.id) === rawSerial,
         );
 
         const equipPayload = {
@@ -1151,7 +1558,8 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (e) =>
                     e["id"] !== result.equipment["id"] &&
-                    String(e["equipmentId"]).toUpperCase() !== String(result.equipment["equipmentId"]).toUpperCase(),
+                    String(e["equipmentId"]).toUpperCase() !==
+                      String(result.equipment["equipmentId"]).toUpperCase(),
                 ),
               ]);
             }
@@ -1161,25 +1569,30 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         // Resolve customer
         let rawCust = String(formData["customer"] || formData["customerName"] || "").trim();
         let matchedCust = customerOptions.find(
-          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust
+          (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust,
         );
 
         // Resolve item
         let rawItem = String(formData["item"] || formData["itemName"] || "").trim();
         // Dropdown value format: "{itemCode} - {itemName}"
-        let itemCodePart = rawItem.includes(" - ") ? (rawItem.split(" - ")[0] ?? "").trim() : rawItem;
+        let itemCodePart = rawItem.includes(" - ")
+          ? (rawItem.split(" - ")[0] ?? "").trim()
+          : rawItem;
         let matchedItem = itemOptions.find(
           (i) =>
             i.code.toLowerCase() === itemCodePart.toLowerCase() ||
             i.name.toLowerCase() === rawItem.toLowerCase() ||
             `${i.code} - ${i.name}`.toLowerCase() === rawItem.toLowerCase() ||
-            String(i.id) === rawItem
+            String(i.id) === rawItem,
         );
 
         // Resolve site
         let rawSite = String(formData["site"] || formData["siteName"] || "").trim();
         let matchedSite = siteOptions.find(
-          (s) => s.name.toLowerCase() === rawSite.toLowerCase() || s.code.toLowerCase() === rawSite.toLowerCase() || String(s.id) === rawSite
+          (s) =>
+            s.name.toLowerCase() === rawSite.toLowerCase() ||
+            s.code.toLowerCase() === rawSite.toLowerCase() ||
+            String(s.id) === rawSite,
         );
 
         const serialPayload = {
@@ -1207,7 +1620,8 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 ...prev.filter(
                   (s) =>
                     s["id"] !== result.serial["id"] &&
-                    String(s["serialNo"]).toUpperCase() !== String(result.serial["serialNo"]).toUpperCase(),
+                    String(s["serialNo"]).toUpperCase() !==
+                      String(result.serial["serialNo"]).toUpperCase(),
                 ),
               ]);
             }
@@ -1390,13 +1804,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/serials?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/serials?serialNo=${encodeURIComponent(String(serialToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/serials").then((res) => res.json()).then((data) => {
-          if (data?.serials) setSavedRecords(data.serials);
-        });
-      }).catch((e) =>
-        console.error("Error deleting serial from DB:", e),
-      );
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/serials")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.serials) setSavedRecords(data.serials);
+            });
+        })
+        .catch((e) => console.error("Error deleting serial from DB:", e));
     }
 
     if (meta.code === "MST-08" || meta.id === "O1-SCR-MST-08") {
@@ -1405,11 +1821,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/equipment-systems?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/equipment-systems?systemId=${encodeURIComponent(String(sysIdToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/equipment-systems").then((res) => res.json()).then((data) => {
-          if (data?.systems) setSavedRecords(data.systems);
-        });
-      }).catch((e) => console.error("Error deleting equipment system from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/equipment-systems")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.systems) setSavedRecords(data.systems);
+            });
+        })
+        .catch((e) => console.error("Error deleting equipment system from DB:", e));
     }
 
     if (meta.code === "MST-09" || meta.id === "O1-SCR-MST-09") {
@@ -1418,11 +1838,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/technicians?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/technicians?employeeId=${encodeURIComponent(String(empIdToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/technicians").then((res) => res.json()).then((data) => {
-          if (data?.technicians) setSavedRecords(data.technicians);
-        });
-      }).catch((e) => console.error("Error deleting technician from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/technicians")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.technicians) setSavedRecords(data.technicians);
+            });
+        })
+        .catch((e) => console.error("Error deleting technician from DB:", e));
     }
 
     if (meta.code === "MST-10" || meta.id === "O1-SCR-MST-10") {
@@ -1431,11 +1855,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/subcontractors?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/subcontractors?vendorCode=${encodeURIComponent(String(vCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/subcontractors").then((res) => res.json()).then((data) => {
-          if (data?.subcontractors) setSavedRecords(data.subcontractors);
-        });
-      }).catch((e) => console.error("Error deleting subcontractor from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/subcontractors")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.subcontractors) setSavedRecords(data.subcontractors);
+            });
+        })
+        .catch((e) => console.error("Error deleting subcontractor from DB:", e));
     }
 
     if (meta.code === "MST-11" || meta.id === "O1-SCR-MST-11") {
@@ -1444,11 +1872,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/service-roles?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/service-roles?roleCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/service-roles").then((res) => res.json()).then((data) => {
-          if (data?.roles) setSavedRecords(data.roles);
-        });
-      }).catch((e) => console.error("Error deleting service role from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/service-roles")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.roles) setSavedRecords(data.roles);
+            });
+        })
+        .catch((e) => console.error("Error deleting service role from DB:", e));
     }
 
     if (meta.code === "MST-12" || meta.id === "O1-SCR-MST-12") {
@@ -1457,11 +1889,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/service-types?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/service-types?code=${encodeURIComponent(String(codeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/service-types").then((res) => res.json()).then((data) => {
-          if (data?.serviceTypes) setSavedRecords(data.serviceTypes);
-        });
-      }).catch((e) => console.error("Error deleting service type from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/service-types")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.serviceTypes) setSavedRecords(data.serviceTypes);
+            });
+        })
+        .catch((e) => console.error("Error deleting service type from DB:", e));
     }
 
     if (meta.code === "MST-13" || meta.id === "O1-SCR-MST-13") {
@@ -1470,11 +1906,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/hold-reasons?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/hold-reasons?reasonCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/hold-reasons").then((res) => res.json()).then((data) => {
-          if (data?.holdReasons) setSavedRecords(data.holdReasons);
-        });
-      }).catch((e) => console.error("Error deleting hold reason from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/hold-reasons")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.holdReasons) setSavedRecords(data.holdReasons);
+            });
+        })
+        .catch((e) => console.error("Error deleting hold reason from DB:", e));
     }
 
     if (meta.code === "MST-14" || meta.id === "O1-SCR-MST-14") {
@@ -1483,11 +1923,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/repeat-reasons?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/repeat-reasons?reasonCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/repeat-reasons").then((res) => res.json()).then((data) => {
-          if (data?.repeatReasons) setSavedRecords(data.repeatReasons);
-        });
-      }).catch((e) => console.error("Error deleting repeat reason from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/repeat-reasons")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.repeatReasons) setSavedRecords(data.repeatReasons);
+            });
+        })
+        .catch((e) => console.error("Error deleting repeat reason from DB:", e));
     }
 
     if (meta.code === "MST-15" || meta.id === "O1-SCR-MST-15") {
@@ -1496,11 +1940,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/sla-rules?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/sla-rules?ruleCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/sla-rules").then((res) => res.json()).then((data) => {
-          if (data?.slaRules) setSavedRecords(data.slaRules);
-        });
-      }).catch((e) => console.error("Error deleting SLA rule from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/sla-rules")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.slaRules) setSavedRecords(data.slaRules);
+            });
+        })
+        .catch((e) => console.error("Error deleting SLA rule from DB:", e));
     }
 
     if (meta.code === "MST-16" || meta.id === "O1-SCR-MST-16") {
@@ -1509,11 +1957,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/checklist-templates?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/checklist-templates?templateCode=${encodeURIComponent(String(tCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/checklist-templates").then((res) => res.json()).then((data) => {
-          if (data?.checklistTemplates) setSavedRecords(data.checklistTemplates);
-        });
-      }).catch((e) => console.error("Error deleting checklist template from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/checklist-templates")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.checklistTemplates) setSavedRecords(data.checklistTemplates);
+            });
+        })
+        .catch((e) => console.error("Error deleting checklist template from DB:", e));
     }
 
     if (meta.code === "MST-17" || meta.id === "O1-SCR-MST-17") {
@@ -1522,11 +1974,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/warranty-rules?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/warranty-rules?ruleCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/warranty-rules").then((res) => res.json()).then((data) => {
-          if (data?.warrantyRules) setSavedRecords(data.warrantyRules);
-        });
-      }).catch((e) => console.error("Error deleting warranty rule from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/warranty-rules")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.warrantyRules) setSavedRecords(data.warrantyRules);
+            });
+        })
+        .catch((e) => console.error("Error deleting warranty rule from DB:", e));
     }
 
     if (meta.code === "MST-18" || meta.id === "O1-SCR-MST-18") {
@@ -1535,11 +1991,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/free-service-plans?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/free-service-plans?planCode=${encodeURIComponent(String(pCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/free-service-plans").then((res) => res.json()).then((data) => {
-          if (data?.plans) setSavedRecords(data.plans);
-        });
-      }).catch((e) => console.error("Error deleting free service plan from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/free-service-plans")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.plans) setSavedRecords(data.plans);
+            });
+        })
+        .catch((e) => console.error("Error deleting free service plan from DB:", e));
     }
 
     if (meta.code === "MST-19" || meta.id === "O1-SCR-MST-19") {
@@ -1548,11 +2008,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/contract-templates?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/contract-templates?template=${encodeURIComponent(String(templateToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/contract-templates").then((res) => res.json()).then((data) => {
-          if (data?.templates) setSavedRecords(data.templates);
-        });
-      }).catch((e) => console.error("Error deleting contract template from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/contract-templates")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.templates) setSavedRecords(data.templates);
+            });
+        })
+        .catch((e) => console.error("Error deleting contract template from DB:", e));
     }
 
     if (meta.code === "MST-20" || meta.id === "O1-SCR-MST-20") {
@@ -1561,11 +2025,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/relationship-stages?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/relationship-stages?code=${encodeURIComponent(String(codeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/relationship-stages").then((res) => res.json()).then((data) => {
-          if (data?.stages) setSavedRecords(data.stages);
-        });
-      }).catch((e) => console.error("Error deleting relationship stage from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/relationship-stages")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.stages) setSavedRecords(data.stages);
+            });
+        })
+        .catch((e) => console.error("Error deleting relationship stage from DB:", e));
     }
 
     if (meta.code === "MST-21" || meta.id === "O1-SCR-MST-21") {
@@ -1574,11 +2042,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/reminder-rules?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/reminder-rules?ruleCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/reminder-rules").then((res) => res.json()).then((data) => {
-          if (data?.reminderRules) setSavedRecords(data.reminderRules);
-        });
-      }).catch((e) => console.error("Error deleting reminder rule from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/reminder-rules")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.reminderRules) setSavedRecords(data.reminderRules);
+            });
+        })
+        .catch((e) => console.error("Error deleting reminder rule from DB:", e));
     }
 
     if (meta.code === "MST-22" || meta.id === "O1-SCR-MST-22") {
@@ -1587,11 +2059,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/notification-templates?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/notification-templates?templateId=${encodeURIComponent(String(tIdToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/notification-templates").then((res) => res.json()).then((data) => {
-          if (data?.templates) setSavedRecords(data.templates);
-        });
-      }).catch((e) => console.error("Error deleting notification template from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/notification-templates")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.templates) setSavedRecords(data.templates);
+            });
+        })
+        .catch((e) => console.error("Error deleting notification template from DB:", e));
     }
 
     if (meta.code === "MST-23" || meta.id === "O1-SCR-MST-23") {
@@ -1600,11 +2076,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/project-budgets?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/project-budgets?projectCode=${encodeURIComponent(String(pCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/project-budgets").then((res) => res.json()).then((data) => {
-          if (data?.budgets) setSavedRecords(data.budgets);
-        });
-      }).catch((e) => console.error("Error deleting project budget from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/project-budgets")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.budgets) setSavedRecords(data.budgets);
+            });
+        })
+        .catch((e) => console.error("Error deleting project budget from DB:", e));
     }
 
     if (meta.code === "MST-24" || meta.id === "O1-SCR-MST-24") {
@@ -1613,11 +2093,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/cost-element-mappings?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/cost-element-mappings?costElement=${encodeURIComponent(String(elemToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/cost-element-mappings").then((res) => res.json()).then((data) => {
-          if (data?.mappings) setSavedRecords(data.mappings);
-        });
-      }).catch((e) => console.error("Error deleting cost element mapping from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/cost-element-mappings")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.mappings) setSavedRecords(data.mappings);
+            });
+        })
+        .catch((e) => console.error("Error deleting cost element mapping from DB:", e));
     }
 
     if (meta.code === "MST-25" || meta.id === "O1-SCR-MST-25") {
@@ -1626,11 +2110,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/labour-rates?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/labour-rates?rateCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/labour-rates").then((res) => res.json()).then((data) => {
-          if (data?.rates) setSavedRecords(data.rates);
-        });
-      }).catch((e) => console.error("Error deleting labour rate from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/labour-rates")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.rates) setSavedRecords(data.rates);
+            });
+        })
+        .catch((e) => console.error("Error deleting labour rate from DB:", e));
     }
 
     if (meta.code === "MST-26" || meta.id === "O1-SCR-MST-26") {
@@ -1639,11 +2127,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/franchise-warehouses?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/franchise-warehouses?franchiseBp=${encodeURIComponent(String(bpToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/franchise-warehouses").then((res) => res.json()).then((data) => {
-          if (data?.warehouses) setSavedRecords(data.warehouses);
-        });
-      }).catch((e) => console.error("Error deleting franchise warehouse from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/franchise-warehouses")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.warehouses) setSavedRecords(data.warehouses);
+            });
+        })
+        .catch((e) => console.error("Error deleting franchise warehouse from DB:", e));
     }
 
     if (meta.code === "MST-27" || meta.id === "O1-SCR-MST-27") {
@@ -1652,11 +2144,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/deviation-reasons?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/deviation-reasons?reasonCode=${encodeURIComponent(String(rCodeToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/deviation-reasons").then((res) => res.json()).then((data) => {
-          if (data?.reasons) setSavedRecords(data.reasons);
-        });
-      }).catch((e) => console.error("Error deleting deviation reason from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/deviation-reasons")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.reasons) setSavedRecords(data.reasons);
+            });
+        })
+        .catch((e) => console.error("Error deleting deviation reason from DB:", e));
     }
 
     if (meta.code === "MST-28" || meta.id === "O1-SCR-MST-28") {
@@ -1664,11 +2160,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/export-permissions?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/export-permissions?role=${encodeURIComponent(String(rec["role"]))}&reportGrid=${encodeURIComponent(String(rec["reportGrid"]))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/export-permissions").then((res) => res.json()).then((data) => {
-          if (data?.permissions) setSavedRecords(data.permissions);
-        });
-      }).catch((e) => console.error("Error deleting export permission from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/export-permissions")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.permissions) setSavedRecords(data.permissions);
+            });
+        })
+        .catch((e) => console.error("Error deleting export permission from DB:", e));
     }
 
     if (meta.code === "MST-29" || meta.id === "O1-SCR-MST-29") {
@@ -1677,11 +2177,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/google-meet-settings?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/google-meet-settings?workspaceDomain=${encodeURIComponent(String(domainToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/google-meet-settings").then((res) => res.json()).then((data) => {
-          if (data?.settings) setSavedRecords(data.settings);
-        });
-      }).catch((e) => console.error("Error deleting google meet setting from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/google-meet-settings")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.settings) setSavedRecords(data.settings);
+            });
+        })
+        .catch((e) => console.error("Error deleting google meet setting from DB:", e));
     }
 
     if (meta.code === "MST-30" || meta.id === "O1-SCR-MST-30") {
@@ -1690,11 +2194,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/equipment-category-attributes?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/equipment-category-attributes?categoryCode=${encodeURIComponent(String(catToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/equipment-category-attributes").then((res) => res.json()).then((data) => {
-          if (data?.categories) setSavedRecords(data.categories);
-        });
-      }).catch((e) => console.error("Error deleting equipment category attribute from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/equipment-category-attributes")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.categories) setSavedRecords(data.categories);
+            });
+        })
+        .catch((e) => console.error("Error deleting equipment category attribute from DB:", e));
     }
 
     if (meta.code === "MST-31" || meta.id === "O1-SCR-MST-31") {
@@ -1703,11 +2211,15 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
       const url = idToDelete
         ? `/api/tool-vehicle-assets?id=${encodeURIComponent(String(idToDelete))}`
         : `/api/tool-vehicle-assets?assetId=${encodeURIComponent(String(assetToDelete))}`;
-      apiFetch(url, { method: "DELETE" }).then(() => {
-        apiFetch("/api/tool-vehicle-assets").then((res) => res.json()).then((data) => {
-          if (data?.assets) setSavedRecords(data.assets);
-        });
-      }).catch((e) => console.error("Error deleting tool/vehicle asset from DB:", e));
+      apiFetch(url, { method: "DELETE" })
+        .then(() => {
+          apiFetch("/api/tool-vehicle-assets")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.assets) setSavedRecords(data.assets);
+            });
+        })
+        .catch((e) => console.error("Error deleting tool/vehicle asset from DB:", e));
     }
 
     setSidePopup({
@@ -1768,7 +2280,9 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
   }, [savedRecords, savedSearchQuery]);
 
   // Primary preview columns for saved records table (first 4 fields, excluding duplicate status/active columns)
-  const previewFields = meta.fields.filter((f) => f.key !== "status" && f.key !== "active").slice(0, 4);
+  const previewFields = meta.fields
+    .filter((f) => f.key !== "status" && f.key !== "active")
+    .slice(0, 4);
 
   const activeTab = meta.tabs.find((t) => t.id === activeTabId);
 
@@ -1907,7 +2421,17 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
             if (meta.code === "MST-33" && f.key === "role" && dynamicRoleOptions.length > 0) {
               fieldDef = { ...f, options: dynamicRoleOptions };
             } else if (
-              (meta.code === "MST-02" || meta.code === "MST-03" || meta.code === "MST-05" || meta.code === "MST-06" || meta.code === "MST-07" || meta.code === "MST-08" || meta.id === "O1-SCR-MST-02" || meta.id === "O1-SCR-MST-03" || meta.id === "O1-SCR-MST-05" || meta.id === "O1-SCR-MST-06" || meta.id === "O1-SCR-MST-07") &&
+              (meta.code === "MST-02" ||
+                meta.code === "MST-03" ||
+                meta.code === "MST-05" ||
+                meta.code === "MST-06" ||
+                meta.code === "MST-07" ||
+                meta.code === "MST-08" ||
+                meta.id === "O1-SCR-MST-02" ||
+                meta.id === "O1-SCR-MST-03" ||
+                meta.id === "O1-SCR-MST-05" ||
+                meta.id === "O1-SCR-MST-06" ||
+                meta.id === "O1-SCR-MST-07") &&
               (f.key === "customerId" || f.key === "customerName" || f.key === "customer") &&
               customerOptions.length > 0
             ) {
@@ -1927,13 +2451,18 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 options: itemOptions.map((i) => `${i.code} - ${i.name}`),
               };
             } else if (
-              (meta.code === "MST-06" || meta.code === "MST-07" || meta.code === "MST-08" || meta.id === "O1-SCR-MST-06" || meta.id === "O1-SCR-MST-07" || meta.id === "O1-SCR-MST-08") &&
+              (meta.code === "MST-06" ||
+                meta.code === "MST-07" ||
+                meta.code === "MST-08" ||
+                meta.id === "O1-SCR-MST-06" ||
+                meta.id === "O1-SCR-MST-07" ||
+                meta.id === "O1-SCR-MST-08") &&
               (f.key === "site" || f.key === "siteName")
             ) {
               // If customer is selected, filter sites for this customer
               const rawCust = String(formData["customer"] || formData["customerName"] || "").trim();
               const matchedCust = customerOptions.find(
-                (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust
+                (c) => c.name.toLowerCase() === rawCust.toLowerCase() || String(c.id) === rawCust,
               );
               const availableSites = matchedCust
                 ? siteOptions.filter((s) => s.customerId === matchedCust.id)
@@ -1941,7 +2470,10 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
               fieldDef = {
                 ...f,
                 type: "select",
-                options: availableSites.length > 0 ? availableSites.map((s) => s.name) : ["Default Customer Site"],
+                options:
+                  availableSites.length > 0
+                    ? availableSites.map((s) => s.name)
+                    : ["Default Customer Site"],
               };
             } else if (
               (meta.code === "MST-06" || meta.id === "O1-SCR-MST-06") &&
@@ -1983,14 +2515,6 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
         </div>
 
         {/* Legend Footer */}
-        <div className="px-5 py-2.5 bg-muted/40 border-t border-border text-[11px] text-muted-foreground flex flex-wrap items-center justify-between gap-4 font-mono">
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="flex items-center gap-1">
-              <span className="text-red-500 font-bold">*</span>
-              <span>Mandatory Field (Required for Save)</span>
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* SAVED RECORDS REGISTER & CONTEXTUAL TABS CONTAINER */}
@@ -2063,7 +2587,6 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border">
                   <tr>
-                    
                     {previewFields.map((f) => (
                       <th key={f.key} className="py-2.5 px-3 whitespace-nowrap">
                         {f.label}
@@ -2076,14 +2599,20 @@ export const MasterScreenView: React.FC<MasterScreenViewProps> = ({ meta, onBack
                 <tbody className="divide-y divide-border">
                   {filteredSavedRecords.map((rec, rIdx) => {
                     const primaryKey = meta.fields[0]?.key || "id";
-                    const activeVal = rec["active"] !== undefined ? String(rec["active"]) : undefined;
-                    const statusVal = rec["status"] !== undefined ? String(rec["status"]) : (activeVal === "No" ? "Inactive" : "Active");
-                    const isStatusActive = statusVal.toLowerCase() === "active" && activeVal !== "No";
+                    const activeVal =
+                      rec["active"] !== undefined ? String(rec["active"]) : undefined;
+                    const statusVal =
+                      rec["status"] !== undefined
+                        ? String(rec["status"])
+                        : activeVal === "No"
+                          ? "Inactive"
+                          : "Active";
+                    const isStatusActive =
+                      statusVal.toLowerCase() === "active" && activeVal !== "No";
                     const displayId = String(rec["id"] || rec["_dbId"] || rIdx + 1);
 
                     return (
                       <tr key={rIdx} className="hover:bg-muted/40 transition-colors">
-                        
                         {previewFields.map((f, cIdx) => (
                           <td
                             key={f.key}

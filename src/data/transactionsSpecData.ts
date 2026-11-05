@@ -114,7 +114,7 @@ export const TRANSACTION_SCREENS_LIST: TransactionScreenMeta[] = [
   {
     id: "O1-SCR-TRX-01",
     code: "TRX-01",
-    name: "Unified Service Request (with SAP Commercial Information Panel)",
+    name: "Service Request",
     module: "Service Request",
     group: "Service Request & Calls",
     type: "Transaction",
@@ -325,7 +325,7 @@ export const TRANSACTION_SCREENS_LIST: TransactionScreenMeta[] = [
   {
     id: "O1-SCR-TRX-02",
     code: "TRX-02",
-    name: "Service Call (with Role Assignment Grid and Repeat Link)",
+    name: "Service Call",
     module: "Service Call",
     group: "Service Request & Calls",
     type: "Transaction",
