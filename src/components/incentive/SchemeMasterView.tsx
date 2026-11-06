@@ -1708,13 +1708,13 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
           </div>
         </div>
 
-        {/* Filters and Scheme Select Chips */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full sm:w-64">
+        {/* Filters and Scheme Select Chips - Single Horizontal Line */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0">
+            <div className="relative w-48 sm:w-64 shrink-0">
               <Search
                 size={13}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
               <input
                 type="text"
@@ -1727,7 +1727,7 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
             <select
               value={divisionFilter}
               onChange={(e) => setDivisionFilter(e.target.value)}
-              className="input-field bg-background text-xs h-8 px-2"
+              className="input-field bg-background text-xs h-8 px-2.5 w-40 sm:w-44 shrink-0"
             >
               <option value="all">All Divisions</option>
               {availableDivisions.map((d) => (
@@ -1739,7 +1739,7 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input-field bg-background text-xs h-8 px-2 capitalize"
+              className="input-field bg-background text-xs h-8 px-2.5 w-32 shrink-0 capitalize"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -1756,14 +1756,14 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
                   setDivisionFilter("all");
                   setStatusFilter("all");
                 }}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium underline px-1.5 cursor-pointer"
+                className="text-xs text-muted-foreground hover:text-foreground font-medium underline px-1 shrink-0 cursor-pointer"
               >
                 Reset
               </button>
             )}
           </div>
 
-          <div className="text-xs text-muted-foreground self-center">
+          <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
             Showing <span className="font-semibold text-foreground">{filteredSchemes.length}</span>{" "}
             of {schemes.length} schemes
           </div>
