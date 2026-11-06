@@ -1851,7 +1851,7 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
           {/* Scheme Actions (Status-flow sensitive) */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Action: Save Scheme Definition to PostgreSQL */}
+            {/* Action: Save Scheme Definition */}
             <Button
               size="sm"
               disabled={isSaving}
@@ -1859,7 +1859,7 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
               className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
             >
               <Save size={13} className={isSaving ? "animate-spin" : ""} />
-              <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
+              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
             </Button>
 
             {/* Action 1: Copy to New Version (available for Active/Approved schemes) */}
@@ -1937,101 +1937,115 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* Mandatory Scheme Master Fields Grid                           */}
+        {/* Enterprise Spec Grid - 3 Logical ERP Groups (SAP Fiori Style) */}
         {/* ------------------------------------------------------------- */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Scheme Code *
-            </span>
-            <p className="mt-0.5 text-xs font-bold text-foreground font-mono">
-              {currentScheme.schemeCode}
-            </p>
+        <div className="rounded-lg border border-border/70 bg-muted/20 divide-y lg:divide-y-0 lg:divide-x divide-border/70 grid grid-cols-1 lg:grid-cols-3">
+          {/* Section 1: Classification & Ownership */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Building size={14} className="text-primary shrink-0" />
+              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
+                Classification & Scope
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Division
+                </dt>
+                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.division}>
+                  {currentScheme.division}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Participant Role
+                </dt>
+                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.participantRole}>
+                  {currentScheme.participantRole}
+                </dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Scheme Model
+                </dt>
+                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.schemeType}>
+                  {currentScheme.schemeType}
+                </dd>
+              </div>
+            </dl>
           </div>
 
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">Division *</span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground truncate">
-              {currentScheme.division}
-            </p>
+          {/* Section 2: Calculation Engine Parameters */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Settings2 size={14} className="text-primary shrink-0" />
+              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
+                Calculation Engine
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
+              <div className="col-span-2">
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Calculation Basis
+                </dt>
+                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.calculationBasis}>
+                  {currentScheme.calculationBasis}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Age Basis
+                </dt>
+                <dd className="font-semibold text-foreground truncate mt-0.5">
+                  {currentScheme.ageBasis}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Payable Lag
+                </dt>
+                <dd className="font-semibold text-foreground mt-0.5">
+                  {currentScheme.payableLagMonths} Month{currentScheme.payableLagMonths > 1 ? "s" : ""}
+                </dd>
+              </div>
+            </dl>
           </div>
 
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Scheme Type *
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground truncate">
-              {currentScheme.schemeType}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Participant Role *
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground truncate">
-              {currentScheme.participantRole}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Calculation Basis *
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground truncate">
-              {currentScheme.calculationBasis}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">Age Basis *</span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground">{currentScheme.ageBasis}</p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Payable Lag (Months) *
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground">
-              {currentScheme.payableLagMonths} Month{currentScheme.payableLagMonths > 1 ? "s" : ""}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Effective From *
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground font-mono">
-              {currentScheme.effectiveFrom}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Effective To
-            </span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground font-mono">
-              {currentScheme.effectiveTo || "Ongoing / Open"}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">Status *</span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground">{currentScheme.status}</p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">Version</span>
-            <p className="mt-0.5 text-xs font-bold text-foreground font-mono">
-              {currentScheme.version}
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-md bg-muted/40 border border-border/60">
-            <span className="text-[11px] font-medium text-muted-foreground block">Posting Day</span>
-            <p className="mt-0.5 text-xs font-semibold text-foreground">
-              {currentScheme.posting.postingDayOfMonth}th of month
-            </p>
+          {/* Section 3: Lifecycle, Validity & Posting */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Calendar size={14} className="text-primary shrink-0" />
+              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
+                Validity & Posting Schedule
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
+              <div className="col-span-2">
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Effective Period
+                </dt>
+                <dd className="font-mono font-semibold text-foreground mt-0.5">
+                  {currentScheme.effectiveFrom} &rarr; {currentScheme.effectiveTo || "Ongoing / Open"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Posting Day
+                </dt>
+                <dd className="font-semibold text-foreground mt-0.5">
+                  {currentScheme.posting.postingDayOfMonth}th of month
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Audit Version
+                </dt>
+                <dd className="font-mono font-semibold text-foreground mt-0.5">
+                  {currentScheme.version} ({currentScheme.status})
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>
