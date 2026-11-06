@@ -92,7 +92,7 @@ function ProcessLifecycleHeader({
             <span>All {INCENTIVE_SCREENS.length} Screens</span>
           </Button>
 
-          <span className="font-mono text-xs font-bold px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-muted text-foreground">
             Step {screen.screenNumber.toString().padStart(2, "0")} / {INCENTIVE_SCREENS.length}
           </span>
 

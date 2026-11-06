@@ -1630,73 +1630,6 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
   return (
     <div className="space-y-6">
       {/* ------------------------------------------------------------- */}
-      {/* Quick Navigation Banner (Rate Matrix & Calculation Run)       */}
-      {/* ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/60 p-3 sm:px-4 rounded-lg border border-border/80">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Settings2 size={15} className="text-primary" />
-          <span className="font-semibold text-foreground">Incentive Workflow Navigation:</span>
-          <span className="hidden sm:inline">Jump directly to linked operational modules</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {onNavigateScreen && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("rate-matrix")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <FileSpreadsheet size={13} className="text-primary" />
-                <span>Commission Rate Matrix</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("slab-table")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <TrendingUp size={13} className="text-primary" />
-                <span>Target Slabs</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("monthly-target")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Target size={13} className="text-primary" />
-                <span>Monthly Targets</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("participant-profile")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Users size={13} className="text-primary" />
-                <span>Participant Profiles</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("attendance-import")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <UploadCloud size={13} className="text-primary" />
-                <span>Attendance Import</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
       {/* Top Action Bar & Master Selector                              */}
       {/* ------------------------------------------------------------- */}
       <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
@@ -1706,27 +1639,9 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
               <Award size={20} />
             </span>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                  Incentive Scheme Master
-                </h2>
-                <span className="text-xs px-2 py-0.5 rounded font-mono font-medium bg-muted text-muted-foreground border">
-                  Total Schemes: {schemes.length}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-medium border ${
-                    isDbConnected
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
-                      : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-                  />
-                  <Database size={11} />
-                  <span>{isDbConnected ? "PostgreSQL Connected" : "Local Mode"}</span>
-                </span>
-              </div>
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                Incentive Scheme Master
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Define incentive and commission schemes, participants, calculation basis,
                 calculation method, period and posting rules.
@@ -1734,38 +1649,38 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
             </div>
           </div>
 
-          {/* Top Primary Actions */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Top Primary Actions — Clean, Icon-Only with Tooltips */}
+          <div className="flex items-center gap-1.5 self-end lg:self-center">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               disabled={isLoading}
               onClick={() => loadSchemesFromDb(false)}
-              className="h-8 gap-1.5 text-xs cursor-pointer"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Sync with Database"
             >
-              <RefreshCw size={13} className={isLoading ? "animate-spin text-primary" : ""} />
-              <span>{isLoading ? "Syncing..." : "Sync DB"}</span>
+              <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => handleExport("excel")}
-              className="h-8 gap-1.5 text-xs cursor-pointer"
+              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+              title="Export to Excel"
             >
-              <Download size={13} />
-              <span>Export Excel</span>
+              <Download size={14} />
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => handleExport("pdf")}
-              className="h-8 gap-1.5 text-xs cursor-pointer"
+              className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              title="Export to PDF"
             >
-              <Printer size={13} />
-              <span>Export PDF</span>
+              <Printer size={14} />
             </Button>
             <Button
-              size="sm"
+              size="icon"
               onClick={() => {
                 const defaultDiv = availableDivisions[0] || "Commercial HVAC";
                 setNewSchemeForm({
@@ -1785,10 +1700,10 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
                 });
                 setIsAddModalOpen(true);
               }}
-              className="h-8 gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+              className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs ml-1"
+              title="Create New Scheme"
             >
-              <Plus size={14} />
-              <span>Add Scheme (Admin)</span>
+              <Plus size={16} />
             </Button>
           </div>
         </div>
@@ -1833,6 +1748,19 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
               <option value="superseded">Superseded</option>
               <option value="inactive">Inactive</option>
             </select>
+            {(searchTerm || divisionFilter !== "all" || statusFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setDivisionFilter("all");
+                  setStatusFilter("all");
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground font-medium underline px-1.5 cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
           </div>
 
           <div className="text-xs text-muted-foreground self-center">

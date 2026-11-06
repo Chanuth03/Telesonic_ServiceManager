@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <RoleSwitcherBar />
+      {!pathname.startsWith("/incentive") && <RoleSwitcherBar />}
       <div>
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-3 border-b bg-card/85 px-4 py-3 backdrop-blur sm:px-6">
           <Link
