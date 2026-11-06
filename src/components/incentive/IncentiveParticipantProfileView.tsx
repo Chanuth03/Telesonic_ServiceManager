@@ -1144,88 +1144,61 @@ export function IncentiveParticipantProfileView({
           </div>
         </div>
 
-        {/* Top Actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Save to PostgreSQL */}
+        {/* Top Actions - Clean ERP Bar */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Sync with DB */}
           <Button
-            variant="default"
+            variant="outline"
+            size="icon"
+            onClick={() => loadParticipantsFromDb(false)}
+            disabled={isLoading}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Sync with Database"
+          >
+            <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
+          </Button>
+
+          {/* Export CSV */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleExportCSV}
+            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+            title="Export CSV"
+          >
+            <Download size={14} />
+          </Button>
+
+          {/* Print */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePrint}
+            className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+            title="Print Profile"
+          >
+            <Printer size={14} />
+          </Button>
+
+          {/* Save Changes */}
+          <Button
             size="sm"
             onClick={() => handleSaveHeader()}
             disabled={isSaving}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            <span>{isSaving ? "Saving..." : isHeaderDirty ? "Save to PostgreSQL *" : "Save to PostgreSQL"}</span>
+            {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            <span>{isSaving ? "Saving..." : isHeaderDirty ? "Save Changes *" : "Save Changes"}</span>
           </Button>
 
+          {/* New Participant */}
           <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            className="h-9 gap-1.5 text-xs font-medium cursor-pointer"
-          >
-            <Download size={14} />
-            <span>Export CSV</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            className="h-9 gap-1.5 text-xs font-medium cursor-pointer"
-          >
-            <Printer size={14} />
-            <span>Print Profile</span>
-          </Button>
-
-          <Button
-            variant="default"
             size="sm"
             onClick={() => setIsNewParticipantModalOpen(true)}
-            className="h-9 gap-1.5 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer shadow-xs border"
+            className="h-8 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
           >
             <Plus size={14} />
             <span>New Participant</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* PostgreSQL Database Connection Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border rounded-lg text-xs">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-          />
-          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
-          <span className="text-muted-foreground">
-            Database Engine:{" "}
-            <strong className="text-foreground">
-              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
-            </strong>{" "}
-            — Participant profiles, scheme enrolments, roles, and payroll IDs are synchronized with PostgreSQL.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              isDbConnected
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-            }`}
-          >
-            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => loadParticipantsFromDb(false)}
-            disabled={isLoading}
-            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Reload from PostgreSQL"
-          >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
-            <span>Sync</span>
           </Button>
         </div>
       </div>

@@ -962,56 +962,41 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Quick Cross-Screen Navigation */}
-          <div className="hidden xl:flex items-center gap-1.5 border-r pr-3 mr-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigateScreen?.("scheme-master")}
-              className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Award size={13} />
-              <span>Scheme Master</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigateScreen?.("rate-matrix")}
-              className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Layers size={13} />
-              <span>Rate Matrix</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigateScreen?.("slab-table")}
-              className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <TrendingUp size={13} />
-              <span>Target Slabs</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigateScreen?.("participant-profile")}
-              className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Users size={13} />
-              <span>Participant Profile</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigateScreen?.("attendance-import")}
-              className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <UploadCloud size={13} />
-              <span>Attendance Import</span>
-            </Button>
-          </div>
+        {/* Action Controls - Clean ERP Bar */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Sync with DB */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => loadTargetsFromDb(false)}
+            disabled={isLoading}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Sync with Database"
+          >
+            <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
+          </Button>
+
+          {/* Export CSV */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleExportCSV}
+            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+            title="Export CSV"
+          >
+            <Download size={14} />
+          </Button>
+
+          {/* Print */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePrintSchedule}
+            title="Print Monthly Targets"
+            className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+          >
+            <Printer size={14} />
+          </Button>
 
           {/* Period Lock Toggle Action */}
           <Button
@@ -1033,17 +1018,17 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             )}
           </Button>
 
-          {/* Save to PostgreSQL Action */}
+          {/* Save Changes Action */}
           {!isPeriodLocked && status === "Draft" && (
             <Button
               variant="default"
               size="sm"
               onClick={handleSaveToPostgreSql}
               disabled={isSaving}
-              className="h-8 gap-1.5 text-xs font-semibold shadow-xs cursor-pointer bg-primary text-primary-foreground hover:opacity-90"
+              className="h-8 gap-1.5 text-xs font-semibold shadow-xs cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-              <span>{isSaving ? "Saving..." : hasUnsavedChanges ? "Save to PostgreSQL *" : "Save to PostgreSQL"}</span>
+              <span>{isSaving ? "Saving..." : hasUnsavedChanges ? "Save Changes *" : "Save Changes"}</span>
             </Button>
           )}
 
@@ -1086,67 +1071,6 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
               <span>Import Excel</span>
             </Button>
           )}
-
-          {/* Export Options */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            className="h-8 gap-1.5 text-xs cursor-pointer"
-          >
-            <Download size={13} />
-            <span>Export CSV</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handlePrintSchedule}
-            title="Print Monthly Targets"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
-          >
-            <Printer size={14} />
-          </Button>
-        </div>
-      </div>
-
-      {/* PostgreSQL Database Connection Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 bg-muted/30 border rounded-lg text-xs">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-          />
-          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
-          <span className="text-muted-foreground">
-            Database Engine:{" "}
-            <strong className="text-foreground">
-              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
-            </strong>{" "}
-            — Monthly participant target quotas, stretch thresholds, and MTD actuals are synchronized with PostgreSQL.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              isDbConnected
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-            }`}
-          >
-            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => loadTargetsFromDb(false)}
-            disabled={isLoading}
-            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Reload from PostgreSQL"
-          >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
-            <span>Sync</span>
-          </Button>
         </div>
       </div>
 

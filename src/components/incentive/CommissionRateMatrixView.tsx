@@ -458,7 +458,7 @@ export function CommissionRateMatrixView({
       creditGt45: 1.0,
     });
     toast.success(`Added dimension row "${newCellRow.capacityBand} - ${newCellRow.itemType}".`, {
-      description: "Click 'Save to PostgreSQL' to persist this to the database.",
+      description: "Click 'Save Changes' to persist this to the database.",
     });
   };
 
@@ -472,7 +472,7 @@ export function CommissionRateMatrixView({
     const updated = matrixData.filter((_, i) => i !== index);
     setMatrixData(updated);
     toast.success(`Removed row "${target.capacityBand} - ${target.itemType}".`, {
-      description: "Click 'Save to PostgreSQL' to update the database.",
+      description: "Click 'Save Changes' to update the database.",
     });
   };
 
@@ -913,46 +913,6 @@ export function CommissionRateMatrixView({
 
   return (
     <div className="space-y-6">
-      {/* PostgreSQL Status & Sync Banner */}
-      <div className="bg-card border rounded-lg p-3 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-          />
-          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
-          <span className="text-muted-foreground">
-            Database Engine:{" "}
-            <strong className="text-foreground">
-              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
-            </strong>{" "}
-            — Commission rates, payment-term bands, and audit logs are synchronized with PostgreSQL.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              isDbConnected
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-            }`}
-          >
-            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => loadMatrixFromDb(false)}
-            disabled={isLoading}
-            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Reload from PostgreSQL"
-          >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
-            <span>Sync</span>
-          </Button>
-        </div>
-      </div>
-
       {/* Main Header Card with Mandatory Fields & Actions */}
       <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
         {/* Top Header Bar */}
@@ -996,65 +956,29 @@ export function CommissionRateMatrixView({
             </div>
           </div>
 
-          {/* Top Quick Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Navigation back to Scheme Master */}
+          {/* Top Quick Actions - Clean ERP Action Bar */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Sync with DB */}
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => onNavigateScreen?.("scheme-master")}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
-              title="Navigate back to Incentive Scheme Master"
+              size="icon"
+              onClick={() => loadMatrixFromDb(false)}
+              disabled={isLoading}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Sync with Database"
             >
-              <ArrowLeft size={14} />
-              <span>Back to Scheme</span>
+              <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
             </Button>
 
-            {/* Navigation to Target Incentive Slab Table */}
+            {/* Export */}
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => onNavigateScreen?.("slab-table")}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
-              title="Navigate to Target Incentive Slab Table"
-            >
-              <TrendingUp size={14} className="text-primary" />
-              <span>Target Slabs</span>
-            </Button>
-
-            {/* Navigation to Monthly Target Entry */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigateScreen?.("monthly-target")}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
-              title="Navigate to Monthly Target Entry"
-            >
-              <Target size={14} className="text-primary" />
-              <span>Monthly Targets</span>
-            </Button>
-
-            {/* Navigation to Participant Profile */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigateScreen?.("participant-profile")}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
-              title="Navigate to Incentive Participant Profile"
-            >
-              <Users size={14} className="text-primary" />
-              <span>Participant Profiles</span>
-            </Button>
-
-            {/* Export action */}
-            <Button
-              variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setShowExportModal(true)}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
+              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+              title="Export Matrix"
             >
               <Download size={14} />
-              <span>Export</span>
             </Button>
 
             {/* Import Excel (draft only) */}
@@ -1063,28 +987,27 @@ export function CommissionRateMatrixView({
               size="sm"
               onClick={() => setShowImportModal(true)}
               disabled={status !== "Draft"}
-              className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-background"
+              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-background"
               title={
                 status !== "Draft"
                   ? "Import only allowed in Draft state"
                   : "Import Excel spreadsheet"
               }
             >
-              <Upload size={14} />
+              <Upload size={13} />
               <span>Import Excel</span>
             </Button>
 
-            {/* Save to PostgreSQL */}
+            {/* Save Changes */}
             {status === "Draft" && (
               <Button
-                variant="outline"
                 size="sm"
                 onClick={handleSaveDraft}
                 disabled={isSaving}
-                className="h-9 gap-1.5 text-xs font-semibold cursor-pointer bg-background text-primary border-primary/40 hover:bg-primary/5 shadow-xs"
+                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
               >
-                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
+                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>{isSaving ? "Saving..." : "Save Changes"}</span>
               </Button>
             )}
 
@@ -1093,7 +1016,7 @@ export function CommissionRateMatrixView({
               <Button
                 size="sm"
                 onClick={() => setShowApprovalModal(true)}
-                className="h-9 gap-1.5 text-xs font-medium cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <CheckCircle2 size={14} />
                 <span>Approve Matrix</span>
@@ -1102,7 +1025,7 @@ export function CommissionRateMatrixView({
               <Button
                 size="sm"
                 onClick={handleCreateNewDraftVersion}
-                className="h-9 gap-1.5 text-xs font-medium cursor-pointer"
+                className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
               >
                 <Plus size={14} />
                 <span>Create New Draft Version</span>

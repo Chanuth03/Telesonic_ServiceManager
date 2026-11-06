@@ -731,106 +731,7 @@ export function TargetIncentiveSlabTableView({
   return (
     <div className="space-y-6">
       {/* ------------------------------------------------------------- */}
-      {/* 1. Quick Navigation Bar to Related Screens                    */}
-      {/* ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/60 p-3 sm:px-4 rounded-lg border border-border/80">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <TrendingUp size={15} className="text-primary" />
-          <span className="font-semibold text-foreground">Slab Table Workflow:</span>
-          <span className="hidden sm:inline">
-            Linked target matrices and calculation configurations
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {onNavigateScreen && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("scheme-master")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Layers size={13} className="text-primary" />
-                <span>Incentive Scheme Master</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("rate-matrix")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <FileSpreadsheet size={13} className="text-primary" />
-                <span>Commission Rate Matrix</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("monthly-target")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Target size={13} className="text-primary" />
-                <span>Monthly Targets</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("participant-profile")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Users size={13} className="text-primary" />
-                <span>Participant Profile</span>
-                <ChevronRight size={12} className="text-muted-foreground" />
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* PostgreSQL Status & Sync Banner */}
-      <div className="bg-card border rounded-lg p-3 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-          />
-          <Database size={16} className={isDbConnected ? "text-emerald-600" : "text-amber-600"} />
-          <span className="text-muted-foreground">
-            Database Engine:{" "}
-            <strong className="text-foreground">
-              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Mode"}
-            </strong>{" "}
-            — Target achievement tiers and non-cumulative slab payouts are synchronized with PostgreSQL.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              isDbConnected
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-            }`}
-          >
-            {isDbConnected ? "PostgreSQL Connected" : "Local Mode"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => loadSlabTableFromDb(false)}
-            disabled={isLoading}
-            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Reload from PostgreSQL"
-          >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
-            <span>Sync</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 2. Top Header & Mandatory Fields Section                      */}
+      {/* Top Header & Mandatory Fields Section                         */}
       {/* ------------------------------------------------------------- */}
       <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -873,25 +774,58 @@ export function TargetIncentiveSlabTableView({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Action Buttons - Clean ERP Controls */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Sync with DB */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => loadSlabTableFromDb(false)}
+              disabled={isLoading}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Sync with Database"
+            >
+              <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
+            </Button>
+
+            {/* Export Excel */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleExportExcel}
+              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+              title="Export Slabs to Excel"
+            >
+              <Download size={14} />
+            </Button>
+
+            {/* Print / PDF */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleExportPdf}
+              className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              title="Print Schedule / Export PDF"
+            >
+              <Printer size={14} />
+            </Button>
+
             {status === "Draft" ? (
               <>
                 <Button
-                  variant="default"
                   size="sm"
                   onClick={handleSaveDraft}
                   disabled={isSaving}
-                  className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:opacity-90"
+                  className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                  <span>{isSaving ? "Saving..." : "Save to PostgreSQL"}</span>
+                  <span>{isSaving ? "Saving..." : "Save Changes"}</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleApproveDraft}
-                  className="h-8 gap-1.5 text-xs font-medium cursor-pointer text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  className="h-8 gap-1.5 text-xs font-medium cursor-pointer text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800"
                 >
                   <CheckCircle2 size={13} className="text-emerald-600" />
                   <span>Approve Slabs</span>
@@ -908,28 +842,6 @@ export function TargetIncentiveSlabTableView({
                 <span>Create New Draft Version</span>
               </Button>
             )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportExcel}
-              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-card hover:bg-accent"
-              title="Export Slabs to Excel"
-            >
-              <Download size={13} className="text-primary" />
-              <span className="hidden sm:inline">Export Excel</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportPdf}
-              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-card hover:bg-accent"
-              title="Print Schedule / Export PDF"
-            >
-              <Printer size={13} className="text-muted-foreground" />
-              <span className="hidden sm:inline">Print / PDF</span>
-            </Button>
           </div>
         </div>
 

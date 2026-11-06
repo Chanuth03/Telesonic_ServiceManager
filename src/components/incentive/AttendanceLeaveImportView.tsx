@@ -1118,110 +1118,7 @@ export function AttendanceLeaveImportView({
   return (
     <div className="space-y-6">
       {/* ------------------------------------------------------------- */}
-      {/* 1. Quick Navigation Bar to Related Screens                    */}
-      {/* ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/30 p-2.5 rounded-lg border text-xs">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Wrench size={14} className="text-primary" />
-          <span className="font-semibold text-foreground">Service Technician Incentive Chain:</span>
-          <span className="hidden sm:inline">
-            Attendance factor directly scales technician First-Time Fix (FTF) & job throughput
-            payouts.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {onNavigateScreen && (
-            <>
-              {/* PRIMARY SPECIFIED NAVIGATION TO SERVICE PERFORMANCE */}
-              <Button
-                size="sm"
-                onClick={() => onNavigateScreen("service-performance")}
-                className="h-7 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer shadow-xs"
-              >
-                <Wrench size={13} />
-                <span>Service Performance Data</span>
-                <ChevronRight size={12} />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("participant-profile")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Users size={13} className="text-primary" />
-                <span>Participants</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateScreen("scheme-master")}
-                className="h-7 text-xs gap-1.5 bg-card hover:bg-accent cursor-pointer"
-              >
-                <Award size={13} className="text-primary" />
-                <span>Scheme Master</span>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* PostgreSQL Database Status Banner                             */}
-      {/* ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-2.5 rounded-lg border text-xs">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background border font-medium">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-              }`}
-            />
-            <Database size={13} className="text-primary" />
-            <span className="font-semibold text-foreground">
-              {isDbConnected ? "PostgreSQL Connected (telesonic)" : "Local Memory"}
-            </span>
-            <span className="text-muted-foreground/60 text-[10px]">|</span>
-            <span className="text-muted-foreground text-[11px]">
-              Batch: <span className="font-mono text-foreground font-semibold">{currentBatchId}</span>
-            </span>
-          </div>
-
-          {hasUnsavedChanges && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-              <AlertCircle size={11} /> Unsaved changes in draft
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => loadAttendanceFromDb(false, period)}
-            disabled={isLoading}
-            className="h-7 text-xs gap-1.5 hover:bg-background cursor-pointer"
-          >
-            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            <span>Sync DB</span>
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={handleSaveToPostgreSql}
-            disabled={isSaving}
-            className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs font-semibold"
-          >
-            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-            <span>Save to PostgreSQL</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 2. Top Header & Mandatory Fields Section                      */}
+      {/* Top Header & Action Section                                   */}
       {/* ------------------------------------------------------------- */}
       <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1284,8 +1181,20 @@ export function AttendanceLeaveImportView({
             </p>
           </div>
 
-          {/* Header Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Header Action Buttons - Clean ERP Controls */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Sync with DB */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => loadAttendanceFromDb(false, period)}
+              disabled={isLoading}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Sync with Database"
+            >
+              <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
+            </Button>
+
             {/* View Import History */}
             <Button
               variant="outline"
@@ -1346,15 +1255,15 @@ export function AttendanceLeaveImportView({
               </Button>
             )}
 
-            {/* Save to PostgreSQL Button */}
+            {/* Save Changes Button */}
             <Button
               size="sm"
               onClick={handleSaveToPostgreSql}
               disabled={isSaving}
-              className="h-8 gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+              className="h-8 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
             >
               {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-              <span>Save to DB</span>
+              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
             </Button>
 
             {/* Approve as HR Action */}

@@ -457,61 +457,59 @@ export function ClawbackPenaltyView({ onBack }: ClawbackPenaltyViewProps) {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        {/* Action Buttons - Clean ERP Controls */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={fetchItems}
             disabled={loading}
-            className="h-9 px-3 text-xs gap-1.5"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Sync with Database"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            Sync
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
           </Button>
 
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleExportCSV}
-            className="h-9 px-3 text-xs gap-1.5"
+            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+            title="Export to Excel"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            Excel
+            <FileSpreadsheet className="w-3.5 h-3.5" />
           </Button>
 
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => window.print()}
-            className="h-9 px-3 text-xs gap-1.5"
+            className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+            title="Print Schedule / PDF"
           >
             <Printer className="w-3.5 h-3.5" />
-            PDF
           </Button>
 
           <Button
             size="sm"
             onClick={() => setIsAddModalOpen(true)}
-            className="h-9 px-3.5 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+            className="h-8 px-3 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4" />
-            Add Entry
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Entry</span>
           </Button>
         </div>
       </div>
 
-      {/* Database Connection & Business Validation Banner */}
-      <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-lg flex items-center justify-between flex-wrap gap-2 text-xs">
-        <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold">PostgreSQL Connected:</span>
-          <span>Table `incentive_clawback_penalties` | Last synced: {lastSynced || "Just now"}</span>
+      {/* Business Policy Alert */}
+      <div className="bg-amber-500/10 border border-amber-500/25 px-3.5 py-2 rounded-lg flex items-center justify-between flex-wrap gap-2 text-xs text-amber-900 dark:text-amber-200">
+        <div className="flex items-center gap-2 font-medium">
+          <Repeat className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <span>Policy Rule: Debtor penalties repeat monthly until customer invoice is 100% settled.</span>
         </div>
-        <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-medium">
-          <Repeat className="w-3.5 h-3.5 text-amber-600" />
-          <span>Validation Rule: Penalty repeats monthly until the invoice is 100% settled</span>
-        </div>
+        <span className="text-[11px] text-muted-foreground">
+          Last synced: {lastSynced || "Just now"}
+        </span>
       </div>
 
       {/* KPI Stat Cards */}
