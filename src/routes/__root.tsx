@@ -17,8 +17,10 @@ import { AppShell } from "@/components/itsm/AppShell";
 import { applyTheme, getSavedTheme } from "@/lib/theme";
 import { RoleProvider, useRole } from "@/context/RoleContext";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
+import { ensureOfflineDatabaseReady } from "@/lib/offline-db";
 import { isStandalonePwa } from "@/lib/pwa";
 import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
+import { syncManager } from "@/lib/sync-manager";
 
 function NotFoundComponent() {
   return (
@@ -191,7 +193,17 @@ function RootComponent() {
     installedMobile;
   useEffect(() => {
     applyTheme(getSavedTheme());
-    void startMobileOfflineBridge();
+    void (async () => {
+      try {
+        await ensureOfflineDatabaseReady();
+        await startMobileOfflineBridge();
+        if (syncManager.getIsOnline()) {
+          void syncManager.triggerSync("app_startup");
+        }
+      } catch (err) {
+        console.error("[App] Offline database init failed:", err);
+      }
+    })();
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       if (import.meta.env.PROD) {
         navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -24,12 +24,15 @@ export interface DexieSyncQueueItem {
     | "SUBMIT_INSPECTION"
     | "SUBMIT_HOLD"
     | "COMPLETE_JOB"
-    | "GENERIC_UPDATE";
+    | "GENERIC_UPDATE"
+    | "TRANSACTION_UPSERT"
+    | "TRANSACTION_DELETE";
   entityId: string;
   payload: Record<string, unknown>;
   createdAt: number;
   status: "pending" | "processing" | "synced" | "failed";
   errorMessage?: string;
+  idempotencyKey?: string;
 }
 
 export interface DexieMeta {
@@ -42,6 +45,8 @@ export interface DexieStockItem extends StockCountItem {
   updatedAt: number;
 }
 
+export type TransactionSyncStatus = "pending" | "syncing" | "synced" | "failed";
+
 export interface DexieTransactionRecord {
   id: string;
   code: string;
@@ -49,7 +54,13 @@ export interface DexieTransactionRecord {
   recordRef: string;
   payload: Record<string, unknown>;
   createdAt: number;
-  syncStatus: "pending" | "synced";
+  updatedAt: number;
+  syncStatus: TransactionSyncStatus;
+  idempotencyKey: string;
+  apiPath: string;
+  operation: "upsert" | "delete";
+  lastError?: string;
+  deleted?: boolean;
 }
 
 /**
@@ -88,10 +99,97 @@ class TelesonicOfflineDB extends Dexie {
       notifications: "id, read, type",
       transactions: "id, code, storageKey, recordRef, createdAt, syncStatus",
     });
+
+    this.version(4)
+      .stores({
+        jobs: "id, customerName, status, priority, technicianName, scheduledDate, syncStatus, updatedAt",
+        syncQueue: "++id, action, entityId, createdAt, status, idempotencyKey",
+        offlineMeta: "key, updatedAt",
+        stockCount: "sku, updatedAt",
+        notifications: "id, read, type",
+        transactions:
+          "id, code, storageKey, recordRef, createdAt, updatedAt, syncStatus, idempotencyKey, apiPath, operation",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("transactions")
+          .toCollection()
+          .modify((row: Record<string, unknown>) => {
+            if (row["updatedAt"] == null) row["updatedAt"] = row["createdAt"] || Date.now();
+            if (!row["idempotencyKey"]) {
+              row["idempotencyKey"] = `trx:upsert:${row["code"]}:${row["recordRef"]}`;
+            }
+            if (!row["operation"]) row["operation"] = "upsert";
+            if (!row["apiPath"]) row["apiPath"] = "/api/service-requests";
+            if (row["syncStatus"] === "syncing") row["syncStatus"] = "pending";
+          });
+      });
   }
 }
 
 export const offlineDB = new TelesonicOfflineDB();
+
+let dbReadyPromise: Promise<void> | null = null;
+
+/** Open Dexie, request persistent storage, seed reference data. Never clears transactions. */
+export async function ensureOfflineDatabaseReady(): Promise<void> {
+  if (dbReadyPromise) return dbReadyPromise;
+  dbReadyPromise = (async () => {
+    await offlineDB.open();
+    await requestPersistentStorage();
+    await ensureOfflineReferenceData();
+  })().catch((err) => {
+    dbReadyPromise = null;
+    throw err;
+  });
+  return dbReadyPromise;
+}
+
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.storage?.persist) return false;
+  try {
+    const already = await navigator.storage.persisted?.();
+    if (already) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
+/** True when the device reports offline or simulated offline is on. */
+export function isDeviceOffline(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (!navigator.onLine) return true;
+  try {
+    return localStorage.getItem("telesonic_simulated_offline") === "true";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Probe whether the backend is actually reachable.
+ * navigator.onLine alone is not enough (Airplane Mode / captive portals).
+ */
+export async function probeBackendReachable(timeoutMs = 3500): Promise<boolean> {
+  if (isDeviceOffline()) return false;
+  if (typeof window === "undefined") return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await window.fetch(`${window.location.origin}/api/auth/session`, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 let seedingPromise: Promise<void> | null = null;
 
@@ -306,38 +404,271 @@ export async function markDexieAsSynced(
   );
 }
 
-/**
- * Get count of pending unsynced items
- */
+/** Prefer for transaction UX: device offline OR simulated offline. */
 export function isOfflineForTransactions(): boolean {
-  if (typeof navigator === "undefined") return false;
-  if (!navigator.onLine) return true;
-  try {
-    return localStorage.getItem("telesonic_simulated_offline") === "true";
-  } catch {
-    return false;
-  }
+  return isDeviceOffline();
 }
 
+function stableTransactionId(code: string, recordRef: string): string {
+  return `${code}::${recordRef}`;
+}
+
+function stableIdempotencyKey(code: string, recordRef: string, operation: "upsert" | "delete"): string {
+  return `trx:${operation}:${code}:${recordRef}`;
+}
+
+/**
+ * Persist a transaction to Dexie BEFORE any API call.
+ * Uses a stable id per code+recordRef so edits update the same row (no duplicates).
+ */
 export async function saveOfflineTransaction(input: {
   code: string;
   storageKey: string;
   recordRef: string;
   payload: Record<string, unknown>;
+  apiPath: string;
+  operation?: "upsert" | "delete";
 }): Promise<DexieTransactionRecord> {
+  await ensureOfflineDatabaseReady();
+  const operation = input.operation || "upsert";
+  const id = stableTransactionId(input.code, input.recordRef);
+  const now = Date.now();
+  const existing = await offlineDB.transactions.get(id);
+  const idempotencyKey =
+    existing?.idempotencyKey && operation === existing.operation
+      ? existing.idempotencyKey
+      : stableIdempotencyKey(input.code, input.recordRef, operation);
+
   const record: DexieTransactionRecord = {
-    id: `${input.code}-${input.recordRef}-${Date.now()}`,
+    id,
     code: input.code,
     storageKey: input.storageKey,
     recordRef: input.recordRef,
-    payload: input.payload,
-    createdAt: Date.now(),
+    payload: {
+      ...input.payload,
+      idempotencyKey,
+      _localSyncMeta: {
+        id,
+        operation,
+        updatedAt: now,
+      },
+    },
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
     syncStatus: "pending",
+    idempotencyKey,
+    apiPath: input.apiPath,
+    operation,
+    deleted: operation === "delete",
+    lastError: undefined,
   };
-  await offlineDB.transactions.put(record);
-  const stored = await offlineDB.transactions.get(record.id);
-  console.log("[Dexie] Offline transaction stored. JSON:", JSON.stringify(stored, null, 2));
+
+  await offlineDB.transaction("rw", [offlineDB.transactions, offlineDB.syncQueue], async () => {
+    await offlineDB.transactions.put(record);
+
+    const existingQueue = await offlineDB.syncQueue
+      .where("entityId")
+      .equals(id)
+      .filter((item) => item.status === "pending" || item.status === "failed")
+      .first();
+
+    const queuePayload = {
+      transactionId: id,
+      code: input.code,
+      recordRef: input.recordRef,
+      apiPath: input.apiPath,
+      operation,
+      idempotencyKey,
+      payload: record.payload,
+    };
+
+    if (existingQueue?.id != null) {
+      await offlineDB.syncQueue.update(existingQueue.id, {
+        action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
+        payload: queuePayload,
+        status: "pending",
+        errorMessage: undefined,
+        idempotencyKey,
+      });
+    } else {
+      await offlineDB.syncQueue.add({
+        action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
+        entityId: id,
+        payload: queuePayload,
+        createdAt: now,
+        status: "pending",
+        idempotencyKey,
+      });
+    }
+  });
+
+  const stored = await offlineDB.transactions.get(id);
+  console.log("[Dexie] Transaction stored locally. JSON:", JSON.stringify(stored, null, 2));
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("telesonic:dexie-update", {
+        detail: { type: "transaction", id, code: input.code },
+      }),
+    );
+  }
+
   return record;
+}
+
+/** Active (non-deleted) local transactions for a screen, newest first. */
+export async function getDexieTransactionsForScreen(
+  code: string,
+  storageKey?: string,
+): Promise<Record<string, unknown>[]> {
+  await ensureOfflineDatabaseReady();
+  let rows = await offlineDB.transactions.where("code").equals(code).toArray();
+  if (storageKey) {
+    rows = rows.filter((row) => row.storageKey === storageKey);
+  }
+  return rows
+    .filter((row) => !row.deleted && row.operation !== "delete")
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
+    .map((row) => {
+      const payload = { ...row.payload };
+      delete payload._localSyncMeta;
+      return {
+        ...payload,
+        id: row.recordRef,
+        recordNo: row.recordRef,
+        _dexieId: row.id,
+        _syncStatus: row.syncStatus,
+        _idempotencyKey: row.idempotencyKey,
+        updatedAt: new Date(row.updatedAt).toISOString(),
+      };
+    });
+}
+
+export async function getPendingTransactionRecords(): Promise<DexieTransactionRecord[]> {
+  await ensureOfflineDatabaseReady();
+  // Include interrupted "syncing" rows so a killed tab/app can safely retry.
+  return offlineDB.transactions
+    .where("syncStatus")
+    .anyOf(["pending", "failed", "syncing"])
+    .toArray();
+}
+
+export async function markTransactionSyncState(
+  id: string,
+  syncStatus: TransactionSyncStatus,
+  lastError?: string,
+): Promise<void> {
+  await offlineDB.transactions.update(id, {
+    syncStatus,
+    lastError,
+    updatedAt: Date.now(),
+  });
+}
+
+/**
+ * Push pending/failed Dexie transactions to their API paths once connectivity is real.
+ * Idempotency-Key header + stable keys prevent duplicates across retries.
+ */
+export async function syncPendingOfflineTransactions(
+  apiFetchImpl: (
+    url: string,
+    init?: RequestInit,
+    options?: { networkOnly?: boolean },
+  ) => Promise<Response>,
+): Promise<{ synced: number; failed: number }> {
+  await ensureOfflineDatabaseReady();
+  const reachable = await probeBackendReachable();
+  if (!reachable) return { synced: 0, failed: 0 };
+
+  const pending = await getPendingTransactionRecords();
+  let synced = 0;
+  let failed = 0;
+
+  for (const tx of pending) {
+    await markTransactionSyncState(tx.id, "syncing");
+    const queueItems = await offlineDB.syncQueue
+      .where("entityId")
+      .equals(tx.id)
+      .filter((item) => item.status === "pending" || item.status === "failed")
+      .toArray();
+    for (const item of queueItems) {
+      if (item.id != null) {
+        await offlineDB.syncQueue.update(item.id, { status: "processing" });
+      }
+    }
+
+    try {
+      let response: Response;
+      if (tx.operation === "delete") {
+        response = await apiFetchImpl(
+          `${tx.apiPath}/${encodeURIComponent(tx.recordRef)}`,
+          {
+            method: "DELETE",
+            headers: {
+              "Idempotency-Key": tx.idempotencyKey,
+            },
+          },
+          { networkOnly: true },
+        );
+      } else {
+        const body = { ...tx.payload };
+        delete body._localSyncMeta;
+        response = await apiFetchImpl(
+          tx.apiPath,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": tx.idempotencyKey,
+            },
+            body: JSON.stringify(body),
+          },
+          { networkOnly: true },
+        );
+      }
+
+      if (!response.ok && response.status !== 404) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      // 404 on delete = already gone on server; treat as success
+      if (tx.operation === "delete") {
+        await offlineDB.transactions.delete(tx.id);
+      } else {
+        await markTransactionSyncState(tx.id, "synced");
+      }
+
+      for (const item of queueItems) {
+        if (item.id != null) {
+          await offlineDB.syncQueue.delete(item.id);
+        }
+      }
+      synced += 1;
+    } catch (err) {
+      failed += 1;
+      const message = err instanceof Error ? err.message : "Sync failed";
+      await markTransactionSyncState(tx.id, "failed", message);
+      for (const item of queueItems) {
+        if (item.id != null) {
+          await offlineDB.syncQueue.update(item.id, {
+            status: "failed",
+            errorMessage: message,
+          });
+        }
+      }
+    }
+  }
+
+  if (typeof window !== "undefined" && synced > 0) {
+    window.dispatchEvent(
+      new CustomEvent("telesonic:sync-complete", {
+        detail: { type: "transactions", synced, failed },
+      }),
+    );
+    window.dispatchEvent(new CustomEvent("telesonic:dexie-update", { detail: { type: "transaction" } }));
+  }
+
+  return { synced, failed };
 }
 
 export async function saveDexieStock(items: StockCountItem[]): Promise<void> {
@@ -384,9 +715,17 @@ export async function ensureOfflineReferenceData(): Promise<void> {
 
 export async function getPendingSyncCount(): Promise<number> {
   try {
+    await ensureOfflineDatabaseReady();
     const countJobs = await offlineDB.jobs.where("syncStatus").equals("pending").count();
-    const countQueue = await offlineDB.syncQueue.where("status").equals("pending").count();
-    return Math.max(countJobs, countQueue);
+    const countQueue = await offlineDB.syncQueue
+      .where("status")
+      .anyOf(["pending", "failed"])
+      .count();
+    const countTx = await offlineDB.transactions
+      .where("syncStatus")
+      .anyOf(["pending", "failed"])
+      .count();
+    return Math.max(countJobs, countQueue, countTx);
   } catch {
     return 0;
   }

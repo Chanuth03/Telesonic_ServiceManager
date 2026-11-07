@@ -7,7 +7,15 @@
  * - Supports simulated offline mode toggle for testing PWA field scenarios.
  */
 
-import { getUnsyncedDexieRecords, markDexieAsSynced, getPendingSyncCount } from "./offline-db";
+import {
+  getUnsyncedDexieRecords,
+  markDexieAsSynced,
+  getPendingSyncCount,
+  probeBackendReachable,
+  syncPendingOfflineTransactions,
+  ensureOfflineDatabaseReady,
+  isDeviceOffline,
+} from "./offline-db";
 import { apiFetch } from "./api-client";
 
 export type SyncState = "idle" | "syncing" | "synced" | "error" | "offline";
@@ -56,16 +64,20 @@ class GlobalSyncManager {
     window.addEventListener("online", this.handleOnlineEvent);
     window.addEventListener("offline", this.handleOfflineEvent);
     window.addEventListener("beforeunload", this.handleBeforeUnloadEvent);
+    window.addEventListener("telesonic:sync-complete", () => {
+      this.refreshPendingCount();
+    });
 
     // Listen to local Dexie updates to recount pending changes
     window.addEventListener("telesonic:dexie-update", () => {
       this.refreshPendingCount();
     });
 
-    // Initial pending count check
-    this.refreshPendingCount();
+    void ensureOfflineDatabaseReady()
+      .then(() => this.refreshPendingCount())
+      .catch((err) => console.error("[SyncManager] Dexie init failed:", err));
 
-    // Periodic heartbeat sync check every 45 seconds when online
+    // Periodic heartbeat: only sync after a real backend probe succeeds
     this.autoSyncInterval = setInterval(() => {
       if (this.getIsOnline() && this.pendingCount > 0 && this.syncState !== "syncing") {
         console.log("[SyncManager] Background heartbeat sync triggered for pending records.");
@@ -78,11 +90,19 @@ class GlobalSyncManager {
 
   private handleOnlineEvent = () => {
     console.log(
-      "[SyncManager] 🌐 Network changed to ONLINE! Initiating automatic push sync to PostgreSQL...",
+      "[SyncManager] 🌐 Network changed to ONLINE! Probing backend before sync...",
     );
     this.notify();
-    // Immediate dynamic synchronization
-    this.triggerSync("network_online_event");
+    void (async () => {
+      const reachable = await probeBackendReachable();
+      if (!reachable) {
+        console.warn("[SyncManager] navigator.onLine is true but backend is unreachable.");
+        this.syncState = "offline";
+        this.notify();
+        return;
+      }
+      await this.triggerSync("network_online_event");
+    })();
   };
 
   private handleOfflineEvent = () => {
@@ -100,9 +120,8 @@ class GlobalSyncManager {
   };
 
   public getIsOnline(): boolean {
-    if (typeof navigator === "undefined") return true;
     if (this.isSimulatedOffline) return false;
-    return navigator.onLine;
+    return !isDeviceOffline();
   }
 
   public getStatus(): SyncStatus {
@@ -182,78 +201,91 @@ class GlobalSyncManager {
     }
 
     try {
+      const reachable = await probeBackendReachable();
+      if (!reachable) {
+        this.syncState = "offline";
+        this.notify();
+        return {
+          success: false,
+          count: 0,
+          message: "Backend unreachable. Local Dexie data kept; will retry when online.",
+        };
+      }
+
       this.syncState = "syncing";
       this.lastError = null;
       this.notify();
 
-      // 1. Gather unsynced Dexie.js records
+      // 1. Sync offline transactions first (Dexie → process API paths)
+      const txResult = await syncPendingOfflineTransactions(apiFetch);
+
+      // 2. Gather unsynced job/queue records
       const { queueItems, pendingJobs } = await getUnsyncedDexieRecords();
-      const totalPending = queueItems.length + pendingJobs.length;
-
-      if (totalPending === 0) {
-        this.syncState = "synced";
-        this.lastSyncedAt = new Date();
-        this.pendingCount = 0;
-        this.notify();
-        return {
-          success: true,
-          count: 0,
-          message: "All records are already up to date with PostgreSQL.",
-        };
-      }
-
-      console.log(
-        `[SyncManager] Pushing ${queueItems.length} queue actions & ${pendingJobs.length} unsynced jobs to PostgreSQL (/api/sync)...`,
+      const jobQueueItems = queueItems.filter(
+        (item) =>
+          item.action !== "TRANSACTION_UPSERT" && item.action !== "TRANSACTION_DELETE",
       );
+      const totalPending = jobQueueItems.length + pendingJobs.length;
+      let jobSyncedCount = 0;
 
-      // 2. Perform secure /api/sync request
-      const response = await apiFetch(
-        "/api/sync",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Auth-Role": "TECHNICIAN",
-            "X-Device-Id": "TECH-MOBILE-PWA-01",
-          },
-          body: JSON.stringify({
-            role: "TECHNICIAN",
-            deviceId: "TECH-MOBILE-PWA-01",
-            timestamp: new Date().toISOString(),
-            triggerReason: reason,
-            queueItems,
-            pendingJobs,
-          }),
-        },
-        { networkOnly: true },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Sync failed with server status ${response.status}: ${response.statusText}`,
+      if (totalPending > 0) {
+        console.log(
+          `[SyncManager] Pushing ${jobQueueItems.length} queue actions & ${pendingJobs.length} unsynced jobs to PostgreSQL (/api/sync)...`,
         );
+
+        const response = await apiFetch(
+          "/api/sync",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Auth-Role": "TECHNICIAN",
+              "X-Device-Id": "TECH-MOBILE-PWA-01",
+            },
+            body: JSON.stringify({
+              role: "TECHNICIAN",
+              deviceId: "TECH-MOBILE-PWA-01",
+              timestamp: new Date().toISOString(),
+              triggerReason: reason,
+              queueItems: jobQueueItems,
+              pendingJobs,
+            }),
+          },
+          { networkOnly: true },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Sync failed with server status ${response.status}: ${response.statusText}`,
+          );
+        }
+
+        const data = await response.json();
+        const syncedJobIds = data.syncedJobIds || [];
+        const processedQueueIds = data.processedQueueIds || [];
+        await markDexieAsSynced(syncedJobIds, processedQueueIds);
+        jobSyncedCount = data.syncedCount || totalPending;
+        this.lastBatchId = data.batchId || null;
       }
-
-      const data = await response.json();
-
-      // 3. Mark processed records as synced in Dexie.js
-      const syncedJobIds = data.syncedJobIds || [];
-      const processedQueueIds = data.processedQueueIds || [];
-
-      await markDexieAsSynced(syncedJobIds, processedQueueIds);
 
       this.lastSyncedAt = new Date();
-      this.lastBatchId = data.batchId || null;
-      this.syncState = "synced";
+      this.syncState = txResult.failed > 0 ? "error" : "synced";
+      if (txResult.failed > 0) {
+        this.lastError = `${txResult.failed} transaction(s) failed to sync; kept in Dexie for retry.`;
+      }
       await this.refreshPendingCount();
 
+      const totalSynced = jobSyncedCount + txResult.synced;
       console.log(
-        `[SyncManager] ✅ Successfully synced ${data.syncedCount} records to PostgreSQL.`,
+        `[SyncManager] ✅ Synced jobs=${jobSyncedCount}, transactions=${txResult.synced}, failedTx=${txResult.failed}`,
       );
       return {
-        success: true,
-        count: data.syncedCount || totalPending,
-        message: data.message || "Sync completed successfully",
+        success: txResult.failed === 0,
+        count: totalSynced,
+        message:
+          totalSynced === 0 && txResult.failed === 0
+            ? "All records are already up to date with PostgreSQL."
+            : `Synced ${totalSynced} record(s).`,
       };
     } catch (err: unknown) {
       console.error("[SyncManager] Error during sync:", err);

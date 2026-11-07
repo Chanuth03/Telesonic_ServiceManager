@@ -24,6 +24,14 @@ import { TransactionExportModal } from "./TransactionExportModal";
 import { AddPartModal } from "@/components/common/AddPartModal";
 import { saveFormData, loadSavedTabData, saveTabData } from "@/data/sparePartsCatalog";
 import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
+import {
+  ensureOfflineDatabaseReady,
+  getDexieTransactionsForScreen,
+  isOfflineForTransactions,
+  probeBackendReachable,
+  saveOfflineTransaction,
+} from "@/lib/offline-db";
+import { syncManager } from "@/lib/sync-manager";
 
 interface TransactionScreenViewProps {
   meta: TransactionScreenMeta;
@@ -294,26 +302,73 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     meta.code === "TRX-04" && formData["googleMeetLinkRequired"] === "Yes",
   );
 
-  // Fetch Saved Records from PostgreSQL for the active transaction process
+  // Always load local Dexie history first; optionally merge server records when reachable.
   const fetchSavedRecords = async () => {
     try {
-      const res = await apiFetch(processConfig.apiPath);
-      if (res.ok) {
-        const json = await res.json();
-        const list = json.records || json.requests || [];
-        if (Array.isArray(list)) {
-          setSavedRecords(list);
+      await ensureOfflineDatabaseReady();
+      const localRecords = await getDexieTransactionsForScreen(meta.code, storageKey);
+      let merged: Record<string, unknown>[] = [...localRecords];
+
+      const canReachBackend = !isOfflineForTransactions() && (await probeBackendReachable());
+      if (canReachBackend) {
+        try {
+          const res = await apiFetch(processConfig.apiPath, undefined, { networkOnly: true });
+          if (res.ok) {
+            const json = await res.json();
+            const list = (json.records || json.requests || []) as Record<string, unknown>[];
+            if (Array.isArray(list)) {
+              const localRefs = new Set(
+                localRecords.map((rec) =>
+                  String(
+                    rec[processConfig.primaryField] ||
+                      rec["requestNo"] ||
+                      rec["callNo"] ||
+                      rec["recordNo"] ||
+                      rec["id"] ||
+                      "",
+                  ),
+                ),
+              );
+              // Keep pending/failed local copies authoritative; append server-only rows.
+              const serverOnly = list.filter((rec) => {
+                const ref = String(
+                  rec[processConfig.primaryField] ||
+                    rec["requestNo"] ||
+                    rec["callNo"] ||
+                    rec["recordNo"] ||
+                    rec["id"] ||
+                    "",
+                );
+                return ref && !localRefs.has(ref);
+              });
+              const localPendingOrFailed = localRecords.filter((rec) => {
+                const status = String(rec["_syncStatus"] || "");
+                return status === "pending" || status === "failed" || status === "syncing";
+              });
+              const localSynced = localRecords.filter((rec) => rec["_syncStatus"] === "synced");
+              merged = [...localPendingOrFailed, ...localSynced, ...serverOnly];
+            }
+          }
+        } catch (err) {
+          console.warn(`[Dexie] Server list unavailable; showing local IndexedDB only:`, err);
         }
       }
+
+      setSavedRecords(merged);
     } catch (err) {
-      console.warn(`[PostgreSQL] Error fetching records from ${processConfig.apiPath}:`, err);
+      console.error("[Dexie] Failed to load local transactions:", err);
     }
   };
 
-  // Fetch Master & Transaction Dropdown Options from PostgreSQL
+  // Fetch Master & Transaction Dropdown Options from PostgreSQL (skip when offline)
   const fetchMasterOptions = async () => {
+    if (isOfflineForTransactions()) return;
+    const reachable = await probeBackendReachable();
+    if (!reachable) return;
     try {
-      const res = await apiFetch("/api/service-requests/master-options");
+      const res = await apiFetch("/api/service-requests/master-options", undefined, {
+        networkOnly: true,
+      });
       if (res.ok) {
         const json = await res.json();
         if (json.options) {
@@ -327,6 +382,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
 
   // Re-initialize when switching between transaction screens
   useEffect(() => {
+    let cancelled = false;
     setFormData(createFreshRecord(meta));
     setActiveTabId("saved-requests");
     const nextTabs: Record<string, Array<Record<string, unknown>>> = {};
@@ -338,8 +394,27 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
       );
     });
     setTabDatasets(nextTabs);
-    fetchSavedRecords();
-    fetchMasterOptions();
+
+    void (async () => {
+      await ensureOfflineDatabaseReady();
+      if (cancelled) return;
+      await fetchSavedRecords();
+      if (cancelled) return;
+      await fetchMasterOptions();
+    })();
+
+    const onDexieUpdate = () => {
+      void fetchSavedRecords();
+    };
+    window.addEventListener("telesonic:dexie-update", onDexieUpdate);
+    window.addEventListener("telesonic:sync-complete", onDexieUpdate);
+    window.addEventListener("online", onDexieUpdate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("telesonic:dexie-update", onDexieUpdate);
+      window.removeEventListener("telesonic:sync-complete", onDexieUpdate);
+      window.removeEventListener("online", onDexieUpdate);
+    };
   }, [meta.code]);
 
   const activeTab = meta.tabs.find((t) => t.id === activeTabId) || meta.tabs[0];
@@ -566,7 +641,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     showToast(`Loaded record ${recId} into editor.`);
   };
 
-  // Delete a saved record from PostgreSQL database
+  // Delete locally in Dexie first; sync delete to PostgreSQL when reachable.
   const handleDeleteRecord = async (rec: Record<string, unknown>) => {
     const recId = String(
       rec[processConfig.primaryField] ||
@@ -576,32 +651,54 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         rec["id"] ||
         "",
     );
-    if (
-      !window.confirm(`Are you sure you want to delete record "${recId}" from PostgreSQL database?`)
-    ) {
+    if (!window.confirm(`Are you sure you want to delete record "${recId}"?`)) {
       return;
     }
 
     try {
-      const res = await apiFetch(`${processConfig.apiPath}/${encodeURIComponent(recId)}`, {
-        method: "DELETE",
+      await saveOfflineTransaction({
+        code: meta.code,
+        storageKey,
+        recordRef: recId,
+        apiPath: processConfig.apiPath,
+        operation: "delete",
+        payload: { ...rec, [processConfig.primaryField]: recId, recordNo: recId },
       });
-      if (res.ok) {
-        showToast(`Record "${recId}" removed from PostgreSQL database.`);
-        await fetchSavedRecords();
-        await fetchMasterOptions();
-        const currentId = String(
-          formData[processConfig.primaryField] || formData["recordNo"] || "",
-        );
-        if (currentId === recId) {
-          handleClearForm();
+
+      const canReachBackend = !isOfflineForTransactions() && (await probeBackendReachable());
+      if (canReachBackend) {
+        try {
+          const res = await apiFetch(
+            `${processConfig.apiPath}/${encodeURIComponent(recId)}`,
+            {
+              method: "DELETE",
+              headers: {
+                "Idempotency-Key": String(rec["_idempotencyKey"] || `trx:delete:${meta.code}:${recId}`),
+              },
+            },
+            { networkOnly: true },
+          );
+          if (res.ok || res.status === 404) {
+            showToast(`Record "${recId}" deleted.`);
+          } else {
+            showToast(`Record "${recId}" deleted offline; will sync when online.`);
+            void syncManager.triggerSync("transaction_delete_retry");
+          }
+        } catch {
+          showToast(`Record "${recId}" deleted offline; will sync when online.`);
         }
       } else {
-        showToast(`Failed to delete record "${recId}".`);
+        showToast(`Record "${recId}" deleted offline; queued for sync.`);
+      }
+
+      await fetchSavedRecords();
+      const currentId = String(formData[processConfig.primaryField] || formData["recordNo"] || "");
+      if (currentId === recId) {
+        handleClearForm();
       }
     } catch (err) {
-      console.error("[PostgreSQL] Delete error:", err);
-      showToast("Error connecting to server to delete record.");
+      console.error("[Dexie] Delete error:", err);
+      showToast("Failed to delete record from local IndexedDB.");
     }
   };
 
@@ -638,7 +735,7 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     showToast(`Reset ${activeTab.label} to default dataset.`);
   };
 
-  // Save full transaction to PostgreSQL (with optional status override)
+  // Save to Dexie/IndexedDB first, then attempt PostgreSQL only if backend is reachable.
   const handleSaveTransaction = async (
     statusOverride?: string,
   ): Promise<Record<string, unknown> | null> => {
@@ -679,30 +776,85 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     };
 
     try {
-      const res = await apiFetch(processConfig.apiPath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      // 1) Always persist locally first (Airplane Mode safe)
+      const localRecord = await saveOfflineTransaction({
+        code: meta.code,
+        storageKey,
+        recordRef: recordId,
+        apiPath: processConfig.apiPath,
+        operation: "upsert",
+        payload,
       });
-      if (res.ok) {
-        const json = await res.json();
-        const savedRec = (json.record || json.request || payload) as Record<string, unknown>;
-        const now = new Date().toLocaleTimeString();
-        setLastSavedTime(now);
-        showToast(`${meta.code} Record "${recordId}" successfully saved to PostgreSQL database!`);
+
+      const now = new Date().toLocaleTimeString();
+      setLastSavedTime(now);
+      setFormData((prev) => ({
+        ...prev,
+        ...effectiveFormData,
+        [processConfig.primaryField]: recordId,
+        recordNo: recordId,
+      }));
+
+      // 2) Optional remote sync — never block local success
+      const canReachBackend = !isOfflineForTransactions() && (await probeBackendReachable());
+      if (!canReachBackend) {
+        showToast(
+          `${meta.code} Record "${recordId}" saved offline (Dexie). Will sync when online.`,
+        );
         await fetchSavedRecords();
-        await fetchMasterOptions();
         setIsSaving(false);
-        return savedRec;
-      } else {
-        showToast(`Failed to save record "${recordId}" to PostgreSQL.`);
+        return { ...payload, _syncStatus: localRecord.syncStatus };
       }
+
+      try {
+        const res = await apiFetch(
+          processConfig.apiPath,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": localRecord.idempotencyKey,
+            },
+            body: JSON.stringify({ ...payload, idempotencyKey: localRecord.idempotencyKey }),
+          },
+          { networkOnly: true },
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const savedRec = (json.record || json.request || payload) as Record<string, unknown>;
+          const { markTransactionSyncState, offlineDB } = await import("@/lib/offline-db");
+          await markTransactionSyncState(localRecord.id, "synced");
+          const queueItems = await offlineDB.syncQueue
+            .where("entityId")
+            .equals(localRecord.id)
+            .toArray();
+          for (const item of queueItems) {
+            if (item.id != null) await offlineDB.syncQueue.delete(item.id);
+          }
+          showToast(`${meta.code} Record "${recordId}" saved to PostgreSQL.`);
+          await fetchSavedRecords();
+          await fetchMasterOptions();
+          setIsSaving(false);
+          return savedRec;
+        }
+        showToast(
+          `${meta.code} Record "${recordId}" kept offline (server rejected). Will retry sync.`,
+        );
+      } catch (err) {
+        console.warn("[Dexie] Remote save failed; local copy retained:", err);
+        showToast(`${meta.code} Record "${recordId}" saved offline; sync will retry.`);
+        void syncManager.triggerSync("transaction_save_retry");
+      }
+
+      await fetchSavedRecords();
+      setIsSaving(false);
+      return { ...payload, _syncStatus: "pending" };
     } catch (err) {
-      console.error("[PostgreSQL] Failed to save transaction:", err);
-      showToast("Error connecting to PostgreSQL database.");
+      console.error("[Dexie] Failed to save transaction locally:", err);
+      showToast("Failed to save transaction to IndexedDB.");
+      setIsSaving(false);
+      return null;
     }
-    setIsSaving(false);
-    return null;
   };
 
   // Helper to hand off context to another transaction screen and navigate
@@ -1502,8 +1654,8 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
                           No saved records found for {meta.name}.
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Enter details in the form above and click &ldquo;Save Record&rdquo; to
-                          store in PostgreSQL.
+                          Enter details and click &ldquo;Save Record&rdquo;. Records are stored in
+                          IndexedDB first and sync to PostgreSQL when online.
                         </p>
                       </td>
                     </tr>
