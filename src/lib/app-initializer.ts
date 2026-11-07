@@ -55,38 +55,70 @@ export function readStoredTechnicianSession(): { token: string; user: StoredUser
   }
 }
 
+function readSessionStorageSession(): { token: string; user: StoredUserProfile } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const token = sessionStorage.getItem("auth_token");
+    const raw = sessionStorage.getItem("auth_user");
+    const user = raw ? (JSON.parse(raw) as StoredUserProfile) : null;
+    if (!token || !user?.name || !user.email || user.id == null || !isUsableJwt(token)) return null;
+    return { token, user };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Offline: trust a non-expired JWT and profile already in localStorage.
- * Online: ask /api/auth/session to confirm that token with the server.
- * If the server cannot be reached, fall back to the stored session.
+ * Offline: trust a non-expired JWT and profile already in local/session storage.
+ * Online: ask /api/auth/session with a short timeout; fall back to the stored session.
  */
 export async function resolveTechnicianStartup(): Promise<TechnicianStartupResult> {
   const stored = readStoredTechnicianSession();
+  const tabSession = readSessionStorageSession();
+  const localSession = stored || tabSession;
 
+  // Airplane Mode / no network: never block the UI waiting on fetch.
   if (isOfflineForTransactions()) {
-    if (!stored) return { status: "login" };
-    return { status: "authenticated", user: stored.user, token: stored.token, remember: true };
+    if (!localSession) return { status: "login" };
+    return {
+      status: "authenticated",
+      user: localSession.user,
+      token: localSession.token,
+      remember: !!stored,
+    };
   }
 
-  const sessionToken =
-    (typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null) || stored?.token || "";
+  const sessionToken = tabSession?.token || stored?.token || "";
   if (!isUsableJwt(sessionToken)) return { status: "login" };
 
   try {
-    const response = await apiFetch(
-      "/api/auth/session",
-      {
-        method: "GET",
-        headers: { Authorization: `Bearer ${sessionToken}` },
-      },
-      { networkOnly: true },
-    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    let response: Response;
+    try {
+      response = await apiFetch(
+        "/api/auth/session",
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${sessionToken}` },
+          signal: controller.signal,
+        },
+        { networkOnly: true },
+      );
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (response.status === 401 || response.status === 403) return { status: "login" };
 
     if (!response.ok) {
-      if (!stored) return { status: "login" };
-      return { status: "authenticated", user: stored.user, token: stored.token, remember: true };
+      if (!localSession) return { status: "login" };
+      return {
+        status: "authenticated",
+        user: localSession.user,
+        token: localSession.token,
+        remember: !!stored,
+      };
     }
 
     const data = (await response.json()) as {
@@ -95,7 +127,13 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       user?: StoredUserProfile;
     };
     if (!data.success || !data.user?.name || !data.user.email || data.user.id == null) {
-      return { status: "login" };
+      if (!localSession) return { status: "login" };
+      return {
+        status: "authenticated",
+        user: localSession.user,
+        token: localSession.token,
+        remember: !!stored,
+      };
     }
 
     const remember =
@@ -107,7 +145,13 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       remember,
     };
   } catch {
-    if (!stored) return { status: "login" };
-    return { status: "authenticated", user: stored.user, token: stored.token, remember: true };
+    // Unreachable backend while navigator.onLine is still true (common on mobile).
+    if (!localSession) return { status: "login" };
+    return {
+      status: "authenticated",
+      user: localSession.user,
+      token: localSession.token,
+      remember: !!stored,
+    };
   }
 }

@@ -875,9 +875,22 @@ export function getMobileJobs(filterByActiveTech = true): MobileJob[] {
   if (!filterByActiveTech) return jobsStore;
   const activeUser = getActiveAuthUser();
   if (activeUser && activeUser.name) {
-    return jobsStore.filter((job) =>
+    const filtered = jobsStore.filter((job) =>
       isJobAssignedToTechnician(job, activeUser.name, activeUser.email),
     );
+    if (filtered.length > 0) return filtered;
+
+    // Airplane Mode / offline: keep the app usable with locally cached jobs even if
+    // the logged-in name does not exactly match technicianName on seed/API rows.
+    const deviceOffline =
+      typeof navigator !== "undefined" &&
+      (!navigator.onLine ||
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("telesonic_simulated_offline") === "true"));
+    if (deviceOffline && jobsStore.length > 0) {
+      return jobsStore;
+    }
+    return filtered;
   }
   // When no user is logged in (e.g. unit tests), return default Nimal Perera jobs
   const nimalJobs = jobsStore.filter((j) =>

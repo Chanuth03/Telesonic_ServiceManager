@@ -25,24 +25,28 @@ export function AppInitializer({ children }: { children: ReactNode }) {
 
     void (async () => {
       const path = window.location.pathname;
-      const result = await resolveTechnicianStartup();
-      if (cancelled) return;
+      try {
+        const result = await resolveTechnicianStartup();
+        if (cancelled) return;
 
-      if (result.status === "authenticated") {
-        await loginRef.current(result.user, result.token, result.remember);
-        if (path === "/mobile/login") {
-          void navigateRef.current({ to: "/mobile", replace: true });
+        if (result.status === "authenticated") {
+          await loginRef.current(result.user, result.token, result.remember);
+          if (path === "/mobile/login") {
+            void navigateRef.current({ to: "/mobile", replace: true });
+          }
+        } else {
+          const hadStoredToken =
+            !!localStorage.getItem("auth_token") || !!sessionStorage.getItem("auth_token");
+          if (hadStoredToken) await logoutRef.current();
+          if (path !== "/mobile/login") {
+            void navigateRef.current({ to: "/mobile/login", replace: true });
+          }
         }
-      } else {
-        const hadStoredToken =
-          !!localStorage.getItem("auth_token") || !!sessionStorage.getItem("auth_token");
-        if (hadStoredToken) await logoutRef.current();
-        if (path !== "/mobile/login") {
-          void navigateRef.current({ to: "/mobile/login", replace: true });
-        }
+      } catch (err) {
+        console.error("[AppInitializer] Startup failed; continuing with local session if any:", err);
+      } finally {
+        if (!cancelled) setReady(true);
       }
-
-      if (!cancelled) setReady(true);
     })();
 
     return () => {

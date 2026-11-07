@@ -35,7 +35,10 @@ export function SyncStatusBadge() {
               </span>
               <WifiOff size={14} className="text-amber-500" />
               <span className="font-semibold text-amber-600 dark:text-amber-400">
-                {isSimulatedOffline ? "Offline (Simulated)" : "Offline (No Connection)"}
+                {isSimulatedOffline ? "Offline (Simulated)" : "Offline"}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                Local mode — app still works
               </span>
             </>
           )}

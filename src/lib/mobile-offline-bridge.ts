@@ -119,6 +119,23 @@ export async function startMobileOfflineBridge() {
     void refreshMobileJobsFromServer();
   });
 
+  // Airplane Mode: immediately re-hydrate from IndexedDB so the UI does not stay empty
+  // waiting on a failed network refresh.
+  window.addEventListener("offline", () => {
+    void (async () => {
+      const [jobs, notifications, stock] = await Promise.all([
+        getDexieJobs(),
+        getDexieNotifications(),
+        getDexieStock(),
+      ]);
+      hydrateMobileStores({
+        jobs: jobs.map(toMobileJob),
+        notifications,
+        stock,
+      });
+    })();
+  });
+
   unsubscribePersist = subscribeMobilePersist((event) => {
     void persistMobileEvent(event).catch((err) => {
       console.error("[Mobile] Offline save failed:", err);

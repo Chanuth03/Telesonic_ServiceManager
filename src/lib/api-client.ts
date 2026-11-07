@@ -26,17 +26,9 @@ export async function apiFetch(
       }
       return res;
     } catch (error) {
-      if (options?.networkOnly) {
-        throw error instanceof Error ? error : new Error("Main database was not reachable");
-      }
-      // Offline fallback: if fetch fails (e.g. offline) in browser, dynamically load handler if supported
-      try {
-        const { handleApiRequest } = await import("./api-handler");
-        const req = new Request(fullUrl, init);
-        return await handleApiRequest(req);
-      } catch {
-        throw error instanceof Error ? error : new Error("Network request failed");
-      }
+      // Never import the Node/Prisma api-handler into the browser.
+      // In Airplane Mode that import hangs or crashes and leaves the UI blank.
+      throw error instanceof Error ? error : new Error("Network request failed");
     }
   }
 
