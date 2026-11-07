@@ -12,6 +12,7 @@ import {
 } from "@/lib/pwa";
 
 export const Route = createFileRoute("/mobile-apk-download")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Telesonic Mobile App — Service Manager" },

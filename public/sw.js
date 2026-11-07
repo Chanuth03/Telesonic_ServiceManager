@@ -1,9 +1,14 @@
-// Telesonic Service Worker — Airplane Mode must serve the real app shell, not an error page
-const CACHE_NAME = "telesonic-pwa-v3";
+// Telesonic Service Worker — full mobile offline (Airplane Mode)
+const CACHE_NAME = "telesonic-pwa-v4";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
   "/mobile/login",
+  "/mobile/jobs",
+  "/mobile/stock-count",
+  "/mobile/notifications",
+  "/mobile-apk-download",
+  "/transactions",
   "/manifest.json",
   "/favicon.ico",
   "/icons/icon-192.png",
@@ -21,7 +26,7 @@ self.addEventListener("install", (event) => {
             const response = await fetch(url, { cache: "reload" });
             if (response.ok) await cache.put(url, response.clone());
           } catch {
-            // Ignore individual precache failures.
+            // ignore
           }
         }),
       );
@@ -36,6 +41,28 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
       await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data.type !== "CACHE_URLS" || !Array.isArray(data.urls)) return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await Promise.all(
+        data.urls.map(async (url) => {
+          try {
+            if (typeof url !== "string") return;
+            const request = new Request(url, { credentials: "same-origin" });
+            const response = await fetch(request);
+            if (response && response.ok) await cache.put(request, response.clone());
+          } catch {
+            // ignore
+          }
+        }),
+      );
     })(),
   );
 });
@@ -61,7 +88,7 @@ function isStaticAsset(request) {
   return (
     path.startsWith("/assets/") ||
     path.startsWith("/icons/") ||
-    /\.(js|css|woff2?|ttf|png|jpg|jpeg|svg|webp|ico|json|webmanifest)$/i.test(path)
+    /\.(js|css|mjs|woff2?|ttf|png|jpg|jpeg|svg|webp|ico|json|webmanifest)$/i.test(path)
   );
 }
 
@@ -74,28 +101,17 @@ function offlineShellResponse() {
   <meta name="theme-color" content="#2563eb" />
   <title>Telesonic Mobile — Offline</title>
   <style>
-    body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center;
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-      background: #f8fafc; color: #0f172a; padding: 24px; text-align: center;
-    }
-    .card {
-      max-width: 360px; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px;
-      background: #fff; padding: 24px; box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
-    }
-    h1 { font-size: 1.15rem; margin: 0 0 8px; }
-    p { margin: 0 0 16px; color: #64748b; font-size: 0.9rem; line-height: 1.45; }
-    a, button {
-      appearance: none; border: 0; border-radius: 10px; padding: 10px 14px;
-      background: #2563eb; color: white; font-weight: 600; cursor: pointer;
-      text-decoration: none; display: inline-block;
-    }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:system-ui,-apple-system,sans-serif; background:#f8fafc; color:#0f172a; padding:24px; text-align:center; }
+    .card { max-width:360px; width:100%; border:1px solid #e2e8f0; border-radius:16px; background:#fff; padding:24px; }
+    h1 { font-size:1.15rem; margin:0 0 8px; }
+    p { margin:0 0 16px; color:#64748b; font-size:0.9rem; line-height:1.45; }
+    a { appearance:none; border:0; border-radius:10px; padding:10px 14px; background:#2563eb; color:#fff; font-weight:600; text-decoration:none; display:inline-block; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>You're offline</h1>
-    <p>Open the mobile app from a screen you used while online. Local jobs and transactions stay on this device.</p>
+    <p>Open a mobile screen you used while online. Jobs, photos, parts, labour and transactions stay on this device.</p>
     <a href="/mobile">Open mobile app</a>
   </div>
 </body>
@@ -109,6 +125,7 @@ function offlineShellResponse() {
 async function cachedAppShell() {
   return (
     (await caches.match("/mobile", { ignoreSearch: true })) ||
+    (await caches.match("/mobile/jobs", { ignoreSearch: true })) ||
     (await caches.match("/", { ignoreSearch: true })) ||
     (await caches.match("/mobile/login", { ignoreSearch: true })) ||
     offlineShellResponse()
@@ -117,7 +134,6 @@ async function cachedAppShell() {
 
 async function putInCache(request, response) {
   if (!response || !response.ok) return;
-  // opaque/cors responses are not useful for same-origin app shell
   if (response.type !== "basic" && response.type !== "cors") return;
   const cache = await caches.open(CACHE_NAME);
   await cache.put(request, response.clone());
@@ -126,7 +142,6 @@ async function putInCache(request, response) {
 self.addEventListener("fetch", (event) => {
   if (!isAppRequest(event.request)) return;
 
-  // HTML navigations: network first, then cached shell
   if (isNavigationRequest(event.request)) {
     event.respondWith(
       (async () => {
@@ -134,7 +149,8 @@ self.addEventListener("fetch", (event) => {
           const response = await fetch(event.request);
           if (response && response.ok) {
             await putInCache(event.request, response);
-            if (new URL(event.request.url).pathname.startsWith("/mobile")) {
+            const path = new URL(event.request.url).pathname;
+            if (path === "/mobile" || path.startsWith("/mobile/")) {
               const cache = await caches.open(CACHE_NAME);
               await cache.put("/mobile", response.clone());
             }
@@ -150,20 +166,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // JS/CSS/images: cache-first so Airplane Mode can boot a previously visited build
   if (isStaticAsset(event.request)) {
     event.respondWith(
       (async () => {
         const cached = await caches.match(event.request, { ignoreSearch: true });
         if (cached) {
-          // Refresh in background when online
           event.waitUntil(
             (async () => {
               try {
                 const fresh = await fetch(event.request);
                 await putInCache(event.request, fresh);
               } catch {
-                // keep cached copy
+                // keep cached
               }
             })(),
           );
@@ -181,7 +195,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Everything else same-origin: network then cache
   event.respondWith(
     (async () => {
       try {

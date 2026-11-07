@@ -21,6 +21,7 @@ import { ensureOfflineDatabaseReady } from "@/lib/offline-db";
 import { isStandalonePwa } from "@/lib/pwa";
 import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
 import { syncManager } from "@/lib/sync-manager";
+import { warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
 
 function NotFoundComponent() {
   return (
@@ -209,6 +210,10 @@ function RootComponent() {
         await startMobileOfflineBridge();
         if (syncManager.getIsOnline()) {
           void syncManager.triggerSync("app_startup");
+          // Warm HTML/JS caches so every mobile page works later in Airplane Mode.
+          window.setTimeout(() => {
+            void warmMobileOfflineCache("app_startup");
+          }, 1500);
         }
       } catch (err) {
         console.error("[App] Offline database init failed:", err);
@@ -216,7 +221,13 @@ function RootComponent() {
     })();
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       if (import.meta.env.PROD) {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((registration) => {
+            // Force activate the latest offline SW after deploy.
+            void registration.update();
+          })
+          .catch(() => {});
       } else {
         // In local development, unregister active service workers so they don't break Vite HMR
         navigator.serviceWorker.getRegistrations().then((registrations) => {

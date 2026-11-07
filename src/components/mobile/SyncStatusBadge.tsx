@@ -101,10 +101,11 @@ export function SyncStatusBadge() {
         </button>
       </div>
 
-      {!isOnline && pendingCount > 0 ? (
+      {!isOnline ? (
         <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-300">
-          Saved on this device. These changes will be sent to the main database when the connection
-          returns.
+          {pendingCount > 0
+            ? `Working offline. ${pendingCount} change${pendingCount > 1 ? "s" : ""} saved on this device and will sync when online.`
+            : "Working offline. Jobs, forms, photos and transactions use on-device storage."}
         </p>
       ) : null}
 

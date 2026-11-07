@@ -78,15 +78,25 @@ function MobileLoginPage() {
     setIsSubmitting(true);
     setError("");
 
+    if (isOfflineForTransactions()) {
+      setError("You are offline. First sign-in needs internet. After that, Keep me signed in works in Airplane Mode.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const response = await apiFetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password.trim(),
-        }),
-      });
+      const response = await apiFetch(
+        "/api/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password.trim(),
+          }),
+        },
+        { networkOnly: true },
+      );
 
       const data = await response.json();
 
@@ -103,7 +113,11 @@ function MobileLoginPage() {
       await refreshMobileJobsFromServer();
       navigate({ to: "/mobile", replace: true });
     } catch {
-      setError("Something went wrong on the server");
+      setError(
+        navigator.onLine
+          ? "Something went wrong on the server"
+          : "You are offline. Connect once to sign in, then Airplane Mode will keep the app working.",
+      );
     } finally {
       setIsSubmitting(false);
     }

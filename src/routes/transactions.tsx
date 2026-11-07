@@ -50,6 +50,7 @@ import {
 import { TransactionScreenView } from "@/components/transactions/TransactionScreenView";
 
 export const Route = createFileRoute("/transactions")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Transactions Hub — ServiceManager & Telesonic Lanka" },
