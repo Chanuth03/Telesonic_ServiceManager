@@ -38,7 +38,21 @@ function readDatabaseUrl(): string | null {
 function getPool(): Pool | null {
   const connectionString = readDatabaseUrl();
   if (!connectionString) return null;
-  if (!pool) pool = new Pool({ connectionString, max: 3 });
+  if (!pool) {
+    const isRemote =
+      connectionString.includes("supabase.com") ||
+      connectionString.includes("neon.tech") ||
+      connectionString.includes("render.com") ||
+      connectionString.includes("pooler");
+
+    const cleanConnectionString = connectionString.replace(/[?&]sslmode=[^&]+/g, "");
+
+    pool = new Pool({
+      connectionString: cleanConnectionString,
+      max: 3,
+      ssl: isRemote ? { rejectUnauthorized: false } : undefined,
+    });
+  }
   return pool;
 }
 
