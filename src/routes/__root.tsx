@@ -47,17 +47,27 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
+  const offline =
+    typeof navigator !== "undefined" &&
+    (!navigator.onLine ||
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("telesonic_simulated_offline") === "true"));
+
   useEffect(() => {
+    if (offline) return;
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+  }, [error, offline]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {offline ? "You're offline" : "This page didn't load"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {offline
+            ? "Airplane Mode is on. Open the mobile app from a page you used while online, or turn the network back on and try again."
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -70,10 +80,10 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             Try again
           </button>
           <a
-            href="/"
+            href={offline ? "/mobile" : "/"}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
           >
-            Go home
+            {offline ? "Open mobile app" : "Go home"}
           </a>
         </div>
       </div>
@@ -124,7 +134,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");var token=localStorage.getItem("auth_token")||"";var jwtOk=false;try{var parts=token.split(".");if(parts.length===3){var b64=parts[1].replace(/-/g,"+").replace(/_/g,"/");while(b64.length%4)b64+="=";var body=JSON.parse(atob(b64));jwtOk=!body.exp||body.exp*1000>Date.now();}}catch(err){jwtOk=false;}if(navigator.onLine===false&&rem&&jwtOk&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
+            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");var token=localStorage.getItem("auth_token")||"";var jwtOk=false;try{var parts=token.split(".");if(parts.length===3){var b64=parts[1].replace(/-/g,"+").replace(/_/g,"/");while(b64.length%4)b64+="=";var body=JSON.parse(atob(b64));jwtOk=!body.exp||body.exp*1000>Date.now();}}catch(err){jwtOk=false;}if(navigator.onLine===false&&rem&&jwtOk&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}if(navigator.onLine===false){document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll('link[href*="fonts.googleapis.com"],link[href*="fonts.gstatic.com"]').forEach(function(n){n.remove();});});}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
           }}
         />
         <HeadContent />

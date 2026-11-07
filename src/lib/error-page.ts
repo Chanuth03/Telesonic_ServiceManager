@@ -18,12 +18,22 @@ export function renderErrorPage(): string {
   </head>
   <body>
     <div class="card">
-      <h1>This page didn't load</h1>
-      <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      <h1 id="title">This page didn't load</h1>
+      <p id="message">Something went wrong on our end. You can try refreshing or head back home.</p>
       <div class="actions">
         <button class="primary" onclick="location.reload()">Try again</button>
-        <a class="secondary" href="/">Go home</a>
+        <a class="secondary" id="home" href="/">Go home</a>
       </div>
+      <script>
+        if (!navigator.onLine) {
+          document.getElementById("title").textContent = "You're offline";
+          document.getElementById("message").textContent =
+            "Airplane Mode is on. Open the mobile app from a page you used while online, or reconnect and try again.";
+          var home = document.getElementById("home");
+          home.href = "/mobile";
+          home.textContent = "Open mobile app";
+        }
+      </script>
     </div>
   </body>
 </html>`;
