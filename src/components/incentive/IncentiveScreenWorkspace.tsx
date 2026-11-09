@@ -93,7 +93,7 @@ function ProcessLifecycleHeader({
           </Button>
 
           <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-muted text-foreground">
-            Step {screen.screenNumber.toString().padStart(2, "0")} / {INCENTIVE_SCREENS.length}
+            {screen.screenNumber.toString().padStart(2, "0")} / {INCENTIVE_SCREENS.length}
           </span>
 
           <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stage.stageTone}`}>

@@ -353,19 +353,14 @@ function IncentiveModulePage() {
                   className="group relative flex flex-col justify-between text-left rounded-xl border bg-card p-5 text-card-foreground shadow-xs transition-all hover:-translate-y-1 hover:border-primary/40 hover:bg-card hover:shadow-md cursor-pointer motion-reduce:transform-none"
                 >
                   <div className="w-full">
-                    {/* Top Row: Icon, Screen # and Arrow */}
+                    {/* Top Row: Icon and Arrow */}
                     <div className="flex w-full items-start justify-between gap-2 mb-3">
                       <span
-                        className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${screen.tone}`}
+                        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${screen.tone}`}
                       >
                         <ScreenIcon className="size-5" />
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-mono font-bold text-foreground bg-muted px-2 py-0.5 rounded border border-border">
-                          Step #{screen.screenNumber.toString().padStart(2, "0")}
-                        </span>
-                        <ArrowUpRight className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform size-4" />
-                      </div>
+                      <ArrowUpRight className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform size-4 mt-1" />
                     </div>
 
                     {/* Title */}
@@ -385,7 +380,7 @@ function IncentiveModulePage() {
                       {screen.category}
                     </span>
                     <span className="text-xs font-semibold text-primary group-hover:underline">
-                      Open Step &rarr;
+                      Open &rarr;
                     </span>
                   </div>
                 </button>
