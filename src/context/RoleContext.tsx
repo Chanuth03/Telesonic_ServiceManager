@@ -13,8 +13,17 @@ import {
   saveOfflineAuthSession,
   getOfflineAuthSession,
   clearOfflineAuthSession,
+  DEFAULT_ORGANIZATION_ID,
+  isOfflineForTransactions,
 } from "@/lib/offline-db";
 import { isUsableJwt } from "@/lib/app-initializer";
+import {
+  scrubPlaintextAuthFromLocalStorage,
+  setActiveSessionMemory,
+  clearActiveSessionMemory,
+  isWithinOfflineAccessPolicy,
+  type SecureAuthSession,
+} from "@/lib/secure-session-store";
 
 export type UserRole = string;
 
@@ -26,6 +35,7 @@ export interface UserProfile {
   title?: string;
   avatarInitials?: string;
   permissions?: string[];
+  organizationId?: string;
 }
 
 interface RoleContextType {
@@ -89,24 +99,7 @@ function getInitialAuthState(isVitest: boolean): {
       }
     }
 
-    const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
-    const localUserRaw = localStorage.getItem("auth_user");
-    const localToken = localStorage.getItem("auth_token");
-    if (isRemembered && localUserRaw && isUsableJwt(localToken)) {
-      const parsed = JSON.parse(localUserRaw) as UserProfile;
-      if (parsed && parsed.name) {
-        sessionStorage.setItem("auth_user", localUserRaw);
-        sessionStorage.setItem("auth_token", localToken);
-        sessionStorage.setItem("mobile_authenticated", "true");
-        sessionStorage.setItem("mobile_tech_id", parsed.name);
-        return {
-          user: parsed,
-          role: parsed.role || "ADMIN",
-          isAuthenticated: true,
-          authReady: true,
-        };
-      }
-    }
+    // Do not trust plaintext localStorage tokens — vault restore happens asynchronously.
   } catch {
     // ignore
   }
@@ -127,15 +120,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState<boolean>(initial.authReady);
 
   // Restore session on mount:
-  // 1) Active tab session in sessionStorage
-  // 2) Persistent "Keep me signed in" session in localStorage (telesonic_remember_session === "true")
-  // 3) Offline PWA Dexie.js session in offlineMeta ("saved_auth_session")
+  // 1) Active tab session in sessionStorage (in-memory for the tab)
+  // 2) Encrypted secure vault (Keep me signed in) — never plaintext localStorage tokens
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     let cancelled = false;
     const restoreAuth = async () => {
       try {
+        scrubPlaintextAuthFromLocalStorage();
+
         // 1. Check active tab sessionStorage first
         const sessionUserRaw = sessionStorage.getItem("auth_user");
         const sessionToken = sessionStorage.getItem("auth_token");
@@ -151,49 +145,22 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 2. Check persistent localStorage if user checked "Keep me signed in"
-        const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
-        const localUserRaw = localStorage.getItem("auth_user");
-        const localToken = localStorage.getItem("auth_token");
-
-        if (isRemembered && localUserRaw && isUsableJwt(localToken)) {
-          const parsed = JSON.parse(localUserRaw) as UserProfile;
-          if (parsed && parsed.name && !cancelled) {
-            sessionStorage.setItem("auth_user", localUserRaw);
-            sessionStorage.setItem("auth_token", localToken);
-            sessionStorage.setItem("mobile_authenticated", "true");
-            sessionStorage.setItem("mobile_tech_id", parsed.name);
-            setCurrentUser(parsed);
-            if (parsed.role) setRoleState(parsed.role);
-            setIsAuthenticated(true);
-            setAuthReady(true);
-            window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: parsed }));
-            return;
-          }
-        } else if (!isRemembered) {
-          // Clean up any legacy un-remembered localStorage keys so fresh startup goes to Login
-          localStorage.removeItem("auth_user");
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("mobile_tech_id");
-        }
-
-        // 3. Check Dexie.js offlineMeta for Mobile PWA offline auto-login
-        const dexieSession = await getOfflineAuthSession();
-        if (
-          dexieSession &&
-          dexieSession.rememberMe &&
-          dexieSession.user &&
-          isUsableJwt(dexieSession.token) &&
-          !cancelled
-        ) {
-          const parsed = dexieSession.user as unknown as UserProfile;
-          if (parsed && parsed.name) {
+        // 2. Encrypted vault / migrated legacy session
+        const vaultSession = await getOfflineAuthSession();
+        if (vaultSession?.rememberMe && vaultSession.user && !cancelled) {
+          const parsed = vaultSession.user as unknown as UserProfile;
+          const jwtOk = isUsableJwt(vaultSession.token);
+          const offline = isOfflineForTransactions();
+          const policyOk = isWithinOfflineAccessPolicy(vaultSession as SecureAuthSession, {
+            offline,
+            jwtStillValid: jwtOk,
+          });
+          if (parsed?.name && (jwtOk || policyOk)) {
             const userJson = JSON.stringify(parsed);
             localStorage.setItem("telesonic_remember_session", "true");
             localStorage.setItem("auth_user", userJson);
-            localStorage.setItem("auth_token", dexieSession.token);
-            sessionStorage.setItem("auth_user", userJson);
-            sessionStorage.setItem("auth_token", dexieSession.token);
+            localStorage.removeItem("auth_token");
+            setActiveSessionMemory(vaultSession.token, userJson);
             sessionStorage.setItem("mobile_authenticated", "true");
             sessionStorage.setItem("mobile_tech_id", parsed.name);
             setCurrentUser(parsed);
@@ -204,6 +171,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
             return;
           }
         }
+
+        localStorage.removeItem("auth_token");
       } catch {
         // Ignore parse errors
       }
@@ -254,36 +223,42 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   };
 
   const loginUser = async (newUser: UserProfile, token: string, rememberMe: boolean) => {
-    setCurrentUser(newUser);
-    if (newUser.role) {
-      setRoleState(newUser.role);
+    const scopedUser: UserProfile = {
+      ...newUser,
+      organizationId: newUser.organizationId || DEFAULT_ORGANIZATION_ID,
+    };
+    setCurrentUser(scopedUser);
+    if (scopedUser.role) {
+      setRoleState(scopedUser.role);
     }
     setIsAuthenticated(true);
     setAuthReady(true);
 
     if (typeof window !== "undefined") {
-      const userJson = JSON.stringify(newUser);
-      sessionStorage.setItem("auth_user", userJson);
-      sessionStorage.setItem("auth_token", token);
+      const userJson = JSON.stringify(scopedUser);
+      setActiveSessionMemory(token, userJson);
       sessionStorage.setItem("mobile_authenticated", "true");
-      sessionStorage.setItem("mobile_tech_id", newUser.name);
-      if (newUser.role) {
-        sessionStorage.setItem("app_user_role", newUser.role);
+      sessionStorage.setItem("mobile_tech_id", scopedUser.name);
+      if (scopedUser.role) {
+        sessionStorage.setItem("app_user_role", scopedUser.role);
       }
 
       if (rememberMe) {
         localStorage.setItem("telesonic_remember_session", "true");
         localStorage.setItem("auth_user", userJson);
-        localStorage.setItem("auth_token", token);
-        localStorage.setItem("mobile_tech_id", newUser.name);
-        if (newUser.role) {
-          localStorage.setItem("app_user_role", newUser.role);
+        localStorage.setItem("mobile_tech_id", scopedUser.name);
+        if (scopedUser.role) {
+          localStorage.setItem("app_user_role", scopedUser.role);
         }
+        // Token goes ONLY to encrypted vault — never localStorage.
+        localStorage.removeItem("auth_token");
         await saveOfflineAuthSession({
           token,
-          user: newUser as unknown as Record<string, unknown>,
+          user: scopedUser as unknown as Record<string, unknown>,
           rememberMe: true,
           savedAt: new Date().toISOString(),
+          userId: String(scopedUser.id),
+          organizationId: scopedUser.organizationId || DEFAULT_ORGANIZATION_ID,
         });
       } else {
         localStorage.removeItem("telesonic_remember_session");
@@ -294,18 +269,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         await clearOfflineAuthSession();
       }
 
-      window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: newUser }));
+      scrubPlaintextAuthFromLocalStorage();
+      window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: scopedUser }));
     }
   };
 
   const logoutUser = async () => {
     setIsAuthenticated(false);
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("auth_user");
-      sessionStorage.removeItem("auth_token");
-      sessionStorage.removeItem("mobile_authenticated");
-      sessionStorage.removeItem("mobile_tech_id");
-      sessionStorage.removeItem("app_user_role");
+      // Clear session credentials only. Local transactions / Dexie business data are retained
+      // until a deliberate data-retention wipe is requested.
+      clearActiveSessionMemory();
       localStorage.removeItem("telesonic_remember_session");
       localStorage.removeItem("auth_user");
       localStorage.removeItem("auth_token");

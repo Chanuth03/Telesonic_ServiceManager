@@ -34,6 +34,12 @@ export function AppInitializer({ children }: { children: ReactNode }) {
           if (path === "/mobile/login") {
             void navigateRef.current({ to: "/mobile", replace: true });
           }
+          try {
+            const { syncManager } = await import("@/lib/sync-manager");
+            void syncManager.triggerSync("app_initializer");
+          } catch {
+            // ignore
+          }
         } else {
           const hadStoredToken =
             !!localStorage.getItem("auth_token") || !!sessionStorage.getItem("auth_token");

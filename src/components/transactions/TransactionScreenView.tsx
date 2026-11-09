@@ -360,12 +360,19 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
     }
   };
 
-  // Fetch Master & Transaction Dropdown Options from PostgreSQL (skip when offline)
+  // Fetch Master & Transaction Dropdown Options — Dexie cache first, then network when reachable.
   const fetchMasterOptions = async () => {
-    if (isOfflineForTransactions()) return;
-    const reachable = await probeBackendReachable();
-    if (!reachable) return;
     try {
+      const { getCachedMasterOptions, cacheMasterOptionsForUser } = await import("@/lib/offline-db");
+      const cached = await getCachedMasterOptions();
+      if (cached) {
+        setMasterOptions((prev) => ({ ...prev, ...cached }));
+      }
+
+      if (isOfflineForTransactions()) return;
+      const reachable = await probeBackendReachable();
+      if (!reachable) return;
+
       const res = await apiFetch("/api/service-requests/master-options", undefined, {
         networkOnly: true,
       });
@@ -373,6 +380,19 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
         const json = await res.json();
         if (json.options) {
           setMasterOptions((prev) => ({ ...prev, ...json.options }));
+          const userRaw = sessionStorage.getItem("auth_user");
+          let userId = "anonymous";
+          let organizationId = "TELESONIC-DEFAULT";
+          if (userRaw) {
+            try {
+              const parsed = JSON.parse(userRaw) as { id?: string | number; organizationId?: string };
+              if (parsed?.id != null) userId = String(parsed.id);
+              if (parsed?.organizationId) organizationId = String(parsed.organizationId);
+            } catch {
+              // ignore
+            }
+          }
+          await cacheMasterOptionsForUser(userId, organizationId, json.options);
         }
       }
     } catch (err) {

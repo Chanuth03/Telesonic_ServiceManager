@@ -1,5 +1,10 @@
 import { apiFetch } from "@/lib/api-client";
-import { isOfflineForTransactions } from "@/lib/offline-db";
+import { isOfflineForTransactions, getOfflineAuthSession } from "@/lib/offline-db";
+import {
+  getSecureAuthSession,
+  isWithinOfflineAccessPolicy,
+  type SecureAuthSession,
+} from "@/lib/secure-session-store";
 import jwt from "@/lib/jwt";
 
 export interface StoredUserProfile {
@@ -10,6 +15,7 @@ export interface StoredUserProfile {
   title?: string;
   avatarInitials?: string;
   permissions?: string[];
+  organizationId?: string;
 }
 
 export type TechnicianStartupResult =
@@ -18,6 +24,7 @@ export type TechnicianStartupResult =
       user: StoredUserProfile;
       token: string;
       remember: boolean;
+      offlineReady?: boolean;
     }
   | { status: "login" };
 
@@ -42,53 +49,103 @@ function parseStoredProfile(raw: string | null): StoredUserProfile | null {
   }
 }
 
-/** JWT plus technician profile saved by "Keep me signed in". */
+function profileFromSession(session: SecureAuthSession | SavedSessionLike): StoredUserProfile | null {
+  const user = session.user as unknown as StoredUserProfile;
+  if (user == null || user.id == null || !user.name || !user.email) return null;
+  return user;
+}
+
+interface SavedSessionLike {
+  token: string;
+  user: Record<string, unknown>;
+  rememberMe: boolean;
+  savedAt: string;
+  offlineExpiresAt?: string;
+}
+
+/** Prefer secure vault; fall back to sessionStorage for the active tab only. */
 export function readStoredTechnicianSession(): { token: string; user: StoredUserProfile } | null {
   if (typeof window === "undefined") return null;
   try {
-    const token = localStorage.getItem("auth_token");
-    const user = parseStoredProfile(localStorage.getItem("auth_user"));
-    if (!token || !user || !isUsableJwt(token)) return null;
-    return { token, user };
+    const token = sessionStorage.getItem("auth_token");
+    const user = parseStoredProfile(sessionStorage.getItem("auth_user"));
+    if (token && user && isUsableJwt(token)) return { token, user };
   } catch {
-    return null;
+    // ignore
   }
+  return null;
 }
 
 function readSessionStorageSession(): { token: string; user: StoredUserProfile } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const token = sessionStorage.getItem("auth_token");
-    const raw = sessionStorage.getItem("auth_user");
-    const user = raw ? (JSON.parse(raw) as StoredUserProfile) : null;
-    if (!token || !user?.name || !user.email || user.id == null || !isUsableJwt(token)) return null;
-    return { token, user };
-  } catch {
-    return null;
-  }
+  return readStoredTechnicianSession();
+}
+
+async function readVaultSession(): Promise<{
+  token: string;
+  user: StoredUserProfile;
+  remember: boolean;
+  session: SecureAuthSession;
+} | null> {
+  const secure = (await getSecureAuthSession()) || (await getOfflineAuthSession());
+  if (!secure?.rememberMe) return null;
+  const user = profileFromSession(secure as SecureAuthSession);
+  if (!user || !secure.token) return null;
+  return {
+    token: secure.token,
+    user,
+    remember: true,
+    session: secure as SecureAuthSession,
+  };
 }
 
 /**
- * Offline: trust a non-expired JWT and profile already in local/session storage.
+ * Offline: trust a non-expired JWT, or an expired JWT still inside the offline access grace window.
  * Online: ask /api/auth/session with a short timeout; fall back to the stored session.
  */
 export async function resolveTechnicianStartup(): Promise<TechnicianStartupResult> {
-  const stored = readStoredTechnicianSession();
   const tabSession = readSessionStorageSession();
-  const localSession = stored || tabSession;
+  const vault = await readVaultSession();
+  const offline = isOfflineForTransactions();
 
-  // Airplane Mode / no network: never block the UI waiting on fetch.
-  if (isOfflineForTransactions()) {
-    if (!localSession) return { status: "login" };
+  if (offline) {
+    const candidate = vault || (tabSession
+      ? {
+          token: tabSession.token,
+          user: tabSession.user,
+          remember: true,
+          session: {
+            token: tabSession.token,
+            user: tabSession.user as unknown as Record<string, unknown>,
+            rememberMe: true,
+            savedAt: new Date().toISOString(),
+            userId: String(tabSession.user.id),
+            organizationId: tabSession.user.organizationId || "TELESONIC-DEFAULT",
+          } satisfies SecureAuthSession,
+        }
+      : null);
+
+    if (!candidate) return { status: "login" };
+
+    const jwtOk = isUsableJwt(candidate.token);
+    const policyOk = isWithinOfflineAccessPolicy(candidate.session, {
+      offline: true,
+      jwtStillValid: jwtOk,
+    });
+    if (!jwtOk && !policyOk) return { status: "login" };
+
     return {
       status: "authenticated",
-      user: localSession.user,
-      token: localSession.token,
-      remember: !!stored,
+      user: candidate.user,
+      token: candidate.token,
+      remember: candidate.remember,
+      offlineReady: true,
     };
   }
 
-  const sessionToken = tabSession?.token || stored?.token || "";
+  const sessionToken = tabSession?.token || vault?.token || "";
+  if (!sessionToken) return { status: "login" };
+
+  // Online but JWT expired: require re-login (offline grace does not apply while online).
   if (!isUsableJwt(sessionToken)) return { status: "login" };
 
   try {
@@ -112,12 +169,14 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
     if (response.status === 401 || response.status === 403) return { status: "login" };
 
     if (!response.ok) {
-      if (!localSession) return { status: "login" };
+      const fallbackUser = tabSession?.user || vault?.user;
+      const fallbackToken = tabSession?.token || vault?.token;
+      if (!fallbackUser || !fallbackToken) return { status: "login" };
       return {
         status: "authenticated",
-        user: localSession.user,
-        token: localSession.token,
-        remember: !!stored,
+        user: fallbackUser,
+        token: fallbackToken,
+        remember: !!vault,
       };
     }
 
@@ -127,31 +186,32 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       user?: StoredUserProfile;
     };
     if (!data.success || !data.user?.name || !data.user.email || data.user.id == null) {
-      if (!localSession) return { status: "login" };
+      const fallbackUser = tabSession?.user || vault?.user;
+      const fallbackToken = tabSession?.token || vault?.token;
+      if (!fallbackUser || !fallbackToken) return { status: "login" };
       return {
         status: "authenticated",
-        user: localSession.user,
-        token: localSession.token,
-        remember: !!stored,
+        user: fallbackUser,
+        token: fallbackToken,
+        remember: !!vault,
       };
     }
 
-    const remember =
-      typeof window !== "undefined" && localStorage.getItem("telesonic_remember_session") === "true";
     return {
       status: "authenticated",
       user: data.user,
       token: data.token || sessionToken,
-      remember,
+      remember: !!vault || (typeof window !== "undefined" && localStorage.getItem("telesonic_remember_session") === "true"),
     };
   } catch {
-    // Unreachable backend while navigator.onLine is still true (common on mobile).
-    if (!localSession) return { status: "login" };
+    const fallbackUser = tabSession?.user || vault?.user;
+    const fallbackToken = tabSession?.token || vault?.token;
+    if (!fallbackUser || !fallbackToken) return { status: "login" };
     return {
       status: "authenticated",
-      user: localSession.user,
-      token: localSession.token,
-      remember: !!stored,
+      user: fallbackUser,
+      token: fallbackToken,
+      remember: !!vault,
     };
   }
 }

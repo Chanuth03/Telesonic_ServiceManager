@@ -33,6 +33,10 @@ export interface DexieSyncQueueItem {
   status: "pending" | "processing" | "synced" | "failed";
   errorMessage?: string;
   idempotencyKey?: string;
+  retryCount?: number;
+  nextRetryAt?: number;
+  userId?: string;
+  organizationId?: string;
 }
 
 export interface DexieMeta {
@@ -46,6 +50,81 @@ export interface DexieStockItem extends StockCountItem {
 }
 
 export type TransactionSyncStatus = "pending" | "syncing" | "synced" | "failed";
+
+export const DEFAULT_ORGANIZATION_ID = "TELESONIC-DEFAULT";
+
+export interface DexieUserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  organizationId: string;
+  permissions: string[];
+  profile: Record<string, unknown>;
+  updatedAt: number;
+}
+
+export interface DexieOrganizationRecord {
+  id: string;
+  name: string;
+  code?: string;
+  updatedAt: number;
+}
+
+export interface DexieRoleRecord {
+  id: string;
+  code: string;
+  name: string;
+  userId: string;
+  organizationId: string;
+  permissions: string[];
+  updatedAt: number;
+}
+
+export interface DexiePermissionRecord {
+  id: string;
+  code: string;
+  roleId: string;
+  userId: string;
+  organizationId: string;
+  updatedAt: number;
+}
+
+export interface DexieConfigurationRecord {
+  key: string;
+  userId: string;
+  organizationId: string;
+  value: unknown;
+  updatedAt: number;
+}
+
+export interface DexieMasterDataRecord {
+  id: string;
+  category: string;
+  userId: string;
+  organizationId: string;
+  data: unknown;
+  updatedAt: number;
+}
+
+export interface DexieTransactionItemRecord {
+  id: string;
+  transactionId: string;
+  userId: string;
+  organizationId: string;
+  lineIndex: number;
+  payload: Record<string, unknown>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DexieSyncMetadataRecord {
+  key: string;
+  userId: string;
+  organizationId?: string;
+  value: unknown;
+  updatedAt: number;
+}
 
 export interface DexieTransactionRecord {
   id: string;
@@ -61,6 +140,14 @@ export interface DexieTransactionRecord {
   operation: "upsert" | "delete";
   lastError?: string;
   deleted?: boolean;
+  /** Local UUID (same as id for new local creates). */
+  localId?: string;
+  serverId?: string | null;
+  userId?: string;
+  organizationId?: string;
+  transactionType?: string;
+  retryCount?: number;
+  nextRetryAt?: number;
 }
 
 /**
@@ -73,6 +160,14 @@ class TelesonicOfflineDB extends Dexie {
   stockCount!: EntityTable<DexieStockItem, "sku">;
   notifications!: EntityTable<MobileNotification, "id">;
   transactions!: EntityTable<DexieTransactionRecord, "id">;
+  users!: EntityTable<DexieUserRecord, "id">;
+  organizations!: EntityTable<DexieOrganizationRecord, "id">;
+  roles!: EntityTable<DexieRoleRecord, "id">;
+  permissions!: EntityTable<DexiePermissionRecord, "id">;
+  configurations!: EntityTable<DexieConfigurationRecord, "key">;
+  masterData!: EntityTable<DexieMasterDataRecord, "id">;
+  transactionItems!: EntityTable<DexieTransactionItemRecord, "id">;
+  syncMetadata!: EntityTable<DexieSyncMetadataRecord, "key">;
 
   constructor() {
     super("TelesonicOfflineDB");
@@ -121,6 +216,39 @@ class TelesonicOfflineDB extends Dexie {
             }
             if (!row["operation"]) row["operation"] = "upsert";
             if (!row["apiPath"]) row["apiPath"] = "/api/service-requests";
+            if (row["syncStatus"] === "syncing") row["syncStatus"] = "pending";
+          });
+      });
+
+    this.version(5)
+      .stores({
+        jobs: "id, customerName, status, priority, technicianName, scheduledDate, syncStatus, updatedAt",
+        syncQueue:
+          "++id, action, entityId, createdAt, status, idempotencyKey, userId, organizationId, nextRetryAt",
+        offlineMeta: "key, updatedAt",
+        stockCount: "sku, updatedAt",
+        notifications: "id, read, type",
+        transactions:
+          "id, code, storageKey, recordRef, createdAt, updatedAt, syncStatus, idempotencyKey, apiPath, operation, userId, organizationId, serverId, transactionType, retryCount, nextRetryAt",
+        users: "id, email, organizationId, updatedAt",
+        organizations: "id, name, updatedAt",
+        roles: "id, code, userId, organizationId, updatedAt",
+        permissions: "id, code, roleId, userId, organizationId, updatedAt",
+        configurations: "key, userId, organizationId, updatedAt",
+        masterData: "id, category, userId, organizationId, updatedAt",
+        transactionItems: "id, transactionId, userId, organizationId, createdAt",
+        syncMetadata: "key, userId, organizationId, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("transactions")
+          .toCollection()
+          .modify((row: Record<string, unknown>) => {
+            if (row["localId"] == null) row["localId"] = row["id"];
+            if (row["serverId"] === undefined) row["serverId"] = null;
+            if (row["organizationId"] == null) row["organizationId"] = DEFAULT_ORGANIZATION_ID;
+            if (row["transactionType"] == null) row["transactionType"] = row["code"] || "UNKNOWN";
+            if (row["retryCount"] == null) row["retryCount"] = 0;
             if (row["syncStatus"] === "syncing") row["syncStatus"] = "pending";
           });
       });
@@ -417,9 +545,55 @@ function stableIdempotencyKey(code: string, recordRef: string, operation: "upser
   return `trx:${operation}:${code}:${recordRef}`;
 }
 
+function readActiveUserScope(): { userId: string; organizationId: string } {
+  if (typeof window === "undefined") {
+    return { userId: "anonymous", organizationId: DEFAULT_ORGANIZATION_ID };
+  }
+  try {
+    const raw =
+      sessionStorage.getItem("auth_user") ||
+      (localStorage.getItem("telesonic_remember_session") === "true"
+        ? localStorage.getItem("auth_user")
+        : null);
+    if (raw) {
+      const parsed = JSON.parse(raw) as {
+        id?: string | number;
+        organizationId?: string;
+      };
+      const userId = parsed?.id != null ? String(parsed.id) : "anonymous";
+      const organizationId = parsed?.organizationId
+        ? String(parsed.organizationId)
+        : DEFAULT_ORGANIZATION_ID;
+      return { userId, organizationId };
+    }
+  } catch {
+    // ignore
+  }
+  return { userId: "anonymous", organizationId: DEFAULT_ORGANIZATION_ID };
+}
+
+function extractTransactionItems(
+  payload: Record<string, unknown>,
+): Array<Record<string, unknown>> {
+  const data = payload["data"] as Record<string, unknown> | undefined;
+  const tabDatasets = (data?.["tabDatasets"] || payload["tabDatasets"]) as
+    | Record<string, Array<Record<string, unknown>>>
+    | undefined;
+  if (!tabDatasets || typeof tabDatasets !== "object") return [];
+  const items: Array<Record<string, unknown>> = [];
+  for (const [tabId, rows] of Object.entries(tabDatasets)) {
+    if (!Array.isArray(rows)) continue;
+    rows.forEach((row, index) => {
+      items.push({ tabId, lineIndex: index, ...row });
+    });
+  }
+  return items;
+}
+
 /**
  * Persist a transaction to Dexie BEFORE any API call.
  * Uses a stable id per code+recordRef so edits update the same row (no duplicates).
+ * Confirms success locally with syncStatus=pending — never waits on the API.
  */
 export async function saveOfflineTransaction(input: {
   code: string;
@@ -428,25 +602,42 @@ export async function saveOfflineTransaction(input: {
   payload: Record<string, unknown>;
   apiPath: string;
   operation?: "upsert" | "delete";
+  userId?: string;
+  organizationId?: string;
+  serverId?: string | null;
 }): Promise<DexieTransactionRecord> {
   await ensureOfflineDatabaseReady();
   const operation = input.operation || "upsert";
   const id = stableTransactionId(input.code, input.recordRef);
   const now = Date.now();
+  const scope = readActiveUserScope();
+  const userId = input.userId || scope.userId;
+  const organizationId = input.organizationId || scope.organizationId;
   const existing = await offlineDB.transactions.get(id);
+
+  // Never allow another user's pending row to be silently overwritten by a different account.
+  if (existing?.userId && existing.userId !== userId && existing.userId !== "anonymous") {
+    throw new Error("Cannot modify another user's offline transaction");
+  }
+
   const idempotencyKey =
     existing?.idempotencyKey && operation === existing.operation
       ? existing.idempotencyKey
       : stableIdempotencyKey(input.code, input.recordRef, operation);
 
+  const lineItems = extractTransactionItems(input.payload);
+
   const record: DexieTransactionRecord = {
     id,
+    localId: existing?.localId || id,
     code: input.code,
     storageKey: input.storageKey,
     recordRef: input.recordRef,
     payload: {
       ...input.payload,
       idempotencyKey,
+      userId,
+      organizationId,
       _localSyncMeta: {
         id,
         operation,
@@ -461,46 +652,87 @@ export async function saveOfflineTransaction(input: {
     operation,
     deleted: operation === "delete",
     lastError: undefined,
+    serverId: input.serverId !== undefined ? input.serverId : existing?.serverId ?? null,
+    userId,
+    organizationId,
+    transactionType: input.code,
+    retryCount: 0,
+    nextRetryAt: undefined,
   };
 
-  await offlineDB.transaction("rw", [offlineDB.transactions, offlineDB.syncQueue], async () => {
-    await offlineDB.transactions.put(record);
+  await offlineDB.transaction(
+    "rw",
+    [offlineDB.transactions, offlineDB.transactionItems, offlineDB.syncQueue],
+    async () => {
+      await offlineDB.transactions.put(record);
 
-    const existingQueue = await offlineDB.syncQueue
-      .where("entityId")
-      .equals(id)
-      .filter((item) => item.status === "pending" || item.status === "failed")
-      .first();
+      const oldItems = await offlineDB.transactionItems
+        .where("transactionId")
+        .equals(id)
+        .toArray();
+      if (oldItems.length > 0) {
+        await offlineDB.transactionItems.bulkDelete(oldItems.map((item) => item.id));
+      }
+      if (lineItems.length > 0 && operation !== "delete") {
+        await offlineDB.transactionItems.bulkPut(
+          lineItems.map((item, index) => ({
+            id: `${id}::item::${index}`,
+            transactionId: id,
+            userId,
+            organizationId,
+            lineIndex: index,
+            payload: item,
+            createdAt: existing?.createdAt || now,
+            updatedAt: now,
+          })),
+        );
+      }
 
-    const queuePayload = {
-      transactionId: id,
-      code: input.code,
-      recordRef: input.recordRef,
-      apiPath: input.apiPath,
-      operation,
-      idempotencyKey,
-      payload: record.payload,
-    };
+      const existingQueue = await offlineDB.syncQueue
+        .where("entityId")
+        .equals(id)
+        .filter((item) => item.status === "pending" || item.status === "failed")
+        .first();
 
-    if (existingQueue?.id != null) {
-      await offlineDB.syncQueue.update(existingQueue.id, {
-        action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
-        payload: queuePayload,
-        status: "pending",
-        errorMessage: undefined,
+      const queuePayload = {
+        transactionId: id,
+        code: input.code,
+        recordRef: input.recordRef,
+        apiPath: input.apiPath,
+        operation,
         idempotencyKey,
-      });
-    } else {
-      await offlineDB.syncQueue.add({
-        action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
-        entityId: id,
-        payload: queuePayload,
-        createdAt: now,
-        status: "pending",
-        idempotencyKey,
-      });
-    }
-  });
+        userId,
+        organizationId,
+        payload: record.payload,
+      };
+
+      if (existingQueue?.id != null) {
+        await offlineDB.syncQueue.update(existingQueue.id, {
+          action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
+          payload: queuePayload,
+          status: "pending",
+          errorMessage: undefined,
+          idempotencyKey,
+          retryCount: 0,
+          nextRetryAt: undefined,
+          userId,
+          organizationId,
+        });
+      } else {
+        await offlineDB.syncQueue.add({
+          action: operation === "delete" ? "TRANSACTION_DELETE" : "TRANSACTION_UPSERT",
+          entityId: id,
+          payload: queuePayload,
+          createdAt: now,
+          status: "pending",
+          idempotencyKey,
+          retryCount: 0,
+          userId,
+          organizationId,
+        });
+      }
+    },
+  );
 
   const stored = await offlineDB.transactions.get(id);
   console.log("[Dexie] Transaction stored locally. JSON:", JSON.stringify(stored, null, 2));
@@ -516,16 +748,20 @@ export async function saveOfflineTransaction(input: {
   return record;
 }
 
-/** Active (non-deleted) local transactions for a screen, newest first. */
+/** Active (non-deleted) local transactions for a screen, newest first (scoped to current user). */
 export async function getDexieTransactionsForScreen(
   code: string,
   storageKey?: string,
 ): Promise<Record<string, unknown>[]> {
   await ensureOfflineDatabaseReady();
+  const { userId } = readActiveUserScope();
   let rows = await offlineDB.transactions.where("code").equals(code).toArray();
   if (storageKey) {
     rows = rows.filter((row) => row.storageKey === storageKey);
   }
+  rows = rows.filter(
+    (row) => !row.userId || row.userId === userId || row.userId === "anonymous",
+  );
   return rows
     .filter((row) => !row.deleted && row.operation !== "delete")
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
@@ -539,18 +775,37 @@ export async function getDexieTransactionsForScreen(
         _dexieId: row.id,
         _syncStatus: row.syncStatus,
         _idempotencyKey: row.idempotencyKey,
+        _serverId: row.serverId ?? null,
+        _retryCount: row.retryCount ?? 0,
         updatedAt: new Date(row.updatedAt).toISOString(),
       };
     });
 }
 
-export async function getPendingTransactionRecords(): Promise<DexieTransactionRecord[]> {
+export async function getPendingTransactionRecords(
+  forUserId?: string,
+): Promise<DexieTransactionRecord[]> {
   await ensureOfflineDatabaseReady();
+  const scopeUserId = forUserId || readActiveUserScope().userId;
+  const now = Date.now();
   // Include interrupted "syncing" rows so a killed tab/app can safely retry.
-  return offlineDB.transactions
+  const rows = await offlineDB.transactions
     .where("syncStatus")
     .anyOf(["pending", "failed", "syncing"])
     .toArray();
+  return rows
+    .filter(
+      (row) =>
+        (!row.userId || row.userId === scopeUserId || row.userId === "anonymous") &&
+        (!row.nextRetryAt || row.nextRetryAt <= now),
+    )
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function computeBackoffMs(retryCount: number): number {
+  const base = 2000;
+  const max = 5 * 60 * 1000;
+  return Math.min(max, base * Math.pow(2, Math.max(0, retryCount)));
 }
 
 export async function markTransactionSyncState(
@@ -568,6 +823,7 @@ export async function markTransactionSyncState(
 /**
  * Push pending/failed Dexie transactions to their API paths once connectivity is real.
  * Idempotency-Key header + stable keys prevent duplicates across retries.
+ * Exponential backoff on failure; never marks SYNCED without backend confirmation.
  */
 export async function syncPendingOfflineTransactions(
   apiFetchImpl: (
@@ -575,16 +831,23 @@ export async function syncPendingOfflineTransactions(
     init?: RequestInit,
     options?: { networkOnly?: boolean },
   ) => Promise<Response>,
+  options?: { userId?: string },
 ): Promise<{ synced: number; failed: number }> {
   await ensureOfflineDatabaseReady();
   const reachable = await probeBackendReachable();
   if (!reachable) return { synced: 0, failed: 0 };
 
-  const pending = await getPendingTransactionRecords();
+  const scope = readActiveUserScope();
+  const pending = await getPendingTransactionRecords(options?.userId || scope.userId);
   let synced = 0;
   let failed = 0;
 
   for (const tx of pending) {
+    // Hard guard: never upload another user's transactions.
+    if (tx.userId && tx.userId !== scope.userId && tx.userId !== "anonymous") {
+      continue;
+    }
+
     await markTransactionSyncState(tx.id, "syncing");
     const queueItems = await offlineDB.syncQueue
       .where("entityId")
@@ -627,39 +890,106 @@ export async function syncPendingOfflineTransactions(
         );
       }
 
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`AUTH_${response.status}`);
+      }
+
       if (!response.ok && response.status !== 404) {
         throw new Error(`HTTP ${response.status}`);
       }
 
       // 404 on delete = already gone on server; treat as success
       if (tx.operation === "delete") {
-        await offlineDB.transactions.delete(tx.id);
+        await offlineDB.transaction(
+          "rw",
+          [offlineDB.transactions, offlineDB.transactionItems, offlineDB.syncQueue],
+          async () => {
+            await offlineDB.transactions.delete(tx.id);
+            const items = await offlineDB.transactionItems
+              .where("transactionId")
+              .equals(tx.id)
+              .primaryKeys();
+            if (items.length > 0) await offlineDB.transactionItems.bulkDelete(items);
+            for (const item of queueItems) {
+              if (item.id != null) await offlineDB.syncQueue.delete(item.id);
+            }
+          },
+        );
       } else {
-        await markTransactionSyncState(tx.id, "synced");
-      }
+        let serverId: string | null = tx.serverId ?? null;
+        try {
+          const json = (await response.json()) as {
+            record?: Record<string, unknown>;
+            request?: Record<string, unknown>;
+            id?: string | number;
+          };
+          const remote = json.record || json.request || json;
+          const candidate =
+            remote?.["id"] ??
+            remote?.["requestNo"] ??
+            remote?.["callNo"] ??
+            remote?.["recordNo"] ??
+            json.id;
+          if (candidate != null) serverId = String(candidate);
+        } catch {
+          // Response may be empty; keep local recordRef as server id fallback.
+          serverId = serverId || tx.recordRef;
+        }
 
-      for (const item of queueItems) {
-        if (item.id != null) {
-          await offlineDB.syncQueue.delete(item.id);
+        await offlineDB.transactions.update(tx.id, {
+          syncStatus: "synced",
+          lastError: undefined,
+          serverId,
+          retryCount: 0,
+          nextRetryAt: undefined,
+          updatedAt: Date.now(),
+        });
+        for (const item of queueItems) {
+          if (item.id != null) {
+            await offlineDB.syncQueue.delete(item.id);
+          }
         }
       }
       synced += 1;
     } catch (err) {
       failed += 1;
       const message = err instanceof Error ? err.message : "Sync failed";
-      await markTransactionSyncState(tx.id, "failed", message);
+      const retryCount = (tx.retryCount || 0) + 1;
+      const nextRetryAt = Date.now() + computeBackoffMs(retryCount);
+      await offlineDB.transactions.update(tx.id, {
+        syncStatus: "failed",
+        lastError: message,
+        retryCount,
+        nextRetryAt,
+        updatedAt: Date.now(),
+      });
       for (const item of queueItems) {
         if (item.id != null) {
           await offlineDB.syncQueue.update(item.id, {
             status: "failed",
             errorMessage: message,
+            retryCount,
+            nextRetryAt,
           });
         }
+      }
+      if (message.startsWith("AUTH_")) {
+        // Stop the batch on auth failure — remaining items stay pending.
+        break;
       }
     }
   }
 
-  if (typeof window !== "undefined" && synced > 0) {
+  const now = Date.now();
+  await offlineDB.syncMetadata.put({
+    key: `last_transaction_sync:${scope.userId}`,
+    userId: scope.userId,
+    organizationId: scope.organizationId,
+    value: { synced, failed, at: new Date(now).toISOString() },
+    updatedAt: now,
+  });
+
+  if (typeof window !== "undefined" && (synced > 0 || failed > 0)) {
     window.dispatchEvent(
       new CustomEvent("telesonic:sync-complete", {
         detail: { type: "transactions", synced, failed },
@@ -761,25 +1091,70 @@ export interface SavedOfflineAuthSession {
   user: Record<string, unknown>;
   rememberMe: boolean;
   savedAt: string;
+  userId?: string;
+  organizationId?: string;
+  offlineExpiresAt?: string;
 }
 
+/**
+ * Persist auth credentials in the encrypted secure vault (not Dexie / not localStorage).
+ * Also removes any legacy plaintext copy from offlineMeta.
+ */
 export async function saveOfflineAuthSession(session: SavedOfflineAuthSession): Promise<void> {
   try {
-    await offlineDB.offlineMeta.put({
-      key: "saved_auth_session",
-      value: session,
-      updatedAt: Date.now(),
+    const { saveSecureAuthSession, computeOfflineExpiry } = await import("./secure-session-store");
+    const userId =
+      session.userId ||
+      (session.user["id"] != null ? String(session.user["id"]) : "anonymous");
+    const organizationId =
+      session.organizationId ||
+      (session.user["organizationId"] != null
+        ? String(session.user["organizationId"])
+        : DEFAULT_ORGANIZATION_ID);
+    const savedAt = session.savedAt || new Date().toISOString();
+    await saveSecureAuthSession({
+      token: session.token,
+      user: session.user,
+      rememberMe: session.rememberMe,
+      savedAt,
+      userId,
+      organizationId,
+      offlineExpiresAt: session.offlineExpiresAt || computeOfflineExpiry(savedAt),
     });
+    // Scrub legacy plaintext Dexie auth copy if present.
+    try {
+      await offlineDB.offlineMeta.delete("saved_auth_session");
+    } catch {
+      // ignore
+    }
   } catch (err) {
-    console.error("[Dexie.js] Failed to save offline auth session:", err);
+    console.error("[SecureVault] Failed to save offline auth session:", err);
   }
 }
 
 export async function getOfflineAuthSession(): Promise<SavedOfflineAuthSession | null> {
   try {
+    const { getSecureAuthSession } = await import("./secure-session-store");
+    const secure = await getSecureAuthSession();
+    if (secure) {
+      return {
+        token: secure.token,
+        user: secure.user,
+        rememberMe: secure.rememberMe,
+        savedAt: secure.savedAt,
+        userId: secure.userId,
+        organizationId: secure.organizationId,
+        offlineExpiresAt: secure.offlineExpiresAt,
+      };
+    }
+
+    // One-time migration from legacy Dexie plaintext session.
     const meta = await offlineDB.offlineMeta.get("saved_auth_session");
     if (meta && meta.value && typeof meta.value === "object") {
-      return meta.value as SavedOfflineAuthSession;
+      const legacy = meta.value as SavedOfflineAuthSession;
+      await saveOfflineAuthSession(legacy);
+      await offlineDB.offlineMeta.delete("saved_auth_session");
+      return legacy;
     }
     return null;
   } catch {
@@ -789,8 +1164,149 @@ export async function getOfflineAuthSession(): Promise<SavedOfflineAuthSession |
 
 export async function clearOfflineAuthSession(): Promise<void> {
   try {
+    const { clearSecureAuthSession } = await import("./secure-session-store");
+    await clearSecureAuthSession();
+  } catch {
+    // ignore
+  }
+  try {
     await offlineDB.offlineMeta.delete("saved_auth_session");
   } catch {
     // ignore
   }
+}
+
+export async function putSyncMetadata(
+  key: string,
+  value: unknown,
+  userId?: string,
+  organizationId?: string,
+): Promise<void> {
+  await ensureOfflineDatabaseReady();
+  const scope = readActiveUserScope();
+  await offlineDB.syncMetadata.put({
+    key,
+    userId: userId || scope.userId,
+    organizationId: organizationId || scope.organizationId,
+    value,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function getSyncMetadata<T = unknown>(key: string): Promise<T | null> {
+  await ensureOfflineDatabaseReady();
+  const row = await offlineDB.syncMetadata.get(key);
+  return (row?.value as T) ?? null;
+}
+
+export async function isOfflineBootstrapComplete(userId: string): Promise<boolean> {
+  const meta = await getSyncMetadata<{ complete?: boolean }>(`bootstrap:${userId}`);
+  return meta?.complete === true;
+}
+
+export async function cacheMasterOptionsForUser(
+  userId: string,
+  organizationId: string,
+  options: Record<string, unknown>,
+): Promise<void> {
+  await ensureOfflineDatabaseReady();
+  const now = Date.now();
+  await offlineDB.masterData.put({
+    id: `master-options:${userId}`,
+    category: "transaction-master-options",
+    userId,
+    organizationId,
+    data: options,
+    updatedAt: now,
+  });
+}
+
+export async function getCachedMasterOptions(
+  userId?: string,
+): Promise<Record<string, unknown> | null> {
+  await ensureOfflineDatabaseReady();
+  const scope = readActiveUserScope();
+  const uid = userId || scope.userId;
+  const row = await offlineDB.masterData.get(`master-options:${uid}`);
+  if (row?.data && typeof row.data === "object") {
+    return row.data as Record<string, unknown>;
+  }
+  return null;
+}
+
+export async function cacheUserProfileLocally(input: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  organizationId?: string;
+  permissions?: string[];
+  profile?: Record<string, unknown>;
+}): Promise<void> {
+  await ensureOfflineDatabaseReady();
+  const now = Date.now();
+  const organizationId = input.organizationId || DEFAULT_ORGANIZATION_ID;
+  const permissions = input.permissions || [];
+
+  await offlineDB.transaction(
+    "rw",
+    [
+      offlineDB.users,
+      offlineDB.organizations,
+      offlineDB.roles,
+      offlineDB.permissions,
+      offlineDB.configurations,
+    ],
+    async () => {
+      await offlineDB.organizations.put({
+        id: organizationId,
+        name: "Telesonic",
+        code: "TELESONIC",
+        updatedAt: now,
+      });
+      await offlineDB.users.put({
+        id: input.id,
+        email: input.email,
+        name: input.name,
+        role: input.role,
+        organizationId,
+        permissions,
+        profile: input.profile || {},
+        updatedAt: now,
+      });
+      const roleId = `${input.id}:${input.role}`;
+      await offlineDB.roles.put({
+        id: roleId,
+        code: input.role,
+        name: input.role,
+        userId: input.id,
+        organizationId,
+        permissions,
+        updatedAt: now,
+      });
+      await offlineDB.permissions
+        .where("userId")
+        .equals(input.id)
+        .delete();
+      if (permissions.length > 0) {
+        await offlineDB.permissions.bulkPut(
+          permissions.map((code) => ({
+            id: `${roleId}:${code}`,
+            code,
+            roleId,
+            userId: input.id,
+            organizationId,
+            updatedAt: now,
+          })),
+        );
+      }
+      await offlineDB.configurations.put({
+        key: `user-config:${input.id}`,
+        userId: input.id,
+        organizationId,
+        value: { offlineFirst: true, cachedAt: new Date(now).toISOString() },
+        updatedAt: now,
+      });
+    },
+  );
 }

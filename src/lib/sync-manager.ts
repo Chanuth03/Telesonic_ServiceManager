@@ -64,8 +64,14 @@ class GlobalSyncManager {
     window.addEventListener("online", this.handleOnlineEvent);
     window.addEventListener("offline", this.handleOfflineEvent);
     window.addEventListener("beforeunload", this.handleBeforeUnloadEvent);
+    window.addEventListener("visibilitychange", this.handleVisibilityChange);
+    window.addEventListener("pageshow", this.handlePageShow);
+    window.addEventListener("focus", this.handleWindowFocus);
     window.addEventListener("telesonic:sync-complete", () => {
       this.refreshPendingCount();
+    });
+    window.addEventListener("telesonic:auth-changed", () => {
+      void this.triggerSync("auth_changed");
     });
 
     // Listen to local Dexie updates to recount pending changes
@@ -74,7 +80,13 @@ class GlobalSyncManager {
     });
 
     void ensureOfflineDatabaseReady()
-      .then(() => this.refreshPendingCount())
+      .then(() => {
+        void this.refreshPendingCount();
+        // Startup sync — always resume pending work when the app opens.
+        if (this.getIsOnline()) {
+          void this.triggerSync("app_startup");
+        }
+      })
       .catch((err) => console.error("[SyncManager] Dexie init failed:", err));
 
     // Periodic heartbeat: only sync after a real backend probe succeeds
@@ -85,8 +97,42 @@ class GlobalSyncManager {
       }
     }, 45000);
 
+    // Background Sync API when supported (best-effort; app-open resume remains primary).
+    try {
+      const hasPeriodicOrOneShotSync =
+        typeof window !== "undefined" && "serviceWorker" in navigator && "SyncManager" in window;
+      if (hasPeriodicOrOneShotSync) {
+        void navigator.serviceWorker.ready.then((reg) => {
+          const syncReg = reg as ServiceWorkerRegistration & {
+            sync?: { register: (tag: string) => Promise<void> };
+          };
+          void syncReg.sync?.register("telesonic-pending-sync");
+        });
+      }
+    } catch {
+      // ignore unsupported environments
+    }
+
     console.log("[SyncManager] Global Dynamic Synchronization Manager initialized.");
   }
+
+  private handleVisibilityChange = () => {
+    if (document.visibilityState === "visible" && this.getIsOnline() && this.pendingCount > 0) {
+      void this.triggerSync("visibility_resume");
+    }
+  };
+
+  private handlePageShow = () => {
+    if (this.getIsOnline() && this.pendingCount > 0) {
+      void this.triggerSync("pageshow_resume");
+    }
+  };
+
+  private handleWindowFocus = () => {
+    if (this.getIsOnline() && this.pendingCount > 0 && this.syncState !== "syncing") {
+      void this.triggerSync("window_focus");
+    }
+  };
 
   private handleOnlineEvent = () => {
     console.log(

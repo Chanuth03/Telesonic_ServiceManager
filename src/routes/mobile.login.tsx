@@ -9,6 +9,7 @@ import {
   EyeOff,
   ArrowRight,
   AlertCircle,
+  DownloadCloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRole } from "@/context/RoleContext";
@@ -16,6 +17,12 @@ import { apiFetch } from "@/lib/api-client";
 import { readStoredTechnicianSession } from "@/lib/app-initializer";
 import { isOfflineForTransactions } from "@/lib/offline-db";
 import { refreshMobileJobsFromServer } from "@/lib/mobile-offline-bridge";
+import {
+  runOfflineBootstrap,
+  subscribeBootstrapProgress,
+  type BootstrapProgress,
+} from "@/lib/offline-bootstrap";
+import { syncManager } from "@/lib/sync-manager";
 
 function hasOfflineBypassSession(): boolean {
   if (typeof window === "undefined") return false;
@@ -55,16 +62,35 @@ function MobileLoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bootstrap, setBootstrap] = useState<BootstrapProgress | null>(null);
+  const [holdForBootstrap, setHoldForBootstrap] = useState(false);
+
+  useEffect(() => {
+    return subscribeBootstrapProgress((progress) => {
+      if (progress.phase !== "idle") setBootstrap(progress);
+    });
+  }, []);
+
+  const isBootstrapping =
+    holdForBootstrap ||
+    (!!bootstrap &&
+      !bootstrap.offlineReady &&
+      bootstrap.phase !== "idle" &&
+      bootstrap.phase !== "error" &&
+      bootstrap.phase !== "ready");
 
   // If the user previously saved login ("Keep me signed in") on this device,
   // skip the login prompt and go directly to the Mobile PWA home screen!
   useEffect(() => {
-    if (authReady && isAuthenticated) {
+    if (authReady && isAuthenticated && !isBootstrapping && !holdForBootstrap) {
       navigate({ to: "/mobile", replace: true });
     }
-  }, [authReady, isAuthenticated, navigate]);
+  }, [authReady, isAuthenticated, navigate, isBootstrapping, holdForBootstrap]);
 
-  if (!authReady || isAuthenticated) {
+  if (!authReady && !isBootstrapping) {
+    return null;
+  }
+  if (isAuthenticated && !isBootstrapping) {
     return null;
   }
 
@@ -79,7 +105,9 @@ function MobileLoginPage() {
     setError("");
 
     if (isOfflineForTransactions()) {
-      setError("You are offline. First sign-in needs internet. After that, Keep me signed in works in Airplane Mode.");
+      setError(
+        "You are offline. First sign-in needs internet. After that, Keep me signed in works in Airplane Mode.",
+      );
       setIsSubmitting(false);
       return;
     }
@@ -106,13 +134,42 @@ function MobileLoginPage() {
         return;
       }
 
+      const token = data.token || "session-token";
+
+      // Hold navigation while mandatory offline bootstrap runs.
+      setHoldForBootstrap(true);
+      try {
+        const result = await runOfflineBootstrap({
+          user: data.user,
+          token,
+        });
+        if (!result.offlineReady) {
+          setError(result.error || "Failed to download offline data. Stay online and try again.");
+          setHoldForBootstrap(false);
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (bootErr) {
+        setError(
+          bootErr instanceof Error
+            ? bootErr.message
+            : "Failed to download offline data. Stay online and try again.",
+        );
+        setHoldForBootstrap(false);
+        setIsSubmitting(false);
+        return;
+      }
+
       if (data.user) {
-        await loginUser(data.user, data.token || "session-token", true);
+        await loginUser(data.user, token, rememberMe);
       }
 
       await refreshMobileJobsFromServer();
+      void syncManager.triggerSync("post_login");
+      setHoldForBootstrap(false);
       navigate({ to: "/mobile", replace: true });
     } catch {
+      setHoldForBootstrap(false);
       setError(
         navigator.onLine
           ? "Something went wrong on the server"
@@ -141,100 +198,121 @@ function MobileLoginPage() {
 
         {/* Screen Title & Body */}
         <div className="p-5 space-y-5">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Sign in with your email and password.
-            </p>
-          </div>
-
-          <form onSubmit={handleMobileSignIn} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                <Mail size={13} className="text-muted-foreground" /> Work email
-              </label>
-              <input
-                type="email"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError("");
-                }}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                  <Lock size={13} className="text-muted-foreground" /> Password
-                </label>
-                <button
-                  type="button"
-                  className="text-[11px] font-medium text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
+          {isBootstrapping ? (
+            <div className="space-y-4 py-6">
+              <div className="flex items-center gap-2">
+                <DownloadCloud size={18} className="text-primary animate-pulse" />
+                <h2 className="text-lg font-bold text-foreground">Preparing offline mode</h2>
               </div>
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  className="w-full rounded-lg border bg-background pl-3 pr-9 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
+              <p className="text-xs text-muted-foreground">{bootstrap?.message}</p>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${bootstrap?.percent || 0}%` }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  aria-label="Toggle password visibility"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Do not close the app until the initial data download finishes. Offline readiness is
+                not claimed until this completes.
+              </p>
             </div>
-
-            {error && (
-              <div className="rounded-lg bg-destructive-soft p-2.5 text-xs font-medium text-destructive flex items-center gap-2">
-                <AlertCircle size={15} className="shrink-0" />
-                <span>{error}</span>
+          ) : (
+            <>
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Welcome back</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sign in with your email and password.
+                </p>
               </div>
-            )}
 
-            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border accent-primary cursor-pointer"
-              />
-              Keep me signed in (Save Login on this device)
-            </label>
+              <form onSubmit={handleMobileSignIn} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <Mail size={13} className="text-muted-foreground" /> Work email
+                  </label>
+                  <input
+                    type="email"
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                    }}
+                  />
+                </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full h-11 text-xs font-bold gap-2 shadow-xs mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Smartphone size={16} className="animate-spin" />
-                  Authenticating...
-                </>
-              ) : (
-                <>
-                  Sign in to Mobile App
-                  <ArrowRight size={15} />
-                </>
-              )}
-            </Button>
-          </form>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <Lock size={13} className="text-muted-foreground" /> Password
+                    </label>
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"}
+                      className="w-full rounded-lg border bg-background pl-3 pr-9 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError("");
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw(!showPw)}
+                      aria-label="Toggle password visibility"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-lg bg-destructive-soft p-2.5 text-xs font-medium text-destructive flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border accent-primary cursor-pointer"
+                  />
+                  Keep me signed in (Save Login on this device)
+                </label>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full h-11 text-xs font-bold gap-2 shadow-xs mt-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Smartphone size={16} className="animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
+                      Sign in to Mobile App
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </Button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>

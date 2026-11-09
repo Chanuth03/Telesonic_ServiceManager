@@ -72,12 +72,19 @@ export function SyncStatusBadge() {
 
       {/* Sub-row: Pending Queue & Toggle Offline Demo */}
       <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/40 text-muted-foreground">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <HardDrive size={11} className="text-blue-500" />
           <span>Local Storage:</span>
-          {pendingCount > 0 ? (
+          {syncState === "syncing" ? (
+            <span className="font-bold text-primary">Syncing…</span>
+          ) : pendingCount > 0 ? (
             <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-              {pendingCount} unsynced
+              {pendingCount} pending
+            </span>
+          ) : syncState === "error" ? (
+            <span className="font-semibold text-destructive flex items-center gap-0.5">
+              <AlertCircle size={11} />
+              <span>Sync failed</span>
             </span>
           ) : (
             <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
@@ -85,6 +92,11 @@ export function SyncStatusBadge() {
               <span>Synced</span>
             </span>
           )}
+          {lastSyncedAt ? (
+            <span className="text-[10px] text-muted-foreground">
+              Last sync {lastSyncedAt.toLocaleTimeString()}
+            </span>
+          ) : null}
         </div>
 
         <button
