@@ -36,7 +36,7 @@ export function UnsyncedDataGuard() {
   }, []);
 
   const hasUnsynced = status.pendingCount > 0 || status.syncState === "syncing";
-  const isOffline = !status.isOnline || status.isSimulatedOffline;
+  const isOffline = !status.isOnline;
 
   return (
     <>
@@ -51,20 +51,10 @@ export function UnsyncedDataGuard() {
             )}
             <span>
               {isOffline
-                ? `You have ${status.pendingCount} offline update${status.pendingCount > 1 ? "s" : ""} saved on this device. Please turn on your internet connection to sync your data to the server.`
+                ? `You have ${status.pendingCount} offline update${status.pendingCount > 1 ? "s" : ""} saved on this device. Turn mobile data or Wi‑Fi back on to sync.`
                 : `Syncing ${status.pendingCount} update${status.pendingCount > 1 ? "s" : ""} to the server... Please do not refresh.`}
             </span>
           </div>
-          {isOffline && status.isSimulatedOffline && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200"
-              onClick={() => syncManager.toggleSimulatedOffline()}
-            >
-              Restore Internet
-            </Button>
-          )}
         </div>
       )}
 
@@ -98,18 +88,6 @@ export function UnsyncedDataGuard() {
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-              {status.isSimulatedOffline && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    syncManager.toggleSimulatedOffline();
-                    setShowRefreshBlockedModal(false);
-                  }}
-                >
-                  Turn On Internet (Simulated)
-                </Button>
-              )}
               <Button
                 variant="default"
                 size="sm"

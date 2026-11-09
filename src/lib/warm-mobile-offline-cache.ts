@@ -55,7 +55,6 @@ async function askServiceWorkerToCache(urls: string[]) {
 export async function warmMobileOfflineCache(reason = "startup"): Promise<void> {
   if (typeof window === "undefined") return;
   if (!navigator.onLine) return;
-  if (localStorage.getItem("telesonic_simulated_offline") === "true") return;
 
   const paths = collectMobilePaths();
   console.log(`[OfflineCache] Warming ${paths.length} mobile URLs (${reason})`);

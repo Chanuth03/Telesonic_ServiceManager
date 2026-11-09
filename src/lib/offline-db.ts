@@ -284,24 +284,50 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
-/** True when the device reports offline or simulated offline is on. */
-export function isDeviceOffline(): boolean {
-  if (typeof navigator === "undefined") return false;
-  if (!navigator.onLine) return true;
-  try {
-    return localStorage.getItem("telesonic_simulated_offline") === "true";
-  } catch {
-    return false;
+/**
+ * Real-network reachability (Wi‑Fi / mobile data), independent of the old
+ * "Test Offline Mode" toggle. null = not probed yet.
+ */
+let backendReachable: boolean | null = null;
+
+export function getBackendReachable(): boolean | null {
+  return backendReachable;
+}
+
+export function setBackendReachable(reachable: boolean | null): void {
+  const prev = backendReachable;
+  backendReachable = reachable;
+  if (prev !== reachable && typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("telesonic:connectivity", {
+        detail: { reachable, onLine: typeof navigator !== "undefined" ? navigator.onLine : true },
+      }),
+    );
   }
 }
 
 /**
+ * True when the phone has no usable network for the app.
+ * Uses navigator.onLine (data/Wi‑Fi off, Airplane Mode) and the latest backend probe.
+ * Does NOT depend on the developer "Test Offline Mode" toggle.
+ */
+export function isDeviceOffline(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (!navigator.onLine) return true;
+  if (backendReachable === false) return true;
+  return false;
+}
+
+/**
  * Probe whether the backend is actually reachable.
- * navigator.onLine alone is not enough (Airplane Mode / captive portals).
+ * navigator.onLine alone is not enough — some phones keep onLine=true after data is cut.
  */
 export async function probeBackendReachable(timeoutMs = 3500): Promise<boolean> {
-  if (isDeviceOffline()) return false;
   if (typeof window === "undefined") return false;
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    setBackendReachable(false);
+    return false;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -311,8 +337,10 @@ export async function probeBackendReachable(timeoutMs = 3500): Promise<boolean> 
       signal: controller.signal,
       headers: { Accept: "application/json" },
     });
+    setBackendReachable(true);
     return true;
   } catch {
+    setBackendReachable(false);
     return false;
   } finally {
     clearTimeout(timer);

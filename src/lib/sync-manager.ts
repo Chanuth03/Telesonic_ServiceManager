@@ -15,6 +15,7 @@ import {
   syncPendingOfflineTransactions,
   ensureOfflineDatabaseReady,
   isDeviceOffline,
+  setBackendReachable,
 } from "./offline-db";
 import { apiFetch } from "./api-client";
 
@@ -53,14 +54,18 @@ class GlobalSyncManager {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    // Read initial simulated offline state if persisted
+    // Clear legacy "Test Offline Mode" flag — real offline = mobile data / Wi‑Fi off.
+    this.isSimulatedOffline = false;
     try {
-      this.isSimulatedOffline = localStorage.getItem("telesonic_simulated_offline") === "true";
+      localStorage.removeItem("telesonic_simulated_offline");
     } catch (e) {
       void e;
     }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setBackendReachable(false);
+    }
 
-    // Register Dynamic Online/Offline Listeners
+    // Register Dynamic Online/Offline Listeners (real network / Airplane Mode / data off)
     window.addEventListener("online", this.handleOnlineEvent);
     window.addEventListener("offline", this.handleOfflineEvent);
     window.addEventListener("beforeunload", this.handleBeforeUnloadEvent);
@@ -70,8 +75,20 @@ class GlobalSyncManager {
     window.addEventListener("telesonic:sync-complete", () => {
       this.refreshPendingCount();
     });
+    window.addEventListener("telesonic:connectivity", () => {
+      this.notify();
+    });
     window.addEventListener("telesonic:auth-changed", () => {
-      void this.triggerSync("auth_changed");
+      if (this.getIsOnline()) void this.triggerSync("auth_changed");
+    });
+
+    // Some Android browsers fire connection changes when mobile data is toggled
+    // even if navigator.onLine is slow to update.
+    const nav = navigator as Navigator & {
+      connection?: EventTarget & { addEventListener: (type: string, fn: () => void) => void };
+    };
+    nav.connection?.addEventListener("change", () => {
+      void this.refreshConnectivity("connection_change");
     });
 
     // Listen to local Dexie updates to recount pending changes
@@ -80,22 +97,24 @@ class GlobalSyncManager {
     });
 
     void ensureOfflineDatabaseReady()
-      .then(() => {
+      .then(async () => {
         void this.refreshPendingCount();
-        // Startup sync — always resume pending work when the app opens.
-        if (this.getIsOnline()) {
+        await this.refreshConnectivity("app_startup");
+        if (this.getIsOnline() && this.pendingCount > 0) {
           void this.triggerSync("app_startup");
         }
       })
       .catch((err) => console.error("[SyncManager] Dexie init failed:", err));
 
-    // Periodic heartbeat: only sync after a real backend probe succeeds
+    // Periodic heartbeat: re-check real connectivity (data/Wi‑Fi), then sync if needed
     this.autoSyncInterval = setInterval(() => {
-      if (this.getIsOnline() && this.pendingCount > 0 && this.syncState !== "syncing") {
-        console.log("[SyncManager] Background heartbeat sync triggered for pending records.");
-        this.triggerSync("heartbeat_timer");
-      }
-    }, 45000);
+      void this.refreshConnectivity("heartbeat_timer").then(() => {
+        if (this.getIsOnline() && this.pendingCount > 0 && this.syncState !== "syncing") {
+          console.log("[SyncManager] Background heartbeat sync triggered for pending records.");
+          this.triggerSync("heartbeat_timer");
+        }
+      });
+    }, 20000);
 
     // Background Sync API when supported (best-effort; app-open resume remains primary).
     try {
@@ -136,26 +155,44 @@ class GlobalSyncManager {
 
   private handleOnlineEvent = () => {
     console.log(
-      "[SyncManager] 🌐 Network changed to ONLINE! Probing backend before sync...",
+      "[SyncManager] Network reported ONLINE (Wi‑Fi/data). Probing backend before sync...",
     );
-    this.notify();
-    void (async () => {
-      const reachable = await probeBackendReachable();
+    void this.refreshConnectivity("network_online_event").then(async (reachable) => {
       if (!reachable) {
-        console.warn("[SyncManager] navigator.onLine is true but backend is unreachable.");
+        console.warn("[SyncManager] onLine=true but backend unreachable (data may still be off).");
         this.syncState = "offline";
         this.notify();
         return;
       }
       await this.triggerSync("network_online_event");
-    })();
+    });
   };
 
   private handleOfflineEvent = () => {
-    console.log("[SyncManager] ⚠️ Network changed to OFFLINE.");
+    console.log("[SyncManager] Network OFFLINE (Airplane Mode / Wi‑Fi & data off).");
+    setBackendReachable(false);
     this.syncState = "offline";
     this.notify();
   };
+
+  /** Probe real backend reachability and refresh Online/Offline UI. */
+  public async refreshConnectivity(reason = "manual"): Promise<boolean> {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setBackendReachable(false);
+      this.syncState = "offline";
+      this.notify();
+      return false;
+    }
+    const reachable = await probeBackendReachable(2500);
+    if (!reachable) {
+      this.syncState = "offline";
+    } else if (this.syncState === "offline") {
+      this.syncState = "idle";
+    }
+    this.notify();
+    console.log(`[SyncManager] Connectivity (${reason}): ${reachable ? "reachable" : "unreachable"}`);
+    return reachable;
+  }
 
   private handleBeforeUnloadEvent = (event: BeforeUnloadEvent) => {
     if (this.pendingCount > 0 || this.syncState === "syncing") {
@@ -166,7 +203,7 @@ class GlobalSyncManager {
   };
 
   public getIsOnline(): boolean {
-    if (this.isSimulatedOffline) return false;
+    // Real network only — mobile data / Wi‑Fi / Airplane Mode.
     return !isDeviceOffline();
   }
 
