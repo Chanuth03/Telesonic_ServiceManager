@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
-import { isOfflineForTransactions, getOfflineAuthSession } from "@/lib/offline-db";
+import { isOfflineForTransactions, getOfflineAuthSession, probeBackendReachable } from "@/lib/offline-db";
 import {
   getSecureAuthSession,
   isWithinOfflineAccessPolicy,
@@ -49,35 +49,47 @@ function parseStoredProfile(raw: string | null): StoredUserProfile | null {
   }
 }
 
-function profileFromSession(session: SecureAuthSession | SavedSessionLike): StoredUserProfile | null {
+function profileFromSession(session: {
+  user: Record<string, unknown>;
+}): StoredUserProfile | null {
   const user = session.user as unknown as StoredUserProfile;
   if (user == null || user.id == null || !user.name || !user.email) return null;
   return user;
 }
 
-interface SavedSessionLike {
-  token: string;
-  user: Record<string, unknown>;
-  rememberMe: boolean;
-  savedAt: string;
-  offlineExpiresAt?: string;
+function readRememberFlag(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("telesonic_remember_session") === "true";
+  } catch {
+    return false;
+  }
 }
 
-/** Prefer secure vault; fall back to sessionStorage for the active tab only. */
+/** Tab session first, then durable localStorage mirror (survives phone restart). */
 export function readStoredTechnicianSession(): { token: string; user: StoredUserProfile } | null {
   if (typeof window === "undefined") return null;
   try {
-    const token = sessionStorage.getItem("auth_token");
-    const user = parseStoredProfile(sessionStorage.getItem("auth_user"));
-    if (token && user && isUsableJwt(token)) return { token, user };
+    const sessionToken = sessionStorage.getItem("auth_token");
+    const sessionUser = parseStoredProfile(sessionStorage.getItem("auth_user"));
+    if (sessionToken && sessionUser && isUsableJwt(sessionToken)) {
+      return { token: sessionToken, user: sessionUser };
+    }
+
+    if (!readRememberFlag()) return null;
+    const localToken = localStorage.getItem("auth_token");
+    const localUser = parseStoredProfile(localStorage.getItem("auth_user"));
+    if (localToken && localUser && isUsableJwt(localToken)) {
+      return { token: localToken, user: localUser };
+    }
+    // Expired token still useful offline — return it; caller applies offline policy.
+    if (localToken && localUser && localToken.split(".").length === 3) {
+      return { token: localToken, user: localUser };
+    }
   } catch {
     // ignore
   }
   return null;
-}
-
-function readSessionStorageSession(): { token: string; user: StoredUserProfile } | null {
-  return readStoredTechnicianSession();
 }
 
 async function readVaultSession(): Promise<{
@@ -86,43 +98,81 @@ async function readVaultSession(): Promise<{
   remember: boolean;
   session: SecureAuthSession;
 } | null> {
-  const secure = (await getSecureAuthSession()) || (await getOfflineAuthSession());
-  if (!secure?.rememberMe) return null;
-  const user = profileFromSession(secure as SecureAuthSession);
-  if (!user || !secure.token) return null;
+  try {
+    const secure = (await getSecureAuthSession()) || (await getOfflineAuthSession());
+    if (!secure?.rememberMe) return null;
+    const user = profileFromSession(secure);
+    if (!user || !secure.token) return null;
+    return {
+      token: secure.token,
+      user,
+      remember: true,
+      session: secure as SecureAuthSession,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function toSecureSessionShape(input: {
+  token: string;
+  user: StoredUserProfile;
+  savedAt?: string;
+}): SecureAuthSession {
   return {
-    token: secure.token,
-    user,
-    remember: true,
-    session: secure as SecureAuthSession,
+    token: input.token,
+    user: input.user as unknown as Record<string, unknown>,
+    rememberMe: true,
+    savedAt: input.savedAt || new Date().toISOString(),
+    userId: String(input.user.id),
+    organizationId: input.user.organizationId || "TELESONIC-DEFAULT",
   };
 }
 
 /**
- * Offline: trust a non-expired JWT, or an expired JWT still inside the offline access grace window.
- * Online: ask /api/auth/session with a short timeout; fall back to the stored session.
+ * Offline / unreachable backend: trust remembered session (vault or local mirror).
+ * Online: validate with /api/auth/session; fall back to stored session on network errors.
  */
 export async function resolveTechnicianStartup(): Promise<TechnicianStartupResult> {
-  const tabSession = readSessionStorageSession();
+  const durable = readStoredTechnicianSession();
   const vault = await readVaultSession();
-  const offline = isOfflineForTransactions();
+  const deviceOffline = isOfflineForTransactions();
 
-  if (offline) {
-    const candidate = vault || (tabSession
-      ? {
-          token: tabSession.token,
-          user: tabSession.user,
+  // Some phones keep navigator.onLine=true under Airplane Mode briefly.
+  // If we already have a remembered session, probe quickly; on failure use offline path.
+  let treatAsOffline = deviceOffline;
+  if (!treatAsOffline && (vault || durable || readRememberFlag())) {
+    const reachable = await probeBackendReachable(2000);
+    if (!reachable) treatAsOffline = true;
+  }
+
+  if (treatAsOffline) {
+    const candidate = vault
+      ? vault
+      : durable
+        ? {
+            token: durable.token,
+            user: durable.user,
+            remember: true,
+            session: toSecureSessionShape(durable),
+          }
+        : null;
+
+    // Last resort: remembered profile without a readable token still opens the app offline.
+    if (!candidate && readRememberFlag()) {
+      const rememberedUser = parseStoredProfile(
+        typeof window !== "undefined" ? localStorage.getItem("auth_user") : null,
+      );
+      if (rememberedUser) {
+        return {
+          status: "authenticated",
+          user: rememberedUser,
+          token: sessionStorage.getItem("auth_token") || "offline-session",
           remember: true,
-          session: {
-            token: tabSession.token,
-            user: tabSession.user as unknown as Record<string, unknown>,
-            rememberMe: true,
-            savedAt: new Date().toISOString(),
-            userId: String(tabSession.user.id),
-            organizationId: tabSession.user.organizationId || "TELESONIC-DEFAULT",
-          } satisfies SecureAuthSession,
-        }
-      : null);
+          offlineReady: true,
+        };
+      }
+    }
 
     if (!candidate) return { status: "login" };
 
@@ -131,22 +181,38 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       offline: true,
       jwtStillValid: jwtOk,
     });
-    if (!jwtOk && !policyOk) return { status: "login" };
+    // Offline: accept valid JWT, grace-period expired JWT, or any remembered JWT-shaped token.
+    if (!jwtOk && !policyOk && candidate.token.split(".").length !== 3) {
+      return { status: "login" };
+    }
 
     return {
       status: "authenticated",
       user: candidate.user,
       token: candidate.token,
-      remember: candidate.remember,
+      remember: true,
       offlineReady: true,
     };
   }
 
-  const sessionToken = tabSession?.token || vault?.token || "";
-  if (!sessionToken) return { status: "login" };
+  const sessionToken = durable?.token || vault?.token || "";
+  if (!sessionToken || sessionToken === "offline-session") {
+    // No usable online token — if remember flag exists try vault/local once more for login page skip
+    if (vault && isUsableJwt(vault.token)) {
+      return {
+        status: "authenticated",
+        user: vault.user,
+        token: vault.token,
+        remember: true,
+      };
+    }
+    return { status: "login" };
+  }
 
-  // Online but JWT expired: require re-login (offline grace does not apply while online).
-  if (!isUsableJwt(sessionToken)) return { status: "login" };
+  if (!isUsableJwt(sessionToken)) {
+    // Online + expired → must re-login (cannot refresh offline grace while truly online)
+    return { status: "login" };
+  }
 
   try {
     const controller = new AbortController();
@@ -168,15 +234,16 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
 
     if (response.status === 401 || response.status === 403) return { status: "login" };
 
+    const fallbackUser = durable?.user || vault?.user;
+    const fallbackToken = durable?.token || vault?.token;
+
     if (!response.ok) {
-      const fallbackUser = tabSession?.user || vault?.user;
-      const fallbackToken = tabSession?.token || vault?.token;
       if (!fallbackUser || !fallbackToken) return { status: "login" };
       return {
         status: "authenticated",
         user: fallbackUser,
         token: fallbackToken,
-        remember: !!vault,
+        remember: !!vault || readRememberFlag(),
       };
     }
 
@@ -186,14 +253,12 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       user?: StoredUserProfile;
     };
     if (!data.success || !data.user?.name || !data.user.email || data.user.id == null) {
-      const fallbackUser = tabSession?.user || vault?.user;
-      const fallbackToken = tabSession?.token || vault?.token;
       if (!fallbackUser || !fallbackToken) return { status: "login" };
       return {
         status: "authenticated",
         user: fallbackUser,
         token: fallbackToken,
-        remember: !!vault,
+        remember: !!vault || readRememberFlag(),
       };
     }
 
@@ -201,17 +266,17 @@ export async function resolveTechnicianStartup(): Promise<TechnicianStartupResul
       status: "authenticated",
       user: data.user,
       token: data.token || sessionToken,
-      remember: !!vault || (typeof window !== "undefined" && localStorage.getItem("telesonic_remember_session") === "true"),
+      remember: !!vault || readRememberFlag(),
     };
   } catch {
-    const fallbackUser = tabSession?.user || vault?.user;
-    const fallbackToken = tabSession?.token || vault?.token;
+    const fallbackUser = durable?.user || vault?.user;
+    const fallbackToken = durable?.token || vault?.token;
     if (!fallbackUser || !fallbackToken) return { status: "login" };
     return {
       status: "authenticated",
       user: fallbackUser,
       token: fallbackToken,
-      remember: !!vault,
+      remember: !!vault || readRememberFlag(),
     };
   }
 }

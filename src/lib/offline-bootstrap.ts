@@ -132,21 +132,27 @@ export async function runOfflineBootstrap(input: {
       percent: 45,
       offlineReady: false,
     });
-    const masterRes = await apiFetch(
-      "/api/service-requests/master-options",
-      {
-        headers: { Authorization: `Bearer ${input.token}` },
-      },
-      { networkOnly: true },
-    );
-    if (!masterRes.ok) {
-      throw new Error(`Master data download failed (HTTP ${masterRes.status})`);
+    // Soft-fail: profile + Dexie seed data are enough to enter the app offline.
+    // Missing master options only limits some dropdowns until the next online sync.
+    try {
+      const masterRes = await apiFetch(
+        "/api/service-requests/master-options",
+        {
+          headers: { Authorization: `Bearer ${input.token}` },
+        },
+        { networkOnly: true },
+      );
+      if (masterRes.ok) {
+        const masterJson = (await masterRes.json()) as { options?: Record<string, unknown> };
+        if (masterJson.options && typeof masterJson.options === "object") {
+          await cacheMasterOptionsForUser(userId, organizationId, masterJson.options);
+        }
+      } else {
+        console.warn(`[Bootstrap] Master options HTTP ${masterRes.status}; continuing.`);
+      }
+    } catch (err) {
+      console.warn("[Bootstrap] Master options skipped:", err);
     }
-    const masterJson = (await masterRes.json()) as { options?: Record<string, unknown> };
-    if (!masterJson.options || typeof masterJson.options !== "object") {
-      throw new Error("Master data response missing options");
-    }
-    await cacheMasterOptionsForUser(userId, organizationId, masterJson.options);
 
     emit({
       phase: "downloading-jobs",

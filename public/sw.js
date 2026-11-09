@@ -1,5 +1,5 @@
 // Telesonic Service Worker — full mobile offline (Airplane Mode)
-const CACHE_NAME = "telesonic-pwa-v4";
+const CACHE_NAME = "telesonic-pwa-v5";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -188,6 +188,10 @@ self.addEventListener("fetch", (event) => {
           await putInCache(event.request, response);
           return response;
         } catch {
+          // Last resort: pathname match ignoring full URL variance after deploys.
+          const path = new URL(event.request.url).pathname;
+          const byPath = await caches.match(path, { ignoreSearch: true });
+          if (byPath) return byPath;
           return new Response("", { status: 503, statusText: "Offline" });
         }
       })(),

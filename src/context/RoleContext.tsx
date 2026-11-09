@@ -18,7 +18,6 @@ import {
 } from "@/lib/offline-db";
 import { isUsableJwt } from "@/lib/app-initializer";
 import {
-  scrubPlaintextAuthFromLocalStorage,
   setActiveSessionMemory,
   clearActiveSessionMemory,
   isWithinOfflineAccessPolicy,
@@ -128,8 +127,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const restoreAuth = async () => {
       try {
-        scrubPlaintextAuthFromLocalStorage();
-
         // 1. Check active tab sessionStorage first
         const sessionUserRaw = sessionStorage.getItem("auth_user");
         const sessionToken = sessionStorage.getItem("auth_token");
@@ -145,22 +142,30 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 2. Encrypted vault / migrated legacy session
-        const vaultSession = await getOfflineAuthSession();
-        if (vaultSession?.rememberMe && vaultSession.user && !cancelled) {
-          const parsed = vaultSession.user as unknown as UserProfile;
-          const jwtOk = isUsableJwt(vaultSession.token);
+        // 2. Durable localStorage mirror (survives phone restart / Airplane Mode)
+        const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
+        const localUserRaw = localStorage.getItem("auth_user");
+        const localToken = localStorage.getItem("auth_token");
+        if (isRemembered && localUserRaw && localToken && localToken.split(".").length === 3) {
+          const parsed = JSON.parse(localUserRaw) as UserProfile;
+          const jwtOk = isUsableJwt(localToken);
           const offline = isOfflineForTransactions();
-          const policyOk = isWithinOfflineAccessPolicy(vaultSession as SecureAuthSession, {
-            offline,
-            jwtStillValid: jwtOk,
-          });
-          if (parsed?.name && (jwtOk || policyOk)) {
-            const userJson = JSON.stringify(parsed);
-            localStorage.setItem("telesonic_remember_session", "true");
-            localStorage.setItem("auth_user", userJson);
-            localStorage.removeItem("auth_token");
-            setActiveSessionMemory(vaultSession.token, userJson);
+          const policyOk =
+            jwtOk ||
+            offline ||
+            isWithinOfflineAccessPolicy(
+              {
+                token: localToken,
+                user: parsed as unknown as Record<string, unknown>,
+                rememberMe: true,
+                savedAt: new Date().toISOString(),
+                userId: String(parsed.id),
+                organizationId: parsed.organizationId || DEFAULT_ORGANIZATION_ID,
+              } satisfies SecureAuthSession,
+              { offline: true, jwtStillValid: jwtOk },
+            );
+          if (parsed?.name && policyOk && !cancelled) {
+            setActiveSessionMemory(localToken, localUserRaw);
             sessionStorage.setItem("mobile_authenticated", "true");
             sessionStorage.setItem("mobile_tech_id", parsed.name);
             setCurrentUser(parsed);
@@ -172,7 +177,36 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        localStorage.removeItem("auth_token");
+        // 3. Encrypted vault
+        const vaultSession = await getOfflineAuthSession();
+        if (vaultSession?.rememberMe && vaultSession.user && !cancelled) {
+          const parsed = vaultSession.user as unknown as UserProfile;
+          const jwtOk = isUsableJwt(vaultSession.token);
+          const offline = isOfflineForTransactions();
+          const policyOk =
+            jwtOk ||
+            offline ||
+            isWithinOfflineAccessPolicy(vaultSession as SecureAuthSession, {
+              offline: true,
+              jwtStillValid: jwtOk,
+            });
+          if (parsed?.name && policyOk) {
+            const userJson = JSON.stringify(parsed);
+            localStorage.setItem("telesonic_remember_session", "true");
+            localStorage.setItem("auth_user", userJson);
+            // Mirror token so Airplane Mode reopen works even if vault decrypt fails later.
+            localStorage.setItem("auth_token", vaultSession.token);
+            setActiveSessionMemory(vaultSession.token, userJson);
+            sessionStorage.setItem("mobile_authenticated", "true");
+            sessionStorage.setItem("mobile_tech_id", parsed.name);
+            setCurrentUser(parsed);
+            if (parsed.role) setRoleState(parsed.role);
+            setIsAuthenticated(true);
+            setAuthReady(true);
+            window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: parsed }));
+            return;
+          }
+        }
       } catch {
         // Ignore parse errors
       }
@@ -246,20 +280,24 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       if (rememberMe) {
         localStorage.setItem("telesonic_remember_session", "true");
         localStorage.setItem("auth_user", userJson);
+        // Durable mirror required for phone restart + Airplane Mode (sessionStorage is wiped).
+        localStorage.setItem("auth_token", token);
         localStorage.setItem("mobile_tech_id", scopedUser.name);
         if (scopedUser.role) {
           localStorage.setItem("app_user_role", scopedUser.role);
         }
-        // Token goes ONLY to encrypted vault — never localStorage.
-        localStorage.removeItem("auth_token");
-        await saveOfflineAuthSession({
-          token,
-          user: scopedUser as unknown as Record<string, unknown>,
-          rememberMe: true,
-          savedAt: new Date().toISOString(),
-          userId: String(scopedUser.id),
-          organizationId: scopedUser.organizationId || DEFAULT_ORGANIZATION_ID,
-        });
+        try {
+          await saveOfflineAuthSession({
+            token,
+            user: scopedUser as unknown as Record<string, unknown>,
+            rememberMe: true,
+            savedAt: new Date().toISOString(),
+            userId: String(scopedUser.id),
+            organizationId: scopedUser.organizationId || DEFAULT_ORGANIZATION_ID,
+          });
+        } catch (err) {
+          console.warn("[Auth] Secure vault save failed; local mirror kept for offline:", err);
+        }
       } else {
         localStorage.removeItem("telesonic_remember_session");
         localStorage.removeItem("auth_user");
@@ -269,7 +307,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         await clearOfflineAuthSession();
       }
 
-      scrubPlaintextAuthFromLocalStorage();
       window.dispatchEvent(new CustomEvent("telesonic:auth-changed", { detail: scopedUser }));
     }
   };

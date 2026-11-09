@@ -136,32 +136,20 @@ function MobileLoginPage() {
 
       const token = data.token || "session-token";
 
-      // Hold navigation while mandatory offline bootstrap runs.
+      // Persist session FIRST so Airplane Mode reopen works even if bootstrap is partial.
+      if (data.user) {
+        await loginUser(data.user, token, rememberMe);
+      }
+
+      // Hold navigation while offline data is cached (soft-fail — never block login).
       setHoldForBootstrap(true);
       try {
-        const result = await runOfflineBootstrap({
+        await runOfflineBootstrap({
           user: data.user,
           token,
         });
-        if (!result.offlineReady) {
-          setError(result.error || "Failed to download offline data. Stay online and try again.");
-          setHoldForBootstrap(false);
-          setIsSubmitting(false);
-          return;
-        }
       } catch (bootErr) {
-        setError(
-          bootErr instanceof Error
-            ? bootErr.message
-            : "Failed to download offline data. Stay online and try again.",
-        );
-        setHoldForBootstrap(false);
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (data.user) {
-        await loginUser(data.user, token, rememberMe);
+        console.warn("[Login] Offline bootstrap partial/failed; session kept:", bootErr);
       }
 
       await refreshMobileJobsFromServer();
