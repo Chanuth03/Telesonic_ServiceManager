@@ -163,22 +163,16 @@ function IncentiveModulePage() {
   // Filtered 19 tiles
   const filteredScreens = useMemo(() => {
     return INCENTIVE_SCREENS.filter((screen) => {
-      if (selectedStage !== null) {
-        const stage = LIFECYCLE_STAGES.find((s) => s.stageNumber === selectedStage);
-        if (stage && !stage.screenNumbers.includes(screen.screenNumber)) return false;
-      }
-
-      const matchCategory = selectedCategory === "All" || screen.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
-      const matchSearch =
+      return (
         !q ||
         screen.title.toLowerCase().includes(q) ||
         screen.description.toLowerCase().includes(q) ||
         screen.screenNumber.toString().includes(q) ||
-        screen.category.toLowerCase().includes(q);
-      return matchCategory && matchSearch;
+        screen.category.toLowerCase().includes(q)
+      );
     });
-  }, [searchQuery, selectedCategory, selectedStage]);
+  }, [searchQuery]);
 
   const activeScreen = useMemo(() => {
     if (!selectedScreenId) return null;
@@ -305,45 +299,28 @@ function IncentiveModulePage() {
 
           {/* Module Hero Banner */}
           <div className="card-surface p-5 sm:p-6 rounded-lg border bg-card">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-success text-success-foreground shadow-xs">
-                  <Trophy size={24} />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                      Incentive & Commission Management
-                    </h1>
-                    <span className="rounded-md bg-success-soft text-success px-2 py-0.5 text-xs font-semibold">
-                      19 Functional Screens
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Telesonic Lanka &middot; Configure schemes, rate matrices, monthly targets,
-                    attendances, calculation runs, settlements, and performance dashboards.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 self-start md:self-auto">
-                <span className="text-xs text-muted-foreground font-mono bg-muted/80 px-3 py-1.5 rounded-md border">
-                  ERP Sync: Active &middot; SAP Business One
-                </span>
+            <div className="flex items-center gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-success text-success-foreground shadow-xs">
+                <Trophy size={24} />
+              </span>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                  Incentive & Commission Management
+                </h1>
               </div>
             </div>
 
-            {/* Search & Category Filter Toolbar */}
-            <div className="mt-6 border-t pt-4 space-y-3">
+            {/* Search Toolbar */}
+            <div className="mt-5 border-t pt-4">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <div className="relative flex-1 max-w-md">
                   <Search
                     size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                   />
                   <input
                     type="text"
-                    placeholder="Search 19 screen modules by name, description or number..."
+                    placeholder="Search screen modules by name, description or number..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="input-field pl-9 bg-card text-xs h-9 w-full"
@@ -351,7 +328,7 @@ function IncentiveModulePage() {
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       Clear
                     </button>
@@ -362,90 +339,6 @@ function IncentiveModulePage() {
                   Showing {filteredScreens.length} of {INCENTIVE_SCREENS.length} Screens
                 </span>
               </div>
-
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap rounded-md px-3 py-1 font-medium transition-colors cursor-pointer ${
-                      selectedCategory === cat
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================== */}
-          {/* VISUAL 6-STAGE PROCESS LIFECYCLE (SECTION 5 STANDARD)      */}
-          {/* ========================================================== */}
-          <div className="card-surface p-4 sm:p-5 rounded-xl border bg-card shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-primary" />
-                  Telesonic End-to-End Month-End Incentive Lifecycle
-                </span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Sequential business process flow matching Section 5 specifications. Click any stage to inspect relevant screens.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {selectedStage !== null && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedStage(null)}
-                    className="h-7 text-xs text-primary font-semibold hover:bg-primary/10"
-                  >
-                    View All Stages
-                  </Button>
-                )}
-                <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded">
-                  {INCENTIVE_SCREENS.length} Active Modules
-                </span>
-              </div>
-            </div>
-
-            {/* Stepper Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
-              {LIFECYCLE_STAGES.map((st) => {
-                const isSelected = selectedStage === st.stageNumber;
-                return (
-                  <button
-                    key={st.stageNumber}
-                    onClick={() => setSelectedStage(isSelected ? null : st.stageNumber)}
-                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
-                        : "border-border bg-card hover:bg-muted/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-foreground">
-                        Stage {st.stageNumber}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {st.screenNumbers.length} Screens
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="font-bold text-xs text-foreground leading-tight">{st.title}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                        {st.screenCodes}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
@@ -504,18 +397,15 @@ function IncentiveModulePage() {
             <div className="card-surface p-12 text-center rounded-lg border bg-card">
               <p className="text-sm font-semibold text-foreground">No matching screens found</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Try searching with a different keyword or reset the category filter.
+                Try searching with a different keyword.
               </p>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory("All");
-                }}
+                onClick={() => setSearchQuery("")}
                 className="mt-4 text-xs"
               >
-                Reset Filters
+                Reset Search
               </Button>
             </div>
           )}
