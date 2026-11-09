@@ -316,11 +316,8 @@ export function SystemParametersView({ onBack }: SystemParametersViewProps) {
               <h1 className="text-xl font-bold tracking-tight text-foreground">
                 System Parameters &amp; Cut-off Policy
               </h1>
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                INC-SCR-19
-              </span>
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                SCREEN 19
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted/60 text-muted-foreground">
+                System Configuration
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">

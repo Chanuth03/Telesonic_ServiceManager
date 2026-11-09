@@ -479,10 +479,7 @@ export function MultiLevelApprovalView({ onBack, onNavigateScreen }: MultiLevelA
                 <h1 className="text-xl font-bold tracking-tight text-foreground">
                   Multi-Level Approval &amp; Verification
                 </h1>
-                <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-primary font-mono">
-                  INC-SCR-11
-                </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                <span className="rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                   Approval &amp; Posting
                 </span>
               </div>
@@ -908,7 +905,7 @@ export function MultiLevelApprovalView({ onBack, onNavigateScreen }: MultiLevelA
                 </span>
                 <div>
                   <h3 className="font-bold text-base text-foreground">Initiate Multi-Level Approval Package</h3>
-                  <p className="text-xs text-muted-foreground font-mono">INC-SCR-11 · Four-Eyes Authorization</p>
+                  <p className="text-xs text-muted-foreground">Four-Eyes Authorization</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setIsCreateModalOpen(false)} className="h-8 w-8 p-0 cursor-pointer">

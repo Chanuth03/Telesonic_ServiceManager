@@ -466,11 +466,8 @@ export function AuditTrailView({ onBack }: AuditTrailViewProps) {
               <h1 className="text-xl font-bold tracking-tight text-foreground">
                 Audit Trail &amp; Scheme Revision History
               </h1>
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                INC-SCR-18
-              </span>
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                SECURITY &amp; AUDIT
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted/60 text-muted-foreground">
+                Security &amp; Audit
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">

@@ -379,11 +379,8 @@ export function ParticipantStatementView({
                 <h1 className="text-xl font-bold tracking-tight text-slate-900">
                   Participant Incentive Statement (Pay Slip)
                 </h1>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
-                  INC-SCR-12
-                </span>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200">
-                  INC-RPT-17
+                <span className="px-2 py-0.5 text-xs font-medium rounded bg-muted/60 text-muted-foreground">
+                  Settlements &amp; Statements
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

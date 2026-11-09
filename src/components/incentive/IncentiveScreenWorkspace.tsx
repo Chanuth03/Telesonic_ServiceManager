@@ -80,7 +80,7 @@ function ProcessLifecycleHeader({
   return (
     <div className="bg-card border border-border p-3 rounded-xl shadow-xs space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Back to launcher & Step Badge */}
+        {/* Left: Back to launcher & Category */}
         <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
@@ -89,27 +89,23 @@ function ProcessLifecycleHeader({
             className="h-8 px-2.5 gap-1.5 text-xs font-semibold hover:bg-muted cursor-pointer"
           >
             <ArrowLeft size={13} />
-            <span>All {INCENTIVE_SCREENS.length} Screens</span>
+            <span>All Screens</span>
           </Button>
 
-          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-muted text-foreground">
-            {screen.screenNumber.toString().padStart(2, "0")} / {INCENTIVE_SCREENS.length}
-          </span>
-
-          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stage.stageTone}`}>
-            Stage {stage.stageNumber}: {stage.stageName}
+          <span className="text-xs font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded">
+            {screen.category}
           </span>
         </div>
 
-        {/* Right: Step Switcher & Prev/Next Buttons */}
+        {/* Right: Screen Switcher & Prev/Next Buttons */}
         <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
           {prevScreen && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onNavigateScreen(prevScreen.id)}
-              className="h-8 px-2.5 text-xs gap-1 font-medium"
-              title={`Previous: #${prevScreen.screenNumber} ${prevScreen.title}`}
+              className="h-8 px-2.5 text-xs gap-1 font-medium cursor-pointer"
+              title={`Previous: ${prevScreen.title}`}
             >
               <ChevronLeft size={14} />
               <span className="hidden sm:inline">Prev</span>
@@ -119,11 +115,11 @@ function ProcessLifecycleHeader({
           <select
             value={screen.id}
             onChange={(e) => onNavigateScreen(e.target.value)}
-            className="h-8 px-2.5 text-xs bg-background border border-border rounded-lg font-medium focus:ring-1 focus:ring-primary max-w-[220px] sm:max-w-[260px] truncate"
+            className="h-8 px-2.5 text-xs bg-background border border-border rounded-lg font-medium focus:ring-1 focus:ring-primary max-w-[240px] sm:max-w-[300px] truncate cursor-pointer"
           >
             {INCENTIVE_SCREENS.map((s) => (
               <option key={s.id} value={s.id}>
-                #{s.screenNumber.toString().padStart(2, "0")} {s.title}
+                {s.title}
               </option>
             ))}
           </select>
@@ -133,8 +129,8 @@ function ProcessLifecycleHeader({
               variant="default"
               size="sm"
               onClick={() => onNavigateScreen(nextScreen.id)}
-              className="h-8 px-2.5 text-xs gap-1 font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
-              title={`Next: #${nextScreen.screenNumber} ${nextScreen.title}`}
+              className="h-8 px-2.5 text-xs gap-1 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+              title={`Next: ${nextScreen.title}`}
             >
               <span className="hidden sm:inline">Next</span>
               <ChevronRight size={14} />

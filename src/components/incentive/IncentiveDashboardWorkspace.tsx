@@ -305,11 +305,8 @@ export function IncentiveDashboardWorkspace({
                 <h1 className="text-xl font-bold tracking-tight text-slate-900">
                   Incentive Dashboard
                 </h1>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  INC-SCR-16
-                </span>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200">
-                  OPERATIONAL MONITOR
+                <span className="px-2 py-0.5 text-xs font-medium rounded bg-muted/60 text-muted-foreground">
+                  Operational Monitor
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

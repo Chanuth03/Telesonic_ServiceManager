@@ -580,11 +580,11 @@ export function IncentiveCalculationRunView({
               className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
             >
               <ArrowLeft size={13} />
-              <span>All Incentive Screens</span>
+              <span>All Screens</span>
             </Button>
           )}
-          <span className="text-xs text-muted-foreground font-mono bg-muted px-2.5 py-1 rounded">
-            Screen #09 · Processing &amp; Runs
+          <span className="text-xs text-muted-foreground font-medium bg-muted/60 px-2.5 py-1 rounded">
+            Processing & Runs
           </span>
         </div>
 

@@ -278,7 +278,7 @@ export function ManualAdjustmentsView({ onBack, onNavigateScreen }: ManualAdjust
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createForm.reason.trim() || !createForm.remarks.trim()) {
-      toast.error("Reason and remarks are mandatory for manual adjustments (INC-SCR-10 rule).");
+      toast.error("Reason and remarks are mandatory for manual adjustments.");
       return;
     }
     if (Number(createForm.amount) <= 0) {
@@ -517,10 +517,7 @@ export function ManualAdjustmentsView({ onBack, onNavigateScreen }: ManualAdjust
                 <h1 className="text-xl font-bold tracking-tight text-foreground">
                   Manual Adjustments &amp; Bonus Claims
                 </h1>
-                <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-primary font-mono">
-                  INC-SCR-10
-                </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                <span className="rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                   Maker-Checker UDO
                 </span>
               </div>
@@ -1013,7 +1010,7 @@ export function ManualAdjustmentsView({ onBack, onNavigateScreen }: ManualAdjust
                 </span>
                 <div>
                   <h3 className="font-bold text-base text-foreground">Record Manual Adjustment / Bonus Claim</h3>
-                  <p className="text-xs text-muted-foreground font-mono">INC-SCR-10 · Controlled Maker-Checker Flow</p>
+                  <p className="text-xs text-muted-foreground">Controlled Maker-Checker Flow</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setIsCreateModalOpen(false)} className="h-8 w-8 p-0 cursor-pointer">

@@ -261,11 +261,8 @@ export function SchemeAnalyticsView({
                 <h1 className="text-xl font-bold tracking-tight text-slate-900">
                   Scheme Performance & Payout Analytics
                 </h1>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-blue-100 text-blue-800 border border-blue-200">
-                  INC-SCR-15
-                </span>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200">
-                  INC-RPT-20..24
+                <span className="px-2 py-0.5 text-xs font-medium rounded bg-muted/60 text-muted-foreground">
+                  Analytics &amp; Reporting
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

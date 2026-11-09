@@ -459,10 +459,7 @@ export function GLPostingPayrollView({ onBack, onNavigateScreen }: GLPostingPayr
                 <h1 className="text-xl font-bold tracking-tight text-foreground">
                   GL Posting &amp; Payroll Handover
                 </h1>
-                <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-primary font-mono">
-                  INC-SCR-12
-                </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                <span className="rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                   Financial Execution Console
                 </span>
               </div>
@@ -891,7 +888,7 @@ export function GLPostingPayrollView({ onBack, onNavigateScreen }: GLPostingPayr
                 </span>
                 <div>
                   <h3 className="font-bold text-base text-foreground">Create GL Posting &amp; Payroll Voucher</h3>
-                  <p className="text-xs text-muted-foreground font-mono">INC-SCR-12 · Balanced Double-Entry Setup</p>
+                  <p className="text-xs text-muted-foreground">Balanced Double-Entry Setup</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setIsCreateModalOpen(false)} className="h-8 w-8 p-0 cursor-pointer">

@@ -499,7 +499,7 @@ export function DivisionMasterView({ onBack, onNavigateScreen }: DivisionMasterV
               Division Master in Telesonic Incentive Architecture
             </h4>
             <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-              These divisions define target groupings (Screen 04), scheme eligibility (Screen 01), attendance batches (Screen 05), and SAP cost center accounting (Screen 13).
+              These divisions define monthly target groupings, scheme eligibility, attendance batches, and SAP cost center accounting.
             </p>
           </div>
         </div>

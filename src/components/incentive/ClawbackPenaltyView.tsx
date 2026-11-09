@@ -444,11 +444,8 @@ export function ClawbackPenaltyView({ onBack }: ClawbackPenaltyViewProps) {
               <h1 className="text-xl font-bold tracking-tight text-foreground">
                 Commission Clawback &amp; Penalty Register
               </h1>
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                INC-SCR-19
-              </span>
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-                SCREEN 17
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted/60 text-muted-foreground">
+                Monitoring &amp; Risk
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
