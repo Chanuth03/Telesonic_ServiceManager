@@ -38,6 +38,7 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  Edit2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -880,10 +881,25 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
   // Dialog & Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [isActivateModalOpen, setIsActivateModalOpen] = useState(false);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isAddRuleModalOpen, setIsAddRuleModalOpen] = useState(false);
+
+  // Form state for Edit Scheme
+  const [editSchemeForm, setEditSchemeForm] = useState({
+    schemeName: "",
+    division: "Mobile & Accessories",
+    schemeType: "Turnover Tier + Slabs",
+    participantRole: "Retail Sales Executive",
+    calculationBasis: "Billed Revenue (Excl. Tax)",
+    ageBasis: "Invoice Date",
+    payableLagMonths: 1,
+    effectiveFrom: "2026-07-01",
+    effectiveTo: "2026-12-31",
+    description: "",
+  });
 
   // Simulated open calculation run flag (to demonstrate validation rule)
   // "Deactivate only when there is no open calculation run"
@@ -1573,6 +1589,70 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     }
   };
 
+  // Action: Open Edit Scheme Modal
+  const handleOpenEditModal = () => {
+    if (!currentScheme) return;
+    setEditSchemeForm({
+      schemeName: currentScheme.schemeName,
+      division: currentScheme.division,
+      schemeType: currentScheme.schemeType,
+      participantRole: currentScheme.participantRole,
+      calculationBasis: currentScheme.calculationBasis,
+      ageBasis: currentScheme.ageBasis,
+      payableLagMonths: currentScheme.payableLagMonths || 1,
+      effectiveFrom: currentScheme.effectiveFrom,
+      effectiveTo: currentScheme.effectiveTo || "",
+      description: currentScheme.description || "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Action: Save Scheme Details / Metadata from Edit Modal
+  const handleEditSchemeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentScheme) return;
+    try {
+      setIsSaving(true);
+      const updatedPayload = {
+        ...currentScheme,
+        schemeName: editSchemeForm.schemeName.trim(),
+        division: editSchemeForm.division,
+        schemeType: editSchemeForm.schemeType,
+        participantRole: editSchemeForm.participantRole,
+        calculationBasis: editSchemeForm.calculationBasis,
+        ageBasis: editSchemeForm.ageBasis,
+        payableLagMonths: Number(editSchemeForm.payableLagMonths),
+        effectiveFrom: editSchemeForm.effectiveFrom,
+        effectiveTo: editSchemeForm.effectiveTo || "2099-12-31",
+        description: editSchemeForm.description,
+        modifiedBy: "Incentive Administrator",
+        changeNote: `Metadata updated via Edit Scheme form.`,
+      };
+
+      const res = await apiFetch(`/api/incentives/schemes/${encodeURIComponent(currentScheme.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedPayload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updatedScheme = data.scheme || updatedPayload;
+        setSchemes((prev) => prev.map((s) => (s.id === currentScheme.id ? updatedScheme : s)));
+        toast.success(`Scheme ${currentScheme.schemeCode} updated successfully.`);
+        setIsEditModalOpen(false);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || "Failed to update scheme.");
+      }
+    } catch (err) {
+      console.error("Edit scheme error:", err);
+      toast.error("Network error while updating scheme.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Action: Delete Scheme from PostgreSQL (Draft or Inactive)
   const handleDeleteScheme = async () => {
     if (!currentScheme) return;
@@ -1848,6 +1928,20 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
           {/* Scheme Actions (Status-flow sensitive) */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Action 0: Edit Scheme Details (Draft or Inactive status) */}
+            {(currentScheme.status === "Draft" || currentScheme.status === "Inactive") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenEditModal}
+                className="h-8 text-xs gap-1.5 text-primary border-primary/40 bg-primary-soft hover:bg-primary/20 cursor-pointer"
+                title="Edit Scheme Details (Name, Division, Role, Calculation Basis, Dates)"
+              >
+                <Edit2 size={13} />
+                <span>Edit Scheme</span>
+              </Button>
+            )}
+
             {/* Action: Save Scheme Definition */}
             <Button
               size="sm"
@@ -1939,11 +2033,24 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
         <div className="rounded-lg border border-border/70 bg-muted/20 divide-y lg:divide-y-0 lg:divide-x divide-border/70 grid grid-cols-1 lg:grid-cols-3">
           {/* Section 1: Classification & Ownership */}
           <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Building size={14} className="text-primary shrink-0" />
-              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
-                Classification & Scope
-              </span>
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+              <div className="flex items-center gap-2">
+                <Building size={14} className="text-primary shrink-0" />
+                <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
+                  Classification & Scope
+                </span>
+              </div>
+              {(currentScheme.status === "Draft" || currentScheme.status === "Inactive") && (
+                <button
+                  type="button"
+                  onClick={handleOpenEditModal}
+                  className="text-xs text-primary hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                  title="Edit metadata"
+                >
+                  <Edit2 size={12} />
+                  <span>Edit</span>
+                </button>
+              )}
             </div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
               <div>
@@ -2824,6 +2931,247 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
                     className="text-xs bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     Create Scheme (Draft)
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: EDIT SCHEME DETAILS (Draft / Inactive Status)          */}
+      {/* ------------------------------------------------------------- */}
+      {isEditModalOpen && currentScheme && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
+          <div className="card-surface bg-card rounded-xl border max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary-soft text-primary">
+                  <Edit2 size={16} />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Edit Incentive Scheme</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Update parameters for <strong className="text-foreground">{currentScheme.schemeCode}</strong> ({currentScheme.version})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-md"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSchemeSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Scheme Code</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={currentScheme.schemeCode}
+                    className="input-field bg-muted text-muted-foreground font-mono text-xs w-full cursor-not-allowed opacity-80"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Code is locked to maintain audit trail and references
+                  </span>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Scheme Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Retail Smartphone Sales Scheme"
+                    value={editSchemeForm.schemeName}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, schemeName: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Division *</label>
+                  <select
+                    value={editSchemeForm.division}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, division: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  >
+                    {availableDivisions.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Scheme Type *</label>
+                  <select
+                    value={editSchemeForm.schemeType}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, schemeType: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  >
+                    <option value="Turnover Tier + Slabs">Turnover Tier + Slabs</option>
+                    <option value="Volume Achievement Matrix">Volume Achievement Matrix</option>
+                    <option value="FTF Multiplier + Job Count">FTF Multiplier + Job Count</option>
+                    <option value="Flat Bounty Per Unit">Flat Bounty Per Unit</option>
+                    <option value="Gross Margin %">Gross Margin %</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Participant Role *
+                  </label>
+                  <select
+                    value={editSchemeForm.participantRole}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, participantRole: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  >
+                    <option value="Retail Sales Executive">Retail Sales Executive</option>
+                    <option value="Field Service Technician">Field Service Technician</option>
+                    <option value="Dealer Principal">Dealer Principal</option>
+                    <option value="Showroom Promoter">Showroom Promoter</option>
+                    <option value="Area Sales Manager">Area Sales Manager</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Calculation Basis *
+                  </label>
+                  <select
+                    value={editSchemeForm.calculationBasis}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, calculationBasis: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  >
+                    <option value="Billed Revenue (Excl. Tax)">Billed Revenue (Excl. Tax)</option>
+                    <option value="Collected Cash Amount">Collected Cash Amount</option>
+                    <option value="Job Completion Count">Job Completion Count</option>
+                    <option value="Sell-Out Unit Count">Sell-Out Unit Count</option>
+                    <option value="Gross Margin">Gross Margin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Age Basis *</label>
+                  <select
+                    value={editSchemeForm.ageBasis}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, ageBasis: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  >
+                    <option value="Invoice Date">Invoice Date</option>
+                    <option value="Payment Due Date">Payment Due Date</option>
+                    <option value="Realization Date">Realization Date</option>
+                    <option value="Job Close Date">Job Close Date</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Payable Lag in Months *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="12"
+                    required
+                    value={editSchemeForm.payableLagMonths}
+                    onChange={(e) =>
+                      setEditSchemeForm({
+                        ...editSchemeForm,
+                        payableLagMonths: Number(e.target.value),
+                      })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Disbursement lag (e.g. 1 month)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Effective From *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editSchemeForm.effectiveFrom}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, effectiveFrom: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">Effective To</label>
+                  <input
+                    type="date"
+                    value={editSchemeForm.effectiveTo}
+                    onChange={(e) =>
+                      setEditSchemeForm({ ...editSchemeForm, effectiveTo: e.target.value })
+                    }
+                    className="input-field bg-background text-xs w-full"
+                  />
+                  <span className="text-[10px] text-muted-foreground">Leave empty if ongoing</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-foreground block mb-1">
+                  Scheme Purpose / Description
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Outline the business objectives, key target criteria, and payout justification..."
+                  value={editSchemeForm.description}
+                  onChange={(e) =>
+                    setEditSchemeForm({ ...editSchemeForm, description: e.target.value })
+                  }
+                  className="input-field bg-background text-xs w-full"
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <span className="text-[11px] text-muted-foreground">
+                  Status: <strong className="text-warning">{currentScheme.status}</strong> &middot; Version:{" "}
+                  <strong className="text-foreground">{currentScheme.version}</strong>
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isSaving}
+                    className="text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isSaving ? "Saving..." : "Save Scheme"}
                   </Button>
                 </div>
               </div>
