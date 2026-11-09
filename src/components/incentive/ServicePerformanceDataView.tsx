@@ -998,7 +998,9 @@ export function ServicePerformanceDataView({
       disciplineScore: Number(newTicketForm.disciplineScore) || 10.0,
       eligibility: (newTicketForm.eligibility as JobEligibility) || "HOD Eligible",
       isPoorRepeat: Boolean(newTicketForm.isPoorRepeat),
-      repeatReferenceJob: newTicketForm.repeatReferenceJob || undefined,
+      ...(newTicketForm.repeatReferenceJob
+        ? { repeatReferenceJob: newTicketForm.repeatReferenceJob }
+        : {}),
       hodReviewed: true,
       closureStatus: "Closed",
       notes: newTicketForm.notes || "Added manually",
