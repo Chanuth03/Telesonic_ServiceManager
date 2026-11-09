@@ -134,6 +134,177 @@ export interface IncentiveScheme {
 // Initial Mock Schemes
 const INITIAL_SCHEMES: IncentiveScheme[] = [
   {
+    id: "sch-rlc-rep-pay",
+    schemeCode: "RLC-REP-PAY",
+    schemeName: "RLC Dealer Sales Staff Payment Commission",
+    division: "RLC",
+    schemeType: "Payment-realised commission",
+    participantRole: "Sales Executive (Dealer Seg.)",
+    calculationBasis: "Units × rate (capacity × type × credit age)",
+    ageBasis: "Invoice date → realisation date",
+    payableLagMonths: 3,
+    effectiveFrom: "2026-04-01",
+    effectiveTo: "—",
+    status: "Active",
+    version: "3",
+    description:
+      "RLC dealer sales payment-realised commission calculated from realised receipts with 3-month payable lag.",
+    rules: [
+      {
+        id: "rlc-r-1",
+        rule: "Credit age measured to",
+        parameter: "Realisation date",
+        value: "Cheque: cleared; cash/transfer/card: rec...",
+        source: "DS-09 §1.1",
+      },
+      {
+        id: "rlc-r-2",
+        rule: "Partial payments",
+        parameter: "Pro-rata by amount",
+        value: "Each receipt aged separately",
+        source: "DS-09 §1.1",
+      },
+      {
+        id: "rlc-r-3",
+        rule: "Returns",
+        parameter: "Deduct in document month",
+        value: "Credit memo month, original rate",
+        source: "DS-09 §1.1",
+      },
+      {
+        id: "rlc-r-4",
+        rule: "Cancelled documents",
+        parameter: "Excluded",
+        value: "Invoice, credit memo, receipt",
+        source: "DS-09 §1.1",
+      },
+      {
+        id: "rlc-r-5",
+        rule: "Exclusion flag",
+        parameter: "U_IncExclude = Yes",
+        value: "Document not considered",
+        source: "DS-09 §1.1",
+      },
+    ],
+    slabs: [
+      {
+        slabId: "S-01",
+        minPercent: 0,
+        maxPercent: 79.99,
+        payoutPercent: 0,
+        multiplier: 0.0,
+        description: "Below floor threshold - No incentive",
+      },
+      {
+        slabId: "S-02",
+        minPercent: 80,
+        maxPercent: 99.99,
+        payoutPercent: 80,
+        multiplier: 0.8,
+        description: "Baseline qualifier band",
+      },
+      {
+        slabId: "S-03",
+        minPercent: 100,
+        maxPercent: 119.99,
+        payoutPercent: 100,
+        multiplier: 1.0,
+        description: "Target achieved - Full payout",
+      },
+      {
+        slabId: "S-04",
+        minPercent: 120,
+        maxPercent: 200,
+        payoutPercent: 125,
+        multiplier: 1.25,
+        description: "High performance tier",
+      },
+    ],
+    rateItems: [
+      {
+        category: "Residential AC",
+        productLine: "9,000 BTU Inverter",
+        commissionRate: "LKR 225 / unit",
+        paymentTermBand: "Immediate / Cash",
+        basis: "Capacity × 2.5",
+      },
+      {
+        category: "Residential AC",
+        productLine: "12,000 BTU Inverter",
+        commissionRate: "LKR 300 / unit",
+        paymentTermBand: "Immediate / Cash",
+        basis: "Capacity × 2.5",
+      },
+      {
+        category: "Residential AC",
+        productLine: "18,000 BTU Inverter",
+        commissionRate: "LKR 450 / unit",
+        paymentTermBand: "Immediate / Cash",
+        basis: "Capacity × 2.5",
+      },
+      {
+        category: "Commercial AC",
+        productLine: "24,000 BTU Inverter",
+        commissionRate: "LKR 600 / unit",
+        paymentTermBand: "Immediate / Cash",
+        basis: "Capacity × 2.5",
+      },
+    ],
+    exclusions: {
+      customerGroups: [
+        "Inter-company Branch Transfers",
+        "Executive Staff Personal Orders",
+      ],
+      itemCategories: [
+        "Free-of-Charge (FOC) Promotional Units",
+        "Marketing Demonstration Samples",
+      ],
+      jobCodes: ["Internal Transfer Freight"],
+      clawbackWindowDays: 45,
+    },
+    posting: {
+      debitGlAccount: "621010",
+      debitGlName: "Dealer Staff Commission Expense",
+      creditGlAccount: "214060",
+      creditGlName: "Accrued Commission Payable — RLC",
+      costCenter: "CC-RLC-DEALER",
+      projectCode: "PRJ-RLC-2026",
+      postingDayOfMonth: 25,
+      journalRemarksTemplate: "INC/{Period}/RLC-REP-PAY/{EmpNo} - Dealer Commission",
+    },
+    versions: [
+      {
+        version: "3",
+        effectiveFrom: "2026-04-01",
+        effectiveTo: "—",
+        status: "Active",
+        createdBy: "Incentive Administrator",
+        createdDate: "2026-03-25",
+        approvedBy: "Head of Finance / CEO",
+        approvalDate: "2026-03-28",
+        changeSummary: "RLC dealer sales staff payment-realised commission version 3.",
+      },
+    ],
+    history: [
+      {
+        id: "h-rlc-1",
+        timestamp: "2026-04-01 09:00",
+        user: "System Daemon",
+        role: "ERP Automation",
+        action: "Version Activated",
+        details: "Version 3 marked Active upon reaching Effective Date 2026-04-01.",
+      },
+      {
+        id: "h-rlc-2",
+        timestamp: "2026-03-28 16:30",
+        user: "D. Fernando",
+        role: "Head of Finance",
+        action: "Scheme Approved",
+        details: "Approved per discovery specification DS-09 §1.1.",
+      },
+    ],
+  },
+  {
     id: "sch-1",
     schemeCode: "SCH-SLS-2026",
     schemeName: "Retail Smartphone & Devices Sales Incentive",
@@ -833,12 +1004,13 @@ const INITIAL_SCHEMES: IncentiveScheme[] = [
 
 interface SchemeMasterViewProps {
   onNavigateScreen?: ((screenId: string) => void) | undefined;
+  onBack?: (() => void) | undefined;
 }
 
-export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
+export function SchemeMasterView({ onNavigateScreen, onBack }: SchemeMasterViewProps) {
   // Master Scheme state
   const [schemes, setSchemes] = useState<IncentiveScheme[]>(INITIAL_SCHEMES);
-  const [selectedSchemeId, setSelectedSchemeId] = useState<string>("sch-1");
+  const [selectedSchemeId, setSelectedSchemeId] = useState<string>("sch-rlc-rep-pay");
   const [activeTab, setActiveTab] = useState<string>("rules");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -859,6 +1031,10 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
         if (data.schemes && data.schemes.length > 0) {
           setSchemes(data.schemes);
           setIsDbConnected(true);
+          const rlc = data.schemes.find((s: any) => s.schemeCode === "RLC-REP-PAY");
+          if (rlc) {
+            setSelectedSchemeId(rlc.id);
+          }
           if (!silent) {
             toast.success("Synchronized with PostgreSQL database.", {
               description: `Loaded ${data.schemes.length} schemes successfully.`,
@@ -872,6 +1048,12 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
     } finally {
       if (!silent) setIsLoading(false);
     }
+  };
+
+  const handleFieldChange = (field: keyof IncentiveScheme, value: any) => {
+    setSchemes((prev) =>
+      prev.map((s) => (s.id === currentScheme.id ? { ...s, [field]: value } : s)),
+    );
   };
 
   useEffect(() => {
@@ -1630,476 +1812,256 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
   return (
     <div className="space-y-6">
       {/* ------------------------------------------------------------- */}
-      {/* Top Action Bar & Master Selector                              */}
-      {/* ------------------------------------------------------------- */}
-      <div className="card-surface p-4 sm:p-5 rounded-lg border bg-card space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary shadow-xs">
-              <Award size={20} />
-            </span>
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                Incentive Scheme Master
-              </h2>
-             
-            </div>
+      /* SAP Business One-Style Add-on Form Container (INC-SCR-01 Specification) */
+      <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
+        {/* Illustrative Yellow/Gold Top Banner matching official PDF specification */}
+        <div className="bg-[#f2c744] text-[#3d2c00] font-semibold px-4 py-1.5 text-xs flex items-center justify-between border-b border-[#d8aa28]">
+          <span>SAP Business One-style client (illustrative layout)</span>
+          <span className="text-[11px] font-mono opacity-85">INC-SCR-01 · Scheme UDO + add-on form</span>
+        </div>
+
+        {/* Window Title & Master Scheme Switcher */}
+        <div className="p-3.5 sm:p-4 bg-[#e8eaf0] dark:bg-muted/40 border-b flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-[#5e35b1] rounded-xs" />
+            <h2 className="text-sm sm:text-base font-bold text-foreground">
+              Incentive Scheme Master <span className="text-xs font-normal text-muted-foreground">[Add-on form]</span>
+            </h2>
           </div>
 
-          {/* Top Primary Actions — Clean, Icon-Only with Tooltips */}
-          <div className="flex items-center gap-1.5 self-end lg:self-center">
+          {/* Scheme Switcher & Database Sync */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">Active Scheme:</span>
+            <select
+              value={selectedSchemeId}
+              onChange={(e) => setSelectedSchemeId(e.target.value)}
+              className="h-7 text-xs font-medium bg-background border border-border rounded px-2.5 max-w-[280px] sm:max-w-[360px] truncate shadow-2xs cursor-pointer focus:ring-1 focus:ring-primary"
+            >
+              {schemes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.schemeCode} — {s.schemeName} ({s.status})
+                </option>
+              ))}
+            </select>
+
             <Button
               variant="outline"
               size="icon"
               disabled={isLoading}
               onClick={() => loadSchemesFromDb(false)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer bg-background"
               title="Sync with Database"
             >
-              <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleExport("excel")}
-              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
-              title="Export to Excel"
-            >
-              <Download size={14} />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleExport("pdf")}
-              className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
-              title="Export to PDF"
-            >
-              <Printer size={14} />
-            </Button>
-            <Button
-              size="icon"
-              onClick={() => {
-                const defaultDiv = availableDivisions[0] || "Commercial HVAC";
-                setNewSchemeForm({
-                  schemeCode: `SCH-${defaultDiv.substring(0, 3).toUpperCase()}-2026`,
-                  schemeName: "",
-                  division: defaultDiv,
-                  schemeType: "Turnover Tier + Slabs",
-                  participantRole: "Retail Sales Executive",
-                  calculationBasis: "Billed Revenue (Excl. Tax)",
-                  ageBasis: "Invoice Date",
-                  payableLagMonths: 1,
-                  effectiveFrom: "2026-07-01",
-                  effectiveTo: "2026-12-31",
-                  status: "Draft",
-                  version: "v1.0",
-                  description: "",
-                });
-                setIsAddModalOpen(true);
-              }}
-              className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs ml-1"
-              title="Create New Scheme"
-            >
-              <Plus size={16} />
+              <RefreshCw size={13} className={isLoading ? "animate-spin text-primary" : ""} />
             </Button>
           </div>
         </div>
 
-        {/* Filters and Scheme Select Chips - Single Horizontal Line */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t">
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0">
-            <div className="relative w-48 sm:w-64 shrink-0">
-              <Search
-                size={13}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-              />
-              <input
-                type="text"
-                placeholder="Search scheme code or title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field pl-8 bg-background text-xs h-8 w-full"
-              />
-            </div>
-            <select
-              value={divisionFilter}
-              onChange={(e) => setDivisionFilter(e.target.value)}
-              className="input-field bg-background text-xs h-8 px-2.5 w-40 sm:w-44 shrink-0"
-            >
-              <option value="all">All Divisions</option>
-              {availableDivisions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="input-field bg-background text-xs h-8 px-2.5 w-32 shrink-0 capitalize"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="approved">Approved</option>
-              <option value="draft">Draft</option>
-              <option value="superseded">Superseded</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            {(searchTerm || divisionFilter !== "all" || statusFilter !== "all") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm("");
-                  setDivisionFilter("all");
-                  setStatusFilter("all");
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium underline px-1 shrink-0 cursor-pointer"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-
-          <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-            Showing <span className="font-semibold text-foreground">{filteredSchemes.length}</span>{" "}
-            of {schemes.length} schemes
-          </div>
-        </div>
-
-        {/* Scheme Selector Horizontal Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-2">
-          {filteredSchemes.map((s) => {
-            const isSelected = s.id === currentScheme.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSelectedSchemeId(s.id)}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                  isSelected
-                    ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/20"
-                    : "border-border/70 bg-card hover:bg-muted/50"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className="font-mono text-xs font-bold text-foreground truncate">
-                    {s.schemeCode}
-                  </span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    {s.version}
-                  </span>
-                </div>
-                <p className="text-xs font-medium text-foreground line-clamp-1">{s.schemeName}</p>
-                <div className="mt-2 flex items-center justify-between text-[11px]">
-                  <span
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${getStatusBadge(s.status)}`}
-                  >
-                    {s.status}
-                  </span>
-                  <span className="text-muted-foreground text-[10px] truncate max-w-[80px]">
-                    {s.division.split(" ")[0]}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* Selected Scheme Detail Header Panel                           */}
-      {/* ------------------------------------------------------------- */}
-      <div className="card-surface p-5 rounded-lg border bg-card space-y-4 shadow-xs">
         {/* Active Scheme Lock Warning Banner */}
         {isActiveLocked && (
-          <div className="flex items-start gap-3 p-3 rounded-md bg-info-soft/40 border border-info/30 text-xs">
-            <Lock size={15} className="text-info shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <span className="font-semibold text-foreground">
-                Active Scheme (Production Locked):{" "}
-              </span>
-              <span className="text-muted-foreground">
-                An active scheme cannot be edited directly to ensure audit integrity of payroll &
-                ERP calculations. To make parameter modifications, use the{" "}
-                <strong className="text-foreground">"Copy to New Version"</strong> button below.
-              </span>
-            </div>
+          <div className="px-4 py-2 bg-info-soft/40 border-b border-info/20 text-xs flex items-center gap-2 text-muted-foreground">
+            <Lock size={13} className="text-info shrink-0" />
+            <span>
+              <strong className="text-foreground">Active Scheme (Production Locked):</strong> Parameter fields are protected to maintain calculation integrity. Use <strong className="text-foreground">"Copy to New Version"</strong> to make modifications.
+            </span>
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h3 className="text-xl font-bold text-foreground">{currentScheme.schemeName}</h3>
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary-soft text-primary border border-primary/20">
-                {currentScheme.schemeCode}
-              </span>
-              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-muted text-foreground border">
-                {currentScheme.version}
-              </span>
-              <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${getStatusBadge(currentScheme.status)}`}
-              >
-                {currentScheme.status}
-              </span>
+        {/* The 2-Column Form Fields (matching exact sample layout INC-SCR-01) */}
+        <div className="p-4 sm:p-5 bg-[#f4f5f8] dark:bg-muted/10 border-b">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-2 text-xs">
+            {/* Left Column (6 Fields) */}
+            <div className="space-y-2">
+              {/* Scheme Code */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Scheme Code</label>
+                <input
+                  type="text"
+                  value={currentScheme.schemeCode}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("schemeCode", e.target.value)}
+                  className="h-6.5 text-xs font-mono font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Division */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Division</label>
+                <input
+                  type="text"
+                  value={currentScheme.division}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("division", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Participant Role */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Participant Role</label>
+                <input
+                  type="text"
+                  value={currentScheme.participantRole}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("participantRole", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Age Basis */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Age Basis</label>
+                <input
+                  type="text"
+                  value={currentScheme.ageBasis}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("ageBasis", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Effective From */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Effective From</label>
+                <input
+                  type="text"
+                  value={currentScheme.effectiveFrom}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("effectiveFrom", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Status */}
+              <div className="flex items-center gap-2">
+                <label className="w-32 text-xs text-foreground font-medium shrink-0">Status</label>
+                <input
+                  type="text"
+                  value={currentScheme.status}
+                  readOnly
+                  className="h-6.5 text-xs font-semibold px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 w-full shadow-2xs"
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">{currentScheme.description}</p>
-          </div>
 
-          {/* Scheme Actions (Status-flow sensitive) */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Action: Save Scheme Definition */}
-            <Button
-              size="sm"
-              disabled={isSaving}
-              onClick={handleSaveSchemeToDb}
-              className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
-            >
-              <Save size={13} className={isSaving ? "animate-spin" : ""} />
-              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
-            </Button>
-
-            {/* Action 1: Copy to New Version (available for Active/Approved schemes) */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const verNum = parseFloat(currentScheme.version.replace("v", "")) || 1.0;
-                setCopyVersionForm({
-                  newVersion: `v${(verNum + 0.1).toFixed(1)}`,
-                  effectiveFrom: "2027-01-01",
-                  effectiveTo: "2027-12-31",
-                  changeSummary: `New version created from ${currentScheme.version} for upcoming policy update.`,
-                });
-                setIsCopyModalOpen(true);
-              }}
-              className="h-8 text-xs gap-1.5 cursor-pointer"
-            >
-              <Copy size={13} />
-              <span>Copy to New Version</span>
-            </Button>
-
-            {/* Action 2: Submit for Approval (Draft status) */}
-            {currentScheme.status === "Draft" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSubmitForApproval}
-                className="h-8 text-xs gap-1.5 text-info border-info/40 bg-info-soft hover:bg-info/20 cursor-pointer"
-              >
-                <FileCheck size={13} />
-                <span>Submit for Approval</span>
-              </Button>
-            )}
-
-            {/* Action 3: Activate (Approved status -> Active after Finance/CEO approval) */}
-            {currentScheme.status === "Approved" && (
-              <Button
-                size="sm"
-                onClick={() => setIsActivateModalOpen(true)}
-                className="h-8 text-xs gap-1.5 bg-success text-success-foreground hover:bg-success/90 cursor-pointer"
-              >
-                <CheckCircle2 size={13} />
-                <span>Activate Scheme</span>
-              </Button>
-            )}
-
-            {/* Action 4: Deactivate (Active status -> Inactive only when no open run) */}
-            {currentScheme.status === "Active" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsDeactivateModalOpen(true)}
-                className="h-8 text-xs gap-1.5 text-destructive border-destructive/40 hover:bg-destructive-soft cursor-pointer"
-              >
-                <AlertCircle size={13} />
-                <span>Deactivate</span>
-              </Button>
-            )}
-
-            {/* Action 5: Delete Draft or Inactive Scheme from PostgreSQL */}
-            {(currentScheme.status === "Draft" || currentScheme.status === "Inactive") && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isSaving}
-                onClick={handleDeleteScheme}
-                className="h-8 text-xs gap-1.5 text-destructive border-destructive/40 hover:bg-destructive-soft cursor-pointer"
-              >
-                <Trash2 size={13} />
-                <span>Delete</span>
-              </Button>
-            )}
+            {/* Right Column (6 Fields) */}
+            <div className="space-y-2">
+              {/* Scheme Name */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Scheme Name</label>
+                <input
+                  type="text"
+                  value={currentScheme.schemeName}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("schemeName", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Scheme Type */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Scheme Type</label>
+                <input
+                  type="text"
+                  value={currentScheme.schemeType}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("schemeType", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Calculation Basis */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Calculation Basis</label>
+                <input
+                  type="text"
+                  value={currentScheme.calculationBasis}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("calculationBasis", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Payable Lag (months) */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Payable Lag (months)</label>
+                <input
+                  type="number"
+                  value={currentScheme.payableLagMonths}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("payableLagMonths", Number(e.target.value))}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Effective To */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Effective To</label>
+                <input
+                  type="text"
+                  value={currentScheme.effectiveTo || "—"}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("effectiveTo", e.target.value)}
+                  className="h-6.5 text-xs font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              {/* Version */}
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-xs text-foreground font-medium shrink-0">Version</label>
+                <input
+                  type="text"
+                  value={currentScheme.version}
+                  readOnly={isActiveLocked}
+                  onChange={(e) => handleFieldChange("version", e.target.value)}
+                  className="h-6.5 text-xs font-mono font-medium px-2 rounded-xs border border-[#8ec5a5] bg-[#eef7f2] dark:bg-emerald-950/20 dark:border-emerald-800 text-foreground w-full shadow-2xs focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* ------------------------------------------------------------- */}
-        {/* Enterprise Spec Grid - 3 Logical ERP Groups (SAP Fiori Style) */}
+        {/* The 7 Required Scheme Master Tabs (Rules, Rates, Slabs, etc.) */}
         {/* ------------------------------------------------------------- */}
-        <div className="rounded-lg border border-border/70 bg-muted/20 divide-y lg:divide-y-0 lg:divide-x divide-border/70 grid grid-cols-1 lg:grid-cols-3">
-          {/* Section 1: Classification & Ownership */}
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Building size={14} className="text-primary shrink-0" />
-              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
-                Classification & Scope
-              </span>
-            </div>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Division
-                </dt>
-                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.division}>
-                  {currentScheme.division}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Participant Role
-                </dt>
-                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.participantRole}>
-                  {currentScheme.participantRole}
-                </dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Scheme Model
-                </dt>
-                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.schemeType}>
-                  {currentScheme.schemeType}
-                </dd>
-              </div>
-            </dl>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="px-4 sm:px-5 pt-2.5 bg-[#e8eaf0]/50 dark:bg-muted/20 border-b">
+            <TabsList className="bg-transparent h-8 p-0 space-x-1 overflow-x-auto justify-start border-b-0">
+              <TabsTrigger
+                value="rules"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Rules
+              </TabsTrigger>
+              <TabsTrigger
+                value="rates"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Rate Tables
+              </TabsTrigger>
+              <TabsTrigger
+                value="slabs"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Slabs
+              </TabsTrigger>
+              <TabsTrigger
+                value="exclusions"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Exclusions
+              </TabsTrigger>
+              <TabsTrigger
+                value="posting"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Posting
+              </TabsTrigger>
+              <TabsTrigger
+                value="versions"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                Versions
+              </TabsTrigger>
+              <TabsTrigger
+                value="history"
+                className="rounded-t border border-b-0 border-border/80 bg-background/60 data-[state=active]:bg-background data-[state=active]:font-bold px-3 py-1 text-xs cursor-pointer shadow-2xs"
+              >
+                History
+              </TabsTrigger>
+            </TabsList>
           </div>
-
-          {/* Section 2: Calculation Engine Parameters */}
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Settings2 size={14} className="text-primary shrink-0" />
-              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
-                Calculation Engine
-              </span>
-            </div>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-              <div className="col-span-2">
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Calculation Basis
-                </dt>
-                <dd className="font-semibold text-foreground truncate mt-0.5" title={currentScheme.calculationBasis}>
-                  {currentScheme.calculationBasis}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Age Basis
-                </dt>
-                <dd className="font-semibold text-foreground truncate mt-0.5">
-                  {currentScheme.ageBasis}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Payable Lag
-                </dt>
-                <dd className="font-semibold text-foreground mt-0.5">
-                  {currentScheme.payableLagMonths} Month{currentScheme.payableLagMonths > 1 ? "s" : ""}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          {/* Section 3: Lifecycle, Validity & Posting */}
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Calendar size={14} className="text-primary shrink-0" />
-              <span className="uppercase tracking-wider text-[11px] font-bold text-muted-foreground">
-                Validity & Posting Schedule
-              </span>
-            </div>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-              <div className="col-span-2">
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Effective Period
-                </dt>
-                <dd className="font-mono font-semibold text-foreground mt-0.5">
-                  {currentScheme.effectiveFrom} &rarr; {currentScheme.effectiveTo || "Ongoing / Open"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Posting Day
-                </dt>
-                <dd className="font-semibold text-foreground mt-0.5">
-                  {currentScheme.posting.postingDayOfMonth}th of month
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Audit Version
-                </dt>
-                <dd className="font-mono font-semibold text-foreground mt-0.5">
-                  {currentScheme.version} ({currentScheme.status})
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* The 7 Required Scheme Master Tabs                             */}
-      {/* ------------------------------------------------------------- */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
-        <div className="border-b">
-          <TabsList className="bg-transparent h-10 p-0 space-x-1 sm:space-x-2 overflow-x-auto justify-start">
-            <TabsTrigger
-              value="rules"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              1. Rules ({currentScheme.rules.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="rates"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              2. Rate Tables ({currentScheme.rateItems.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="slabs"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              3. Slabs ({currentScheme.slabs.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="exclusions"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              4. Exclusions
-            </TabsTrigger>
-            <TabsTrigger
-              value="posting"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              5. Posting (SAP B1)
-            </TabsTrigger>
-            <TabsTrigger
-              value="versions"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              6. Versions ({currentScheme.versions.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer"
-            >
-              7. History ({currentScheme.history.length})
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 1: RULES GRID (Rule, Parameter, Value, Source)             */}
+{/* TAB 1: RULES GRID (Rule, Parameter, Value, Source)             */}
         {/* ------------------------------------------------------------- */}
         <TabsContent value="rules" className="mt-0 focus-visible:outline-none space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-lg border">
@@ -2123,47 +2085,54 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
 
           <div className="rounded-lg border bg-card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b bg-muted/60 font-semibold text-muted-foreground uppercase tracking-wider">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="border-b bg-[#e8eaf0]/70 dark:bg-muted/50 font-semibold text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3">Rule</th>
-                    <th className="px-4 py-3">Parameter</th>
-                    <th className="px-4 py-3">Value</th>
-                    <th className="px-4 py-3">Source</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-3 py-2 w-10 text-center border-r">#</th>
+                    <th className="px-3 py-2 border-r">Rule</th>
+                    <th className="px-3 py-2 border-r">Parameter</th>
+                    <th className="px-3 py-2 border-r">Value</th>
+                    <th className="px-3 py-2 border-r">Source</th>
+                    {!isActiveLocked && <th className="px-3 py-2 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {currentScheme.rules.map((r) => (
-                    <tr key={r.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-foreground flex items-center gap-2">
-                        <CheckCircle2 size={13} className="text-primary shrink-0" />
-                        <span>{r.rule}</span>
+                  {currentScheme.rules.map((r, idx) => (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <td className="px-3 py-2 text-center text-muted-foreground font-mono border-r">
+                        {idx + 1}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground font-mono">{r.parameter}</td>
-                      <td className="px-4 py-3 font-bold text-foreground">{r.value}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground border">
-                          {r.source}
-                        </span>
+                      <td className="px-3 py-2 font-medium text-foreground border-r">
+                        {r.rule}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={isActiveLocked}
-                          onClick={() => handleDeleteRule(r.id)}
-                          className="h-7 text-xs text-destructive hover:bg-destructive-soft disabled:opacity-30 cursor-pointer"
-                        >
-                          Remove
-                        </Button>
+                      <td className="px-3 py-2 text-foreground font-mono border-r">
+                        {r.parameter}
                       </td>
+                      <td className="px-3 py-2 text-foreground border-r font-medium">
+                        {r.value}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground font-mono border-r">
+                        {r.source}
+                      </td>
+                      {!isActiveLocked && (
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isActiveLocked}
+                            onClick={() => handleDeleteRule(r.id)}
+                            className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive-soft cursor-pointer"
+                          >
+                            Remove
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {currentScheme.rules.length === 0 && (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-4 py-8 text-center text-xs text-muted-foreground"
                       >
                         No rules configured for this scheme yet. Click "Add Rule" to add parameters.
@@ -2587,6 +2556,159 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
           </div>
         </TabsContent>
       </Tabs>
+        {/* Bottom Action Bar (matching exact sample buttons from INC-SCR-01 specification) */}
+        <div className="p-3 sm:p-4 border-t bg-[#f4f5f8] dark:bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+          {/* Left Button Group: Save, Close, Add, Copy to New Version, Activate, Deactivate, Export */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button
+              size="sm"
+              disabled={isSaving}
+              onClick={handleSaveSchemeToDb}
+              className="h-7 px-4 text-xs font-semibold bg-[#faebbf] hover:bg-[#f5e09f] text-[#5c4300] border border-[#d6ba6d] cursor-pointer shadow-2xs"
+              title="Save Scheme to PostgreSQL"
+            >
+              <Save size={12} className={isSaving ? "animate-spin mr-1" : "mr-1"} />
+              <span>{isSaving ? "Saving..." : "Save"}</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onBack?.()}
+              className="h-7 px-4 text-xs font-medium bg-[#faebbf]/70 hover:bg-[#faebbf] text-[#5c4300] border border-[#d6ba6d] cursor-pointer"
+              title="Close and return"
+            >
+              <span>Close</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const defaultDiv = availableDivisions[0] || "Commercial HVAC";
+                setNewSchemeForm({
+                  schemeCode: `SCH-${defaultDiv.substring(0, 3).toUpperCase()}-2026`,
+                  schemeName: "",
+                  division: defaultDiv,
+                  schemeType: "Turnover Tier + Slabs",
+                  participantRole: "Retail Sales Executive",
+                  calculationBasis: "Billed Revenue (Excl. Tax)",
+                  ageBasis: "Invoice Date",
+                  payableLagMonths: 1,
+                  effectiveFrom: "2026-07-01",
+                  effectiveTo: "2026-12-31",
+                  status: "Draft",
+                  version: "v1.0",
+                  description: "",
+                });
+                setIsAddModalOpen(true);
+              }}
+              className="h-7 px-3 text-xs font-medium bg-[#f0edfa] hover:bg-[#e4ddf7] text-[#4a3a80] border border-[#c7bde8] cursor-pointer"
+              title="Add New Scheme"
+            >
+              <span>Add</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const verNum = parseFloat(currentScheme.version.replace("v", "")) || 1.0;
+                setCopyVersionForm({
+                  newVersion: `${verNum + 1}`,
+                  effectiveFrom: "2027-01-01",
+                  effectiveTo: "2027-12-31",
+                  changeSummary: `New version created from ${currentScheme.version} for upcoming policy update.`,
+                });
+                setIsCopyModalOpen(true);
+              }}
+              className="h-7 px-3 text-xs font-medium bg-[#f0edfa] hover:bg-[#e4ddf7] text-[#4a3a80] border border-[#c7bde8] cursor-pointer"
+              title="Copy to New Version"
+            >
+              <span>Copy to New Version</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentScheme.status === "Active"}
+              onClick={() => setIsActivateModalOpen(true)}
+              className="h-7 px-3 text-xs font-medium bg-[#f0edfa] hover:bg-[#e4ddf7] text-[#4a3a80] border border-[#c7bde8] cursor-pointer disabled:opacity-40"
+              title="Activate Scheme"
+            >
+              <span>Activate</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentScheme.status !== "Active"}
+              onClick={() => setIsDeactivateModalOpen(true)}
+              className="h-7 px-3 text-xs font-medium bg-[#f0edfa] hover:bg-[#e4ddf7] text-[#4a3a80] border border-[#c7bde8] cursor-pointer disabled:opacity-40"
+              title="Deactivate Scheme"
+            >
+              <span>Deactivate</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              className="h-7 px-3 text-xs font-medium bg-[#f0edfa] hover:bg-[#e4ddf7] text-[#4a3a80] border border-[#c7bde8] cursor-pointer"
+              title="Export Full Definition"
+            >
+              <span>Export Excel / PDF</span>
+            </Button>
+          </div>
+
+          {/* Right Button Group: Separate Export to Excel and Export to PDF buttons */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              className="h-7 px-3.5 text-xs font-medium bg-background border border-[#8ec5a5] text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer shadow-2xs"
+            >
+              <span>Export to Excel</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("pdf")}
+              className="h-7 px-3.5 text-xs font-medium bg-background border border-[#8ec5a5] text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer shadow-2xs"
+            >
+              <span>Export to PDF</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Legend Bar & Sample Screen Reference */}
+        <div className="px-4 py-2 bg-[#e8eaf0]/60 dark:bg-muted/30 border-t flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-border bg-background rounded-xs" />
+              <span>Standard</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-[#d6ba6d] bg-[#faebbf] rounded-xs" />
+              <span>UDF</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-[#8ec5a5] bg-[#eef7f2] rounded-xs" />
+              <span>UDT/UDO form field</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-[#c7bde8] bg-[#f0edfa] rounded-xs" />
+              <span>Add-on tab / button / field</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-4 w-full sm:w-auto text-[10px] font-mono">
+            <span>Sample Screen - For Illustration | INC-SCR-01 | Incentive Scheme Master</span>
+            <span className="opacity-80">B1 Add-on Form · Scheme UDO + add-on form</span>
+          </div>
+        </div>
+      </div>
+
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL 1: ADD SCHEME (Incentive Administrator)                 */}
