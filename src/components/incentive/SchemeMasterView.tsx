@@ -1642,10 +1642,7 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
               <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
                 Incentive Scheme Master
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Define incentive and commission schemes, participants, calculation basis,
-                calculation method, period and posting rules.
-              </p>
+             
             </div>
           </div>
 
