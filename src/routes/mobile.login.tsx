@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Smartphone,
   Headset,
@@ -18,6 +18,7 @@ import { readStoredTechnicianSession } from "@/lib/app-initializer";
 import { isOfflineForTransactions } from "@/lib/offline-db";
 import { refreshMobileJobsFromServer } from "@/lib/mobile-offline-bridge";
 import {
+  ensureSessionOfflineBootstrap,
   runOfflineBootstrap,
   subscribeBootstrapProgress,
   type BootstrapProgress,
@@ -64,6 +65,7 @@ function MobileLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bootstrap, setBootstrap] = useState<BootstrapProgress | null>(null);
   const [holdForBootstrap, setHoldForBootstrap] = useState(false);
+  const returningBootstrapDone = useRef(false);
 
   useEffect(() => {
     return subscribeBootstrapProgress((progress) => {
@@ -79,13 +81,27 @@ function MobileLoginPage() {
       bootstrap.phase !== "error" &&
       bootstrap.phase !== "ready");
 
-  // If the user previously saved login ("Keep me signed in") on this device,
-  // skip the login prompt and go directly to the Mobile PWA home screen!
+  // Keep-me-signed-in: still prefetch ALL APIs/pages while online before entering the app.
   useEffect(() => {
-    if (authReady && isAuthenticated && !isBootstrapping && !holdForBootstrap) {
-      navigate({ to: "/mobile", replace: true });
-    }
-  }, [authReady, isAuthenticated, navigate, isBootstrapping, holdForBootstrap]);
+    if (!authReady || !isAuthenticated || returningBootstrapDone.current) return;
+    returningBootstrapDone.current = true;
+    let cancelled = false;
+    void (async () => {
+      if (!isOfflineForTransactions() && navigator.onLine) {
+        setHoldForBootstrap(true);
+        try {
+          await ensureSessionOfflineBootstrap({ force: true });
+        } catch (err) {
+          console.warn("[Login] Returning-session bootstrap partial:", err);
+        }
+        if (!cancelled) setHoldForBootstrap(false);
+      }
+      if (!cancelled) navigate({ to: "/mobile", replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isAuthenticated, navigate]);
 
   if (!authReady && !isBootstrapping) {
     return null;
@@ -154,6 +170,7 @@ function MobileLoginPage() {
 
       await refreshMobileJobsFromServer();
       void syncManager.triggerSync("post_login");
+      returningBootstrapDone.current = true;
       setHoldForBootstrap(false);
       navigate({ to: "/mobile", replace: true });
     } catch {

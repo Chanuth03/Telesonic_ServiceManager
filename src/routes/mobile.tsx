@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { AppInitializer } from "@/components/mobile/AppInitializer";
 import { SyncStatusBadge } from "@/components/mobile/SyncStatusBadge";
+import { ensureSessionOfflineBootstrap } from "@/lib/offline-bootstrap";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
 import { warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
 import { syncManager } from "@/lib/sync-manager";
@@ -31,8 +32,24 @@ function MobileLayout() {
       }, 800);
     };
 
-    void startMobileOfflineBridge().then(() => scheduleWarm("mobile_layout"));
-    const onOnline = () => scheduleWarm("network_online");
+    void (async () => {
+      await startMobileOfflineBridge();
+      // While online, prefetch any APIs/pages still missing so offline ≠ "only visited pages".
+      if (syncManager.getIsOnline() && !window.location.pathname.endsWith("/mobile/login")) {
+        try {
+          await ensureSessionOfflineBootstrap({ force: false });
+        } catch (err) {
+          console.warn("[Mobile] Session offline bootstrap skipped:", err);
+        }
+      }
+      scheduleWarm("mobile_layout");
+    })();
+
+    const onOnline = () => {
+      void ensureSessionOfflineBootstrap({ force: true }).finally(() =>
+        scheduleWarm("network_online"),
+      );
+    };
     const onDexie = () => scheduleWarm("dexie_update");
     window.addEventListener("online", onOnline);
     window.addEventListener("telesonic:dexie-update", onDexie);

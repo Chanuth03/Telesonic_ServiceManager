@@ -1,4 +1,3 @@
-import { getMobileJobs } from "@/lib/mobile-data";
 import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
 
 const MOBILE_STATIC_PATHS = [
@@ -16,6 +15,7 @@ const MOBILE_STATIC_PATHS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
+  "/sw.js",
 ];
 
 const JOB_SUBPATHS = [
@@ -29,20 +29,23 @@ const JOB_SUBPATHS = [
   "/completion",
 ] as const;
 
-function collectMobilePaths(): string[] {
-  const jobIds = getMobileJobs(false)
-    .map((job) => job.id)
-    .filter(Boolean)
-    .slice(0, 40);
+export interface WarmOfflineCacheOptions {
+  /** Job IDs already downloaded into Dexie — used so Airplane Mode can open every job screen. */
+  jobIds?: string[];
+}
 
-  const jobPaths = jobIds.flatMap((id) =>
+function collectMobilePaths(jobIds: string[] = []): string[] {
+  const ids = jobIds.filter(Boolean).slice(0, 60);
+
+  const jobPaths = ids.flatMap((id) =>
     JOB_SUBPATHS.map((suffix) => `/mobile/jobs/${encodeURIComponent(id)}${suffix}`),
   );
 
-  // Transactions hub is one SPA route; still warm it so the chunk is cached.
-  const trxPaths = Object.keys(TRANSACTION_PROCESS_MAP).map(
-    (code) => `/transactions?screen=${encodeURIComponent(code)}`,
-  );
+  // Every TRX screen must be reachable offline without visiting it online first.
+  const trxPaths = Object.keys(TRANSACTION_PROCESS_MAP).flatMap((code) => [
+    `/transactions?screen=${encodeURIComponent(code)}`,
+    `/transactions?code=${encodeURIComponent(code)}`,
+  ]);
 
   return Array.from(new Set([...MOBILE_STATIC_PATHS, ...jobPaths, ...trxPaths]));
 }
@@ -66,6 +69,8 @@ async function preloadAppModules(): Promise<void> {
       "/src/lib/offline-*.ts",
       "/src/lib/sync-manager.ts",
       "/src/lib/mobile-*.ts",
+      "/src/lib/warm-mobile-offline-cache.ts",
+      "/src/data/transactionsSpecData.ts",
     ]);
     await Promise.allSettled(Object.values(modules).map((load) => load()));
   } catch (err) {
@@ -73,34 +78,57 @@ async function preloadAppModules(): Promise<void> {
   }
 }
 
+async function fetchInBatches(urls: string[], batchSize = 8): Promise<void> {
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    await Promise.allSettled(
+      batch.map(async (url) => {
+        try {
+          await fetch(url, {
+            credentials: "same-origin",
+            cache: "reload",
+            headers: {
+              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+        } catch {
+          // Ignore individual warm failures.
+        }
+      }),
+    );
+  }
+}
+
 /**
  * While online, visit mobile + transaction URLs and preload JS modules so
- * Airplane Mode / data-off can open the same screens later from cache.
+ * Airplane Mode / data-off can open the same screens later from cache —
+ * including screens the user has never opened in this session.
  */
-export async function warmMobileOfflineCache(reason = "startup"): Promise<void> {
+export async function warmMobileOfflineCache(
+  reason = "startup",
+  options: WarmOfflineCacheOptions = {},
+): Promise<void> {
   if (typeof window === "undefined") return;
   if (!navigator.onLine) return;
 
-  const paths = collectMobilePaths();
+  let jobIds = options.jobIds || [];
+  if (jobIds.length === 0) {
+    try {
+      const { getDexieJobs } = await import("@/lib/offline-db");
+      const jobs = await getDexieJobs();
+      jobIds = jobs.map((j) => j.id).filter(Boolean);
+    } catch {
+      // ignore — still warm static + TRX shells
+    }
+  }
+
+  const paths = collectMobilePaths(jobIds);
   console.log(`[OfflineCache] Warming ${paths.length} URLs + modules (${reason})`);
 
   await preloadAppModules();
 
   const absolute = paths.map((path) => new URL(path, window.location.origin).href);
-
-  await Promise.allSettled(
-    absolute.map(async (url) => {
-      try {
-        await fetch(url, {
-          credentials: "same-origin",
-          cache: "reload",
-          headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
-        });
-      } catch {
-        // Ignore individual warm failures.
-      }
-    }),
-  );
+  await fetchInBatches(absolute, 8);
 
   // Cache whatever the browser already downloaded (route chunks, CSS, icons).
   const loaded = performance
@@ -112,6 +140,7 @@ export async function warmMobileOfflineCache(reason = "startup"): Promise<void> 
 
   try {
     localStorage.setItem("telesonic_offline_cache_warmed_at", new Date().toISOString());
+    localStorage.setItem("telesonic_offline_cache_warmed_paths", String(paths.length));
   } catch {
     // ignore
   }
