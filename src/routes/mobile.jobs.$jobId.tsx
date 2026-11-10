@@ -7,7 +7,6 @@ import {
   UserCheck,
   Phone,
   AlertTriangle,
-  CheckCircle,
   XCircle,
   FileText,
   Wrench,
@@ -20,7 +19,6 @@ import {
   Camera,
   PenTool,
   PauseCircle,
-  X,
   ChevronRight,
   ShieldCheck,
   Building,
@@ -28,11 +26,9 @@ import {
 import {
   getMobileJobById,
   subscribeMobileJobs,
-  updateMobileJobStatus,
   type MobileJob,
   type MobileJobStatus,
 } from "@/lib/mobile-data";
-import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mobile/jobs/$jobId")({
   head: ({ params }) => ({
@@ -94,7 +90,6 @@ function MobileJobDetailScreen() {
   const { jobId } = Route.useParams();
   const [job, setJob] = useState<MobileJob | undefined>(() => getMobileJobById(jobId));
   const [activeTab, setActiveTab] = useState<"overview" | "components" | "history">("overview");
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setJob(getMobileJobById(jobId));
@@ -102,13 +97,6 @@ function MobileJobDetailScreen() {
       setJob(getMobileJobById(jobId));
     });
   }, [jobId]);
-
-  const handleAccept = () => {
-    if (!job) return;
-    updateMobileJobStatus(job.id, "Accepted");
-    setFeedbackMessage(`Job ${job.id} accepted. Status updated.`);
-    setTimeout(() => setFeedbackMessage(null), 4000);
-  };
 
   if (!job) {
     return (
@@ -252,20 +240,6 @@ function MobileJobDetailScreen() {
           </span>
         </div>
 
-        {/* Accept action for Assigned status */}
-        {job.status === "Assigned" && (
-          <div className="flex items-center gap-2 bg-info-soft/50 p-2.5 rounded-lg border border-info/20">
-            <Button
-              size="sm"
-              className="w-full text-xs bg-success text-success-foreground hover:bg-success/90 h-8 font-semibold shadow-2xs"
-              onClick={handleAccept}
-            >
-              <CheckCircle size={14} className="mr-1.5" />
-              Accept Job
-            </Button>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground bg-muted/40 p-3 rounded-lg border border-border/40">
           <div className="flex items-center gap-2">
             <MapPin size={14} className="text-primary shrink-0" />
@@ -309,21 +283,6 @@ function MobileJobDetailScreen() {
           </div>
         )}
       </div>
-
-      {feedbackMessage && (
-        <div className="flex items-center justify-between rounded-lg bg-primary-soft p-3 text-xs text-primary border border-primary/20 animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={16} />
-            <span>{feedbackMessage}</span>
-          </div>
-          <button
-            onClick={() => setFeedbackMessage(null)}
-            className="text-primary hover:text-foreground"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
 
       {/* Tabs for Details, Equipment, Service History */}
       <div className="flex rounded-lg bg-muted p-1 text-xs font-medium border border-border/40">
