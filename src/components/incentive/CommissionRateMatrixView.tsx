@@ -449,6 +449,25 @@ export function CommissionRateMatrixView({
     creditGt45: 1.0,
   });
 
+  // Switch between Approved and Draft Matrix modes
+  const handleSwitchStatus = (newStatus: MatrixStatus) => {
+    if (newStatus === "Draft") {
+      const draftVer = selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4";
+      setStatus("Draft");
+      setSelectedVersion(draftVer);
+      toast.info(`Switched to Draft Matrix (Version ${draftVer})`, {
+        description: "Cells are unlocked. Click any cell to modify rates or import from Excel.",
+      });
+    } else {
+      const approvedVer = selectedScheme === "RLC-REP-PAY" ? "3" : "v3.3";
+      setStatus("Approved");
+      setSelectedVersion(approvedVer);
+      toast.success(`Switched to Approved Matrix (Version ${approvedVer})`, {
+        description: "Viewing certified read-only rates currently active for calculations.",
+      });
+    }
+  };
+
   // Load Commission Rate Matrix from PostgreSQL
   const loadMatrixFromDb = async (silent: boolean = false) => {
     try {
@@ -457,24 +476,25 @@ export function CommissionRateMatrixView({
       if (res.ok) {
         const data = await res.json();
         if (data.matrices && data.matrices.length > 0) {
-          const mat = data.matrices[0];
-          setMatrixId(mat.id);
-          setMatrixName(mat.matrixName);
-          setSelectedScheme(mat.schemeCode);
-          setSelectedVersion(mat.version);
-          setRowDimension(mat.rowDimension);
-          setColumnDimension(mat.columnDimension);
-          setRateUnit(mat.rateUnit);
-          setCurrency(mat.currency);
-          setStatus(mat.status);
-          if (mat.bands && mat.bands.length > 0) setBands(mat.bands);
-          if (mat.matrixData && mat.matrixData.length > 0) setMatrixData(mat.matrixData);
-          if (mat.history && mat.history.length > 0) setHistory(mat.history);
+          const matching = data.matrices.find(
+            (m: any) => m.schemeCode === selectedScheme,
+          );
+          if (matching) {
+            setMatrixId(matching.id);
+            setMatrixName(matching.matrixName);
+            setSelectedVersion(matching.version);
+            setRowDimension(matching.rowDimension);
+            setColumnDimension(matching.columnDimension);
+            setRateUnit(matching.rateUnit);
+            setCurrency(matching.currency);
+            setStatus(matching.status);
+            if (matching.bands && matching.bands.length > 0) setBands(matching.bands);
+            if (matching.matrixData && matching.matrixData.length > 0) setMatrixData(matching.matrixData);
+            if (matching.history && matching.history.length > 0) setHistory(matching.history);
+          }
           setIsDbConnected(true);
           if (!silent) {
-            toast.success("Synchronized with PostgreSQL database.", {
-              description: `Loaded matrix ${mat.matrixName} (${mat.version}) successfully.`,
-            });
+            toast.success("Synchronized with PostgreSQL database.");
           }
         }
       } else {
@@ -789,7 +809,7 @@ export function CommissionRateMatrixView({
   };
 
   const handleCreateNewDraftVersion = () => {
-    const nextVer = "v3.3";
+    const nextVer = selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4";
     setSelectedVersion(nextVer);
     setStatus("Draft");
 
@@ -1042,6 +1062,36 @@ export function CommissionRateMatrixView({
                   <span className="text-xs bg-muted px-2 py-0.5 rounded font-mono font-medium text-muted-foreground border">
                     {selectedVersion}
                   </span>
+
+                  {/* Status Toggle Pill: Approved Matrix vs Draft Matrix */}
+                  <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg border text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchStatus("Approved")}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        status === "Approved"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="View Approved Version"
+                    >
+                      <CheckCircle2 size={12} />
+                      <span>Approved (v{selectedScheme === "RLC-REP-PAY" ? "3" : "3.3"})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchStatus("Draft")}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        status === "Draft"
+                          ? "bg-amber-500 text-white shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="View Draft Version"
+                    >
+                      <Clock size={12} />
+                      <span>Draft Matrix (v{selectedScheme === "RLC-REP-PAY" ? "3.1" : "3.4"})</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1202,28 +1252,30 @@ export function CommissionRateMatrixView({
 
             {/* Right Column: Version, Column Dimension, Currency */}
             <div className="space-y-4">
-              {/* 4. Version */}
+              {/* 4. Version & Status Selector */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Version <span className="text-destructive font-bold">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={selectedVersion}
-                    readOnly={status === "Approved"}
-                    onChange={(e) => setSelectedVersion(e.target.value)}
-                    className={`w-full text-xs rounded-md border border-input px-2.5 py-1.5 font-mono shadow-xs ${
-                      status === "Approved"
-                        ? "bg-muted text-muted-foreground cursor-not-allowed"
-                        : "bg-background"
-                    }`}
-                    placeholder="e.g. 3 or v3.2"
-                  />
-                  {status === "Approved" && (
-                    <Lock size={12} className="absolute right-2.5 top-2.5 text-muted-foreground" />
-                  )}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Version <span className="text-destructive font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">Select Version to View</span>
                 </div>
+                <select
+                  value={status}
+                  onChange={(e) => handleSwitchStatus(e.target.value as MatrixStatus)}
+                  className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium shadow-xs focus:ring-1 focus:ring-ring cursor-pointer ${
+                    status === "Draft"
+                      ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
+                      : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
+                  }`}
+                >
+                  <option value="Approved">
+                    Version {selectedScheme === "RLC-REP-PAY" ? "3" : "v3.3"} — Approved (Current Active)
+                  </option>
+                  <option value="Draft">
+                    Version {selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4"} — Draft (Work in Progress / Editable)
+                  </option>
+                </select>
               </div>
 
               {/* 5. Column Dimension */}
