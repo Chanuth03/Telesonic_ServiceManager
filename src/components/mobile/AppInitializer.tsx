@@ -23,12 +23,45 @@ export function AppInitializer({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Never leave the technician on a forever spinner if startup hangs.
+    const safety = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 4000);
 
     void (async () => {
       const path = window.location.pathname;
       try {
-        const result = await resolveTechnicianStartup();
+        const result = await Promise.race([
+          resolveTechnicianStartup(),
+          new Promise<"timeout">((resolve) => {
+            window.setTimeout(() => resolve("timeout"), 3500);
+          }),
+        ]);
         if (cancelled) return;
+
+        if (result === "timeout") {
+          const remembered =
+            localStorage.getItem("telesonic_remember_session") === "true" &&
+            !!localStorage.getItem("auth_user");
+          if (remembered) {
+            try {
+              const raw = localStorage.getItem("auth_user");
+              const token = localStorage.getItem("auth_token") || "offline-session";
+              if (raw) {
+                const user = JSON.parse(raw);
+                await loginRef.current(user, token, true);
+              }
+            } catch {
+              // ignore
+            }
+            if (path === "/mobile/login") {
+              void navigateRef.current({ to: "/mobile", replace: true });
+            }
+          } else if (path !== "/mobile/login") {
+            void navigateRef.current({ to: "/mobile/login", replace: true });
+          }
+          return;
+        }
 
         if (result.status === "authenticated") {
           await loginRef.current(result.user, result.token, result.remember);
@@ -44,23 +77,29 @@ export function AppInitializer({ children }: { children: ReactNode }) {
             }
           }
         } else {
-          // Never wipe a remembered offline session just because startup could not
-          // reach the API. Only clear credentials when we are online and the server
-          // rejected the token (handled inside resolveTechnicianStartup → login).
           const offline = isOfflineForTransactions();
           const remembered =
             localStorage.getItem("telesonic_remember_session") === "true" &&
             !!localStorage.getItem("auth_user");
 
-          if (offline && remembered) {
-            // Stay on whatever screen we can; do not force login while offline.
+          if ((offline || !navigator.onLine) && remembered) {
+            try {
+              const raw = localStorage.getItem("auth_user");
+              const token = localStorage.getItem("auth_token") || "offline-session";
+              if (raw) {
+                const user = JSON.parse(raw);
+                await loginRef.current(user, token, true);
+              }
+            } catch {
+              // ignore
+            }
             if (path === "/mobile/login") {
               void navigateRef.current({ to: "/mobile", replace: true });
             }
           } else {
             const hadStoredToken =
               !!localStorage.getItem("auth_token") || !!sessionStorage.getItem("auth_token");
-            if (hadStoredToken && !offline) await logoutRef.current();
+            if (hadStoredToken && !offline && navigator.onLine) await logoutRef.current();
             if (path !== "/mobile/login") {
               void navigateRef.current({ to: "/mobile/login", replace: true });
             }
@@ -68,6 +107,15 @@ export function AppInitializer({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("[AppInitializer] Startup failed; continuing with local session if any:", err);
+        try {
+          const raw = localStorage.getItem("auth_user");
+          const token = localStorage.getItem("auth_token");
+          if (raw && token && localStorage.getItem("telesonic_remember_session") === "true") {
+            await loginRef.current(JSON.parse(raw), token, true);
+          }
+        } catch {
+          // ignore
+        }
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -75,6 +123,7 @@ export function AppInitializer({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(safety);
     };
   }, []);
 

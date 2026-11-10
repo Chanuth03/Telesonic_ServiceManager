@@ -49,90 +49,64 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
-  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
-    if (offline) return;
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    // Clear any previous recovery counter so the user is never permanently stuck.
+    try {
+      sessionStorage.removeItem("telesonic_offline_recover");
+    } catch {
+      // ignore
+    }
+    if (!offline) {
+      reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    }
   }, [error, offline]);
 
-  // Offline: do not leave the technician on a dead-end error page.
-  // Reset the boundary and reopen the cached mobile shell (with loop guard).
-  useEffect(() => {
-    if (!offline || recovering) return;
-    setRecovering(true);
-    let attempts = 0;
+  const reopenMobile = () => {
     try {
-      attempts = Number(sessionStorage.getItem("telesonic_offline_recover") || "0");
+      reset();
+      void router.invalidate();
     } catch {
-      attempts = 0;
+      // ignore
     }
-    if (attempts >= 3) return;
-
-    const timer = window.setTimeout(() => {
-      try {
-        sessionStorage.setItem("telesonic_offline_recover", String(attempts + 1));
-      } catch {
-        // ignore
-      }
-      try {
-        reset();
-        void router.invalidate();
-      } catch {
-        // ignore
-      }
-      window.location.replace("/mobile");
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [offline, recovering, reset, router]);
-
-  if (offline) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="max-w-md text-center space-y-3">
-          <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Opening offline mode…
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Loading your on-device jobs and transactions. Saves stay on this phone until
-            connection returns.
-          </p>
-          <a
-            href="/mobile"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
-            Continue offline
-          </a>
-        </div>
-      </div>
-    );
-  }
+    window.location.assign("/mobile");
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+      <div className="max-w-md text-center space-y-4">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {offline ? "Connection lost" : "This page didn't load"}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+        <p className="text-sm text-muted-foreground">
+          {offline
+            ? "You can keep working from data saved on this phone. Open the mobile app below."
+            : "Something went wrong. Open the mobile app or try again."}
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            type="button"
+            onClick={reopenMobile}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
-            Try again
+            Open mobile app
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              reset();
+              void router.invalidate();
+              window.location.reload();
+            }}
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Reload
           </button>
           <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            href="/mobile/login"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
           >
-            Go home
+            Sign in again
           </a>
         </div>
       </div>
