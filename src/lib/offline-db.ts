@@ -263,12 +263,27 @@ let dbReadyPromise: Promise<void> | null = null;
 export async function ensureOfflineDatabaseReady(): Promise<void> {
   if (dbReadyPromise) return dbReadyPromise;
   dbReadyPromise = (async () => {
-    await offlineDB.open();
-    await requestPersistentStorage();
-    await ensureOfflineReferenceData();
+    // iPhone Safari can hang on IndexedDB open in private mode / low storage.
+    await Promise.race([
+      offlineDB.open(),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("IndexedDB open timeout")), 4000);
+      }),
+    ]);
+    try {
+      await requestPersistentStorage();
+    } catch {
+      // iOS often denies persistence — app must still work.
+    }
+    try {
+      await ensureOfflineReferenceData();
+    } catch (err) {
+      console.warn("[Dexie] Reference seed skipped:", err);
+    }
   })().catch((err) => {
+    console.error("[Dexie] Offline DB init failed (continuing without block):", err);
     dbReadyPromise = null;
-    throw err;
+    // Do not rethrow — mobile UI must remain usable on iPhone even if IDB fails once.
   });
   return dbReadyPromise;
 }

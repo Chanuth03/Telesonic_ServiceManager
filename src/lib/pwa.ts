@@ -44,9 +44,20 @@ export function initPwa() {
   });
 
   if ("serviceWorker" in navigator && import.meta.env.PROD) {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-      /* Install stays unavailable if the worker cannot register. */
-    });
+    // iPhone Safari: register ASAP and force update so offline cache is available
+    // after the first online visit (Add to Home Screen recommended).
+    const register = () => {
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/" })
+        .then((reg) => {
+          void reg.update();
+        })
+        .catch(() => {
+          /* Install stays unavailable if the worker cannot register. */
+        });
+    };
+    if (document.readyState === "complete") register();
+    else window.addEventListener("load", register, { once: true });
   }
 }
 

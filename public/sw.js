@@ -1,5 +1,6 @@
 // Telesonic Service Worker — keep the real SPA working when data/Wi‑Fi is off
-const CACHE_NAME = "telesonic-pwa-v8";
+const CACHE_NAME = "telesonic-pwa-v9-ios";
+const PREV_CACHE_NAME = "telesonic-pwa-v8";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -41,8 +42,14 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      // iPhone: keep the previous cache for one generation so a mid-update
+      // offline launch still has JS/CSS. Delete only older leftovers.
       const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+      await Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME && key !== PREV_CACHE_NAME)
+          .map((key) => caches.delete(key)),
+      );
       await self.clients.claim();
     })(),
   );
@@ -95,16 +102,17 @@ function isStaticAsset(request) {
   );
 }
 
-/** Prefer a cached SPA document (with JS), never a dead-end offline HTML card. */
+/** Prefer a cached SPA document (with JS). Check current + previous cache (iOS). */
 async function cachedAppShell() {
-  return (
-    (await caches.match("/mobile", { ignoreSearch: true })) ||
-    (await caches.match("/mobile/", { ignoreSearch: true })) ||
-    (await caches.match("/", { ignoreSearch: true })) ||
-    (await caches.match("/transactions", { ignoreSearch: true })) ||
-    (await caches.match("/mobile/jobs", { ignoreSearch: true })) ||
-    (await caches.match("/mobile/login", { ignoreSearch: true }))
-  );
+  const keys = ["/mobile", "/mobile/", "/", "/transactions", "/mobile/jobs", "/mobile/login"];
+  for (const key of keys) {
+    const hit =
+      (await caches.match(key, { ignoreSearch: true, cacheName: CACHE_NAME })) ||
+      (await caches.match(key, { ignoreSearch: true, cacheName: PREV_CACHE_NAME })) ||
+      (await caches.match(key, { ignoreSearch: true }));
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 async function putInCache(request, response) {
