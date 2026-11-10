@@ -522,6 +522,21 @@ export function CommissionRateMatrixView({
         const data = await res.json();
         if (data.matrices && Array.isArray(data.matrices)) {
           setAllMatrices(data.matrices);
+
+          // Merge any schemes from persisted matrices into availableSchemes
+          setAvailableSchemes((prev) => {
+            const map = new Map(prev.map((s) => [s.schemeCode, s.schemeName]));
+            for (const m of data.matrices) {
+              if (!map.has(m.schemeCode)) {
+                map.set(m.schemeCode, m.matrixName || `${m.schemeCode} Commission Scheme`);
+              }
+            }
+            return Array.from(map.entries()).map(([schemeCode, schemeName]) => ({
+              schemeCode,
+              schemeName,
+            }));
+          });
+
           const currentScheme = targetScheme || selectedScheme;
           const schemeMatches = data.matrices.filter((m: any) => m.schemeCode === currentScheme);
           if (schemeMatches.length > 0) {
@@ -1184,67 +1199,32 @@ export function CommissionRateMatrixView({
       {/* Main Header Card with Mandatory Fields & Actions */}
       <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
         {/* Top Header Bar */}
-        <div className="p-5 sm:p-6 border-b bg-muted/20 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-info-soft text-info flex items-center justify-center font-bold">
-                <Layers size={20} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                    Commission Rate Matrix
-                  </h1>
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                      status === "Draft"
-                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                    }`}
-                  >
-                    {status === "Draft" ? (
-                      <>
-                        <Clock size={12} /> Draft
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={12} /> Approved
-                      </>
-                    )}
-                  </span>
-                  <span className="text-xs bg-muted px-2 py-0.5 rounded font-mono font-medium text-muted-foreground border">
-                    {selectedVersion}
-                  </span>
-
-                  {/* Dynamic Version Selector for Current Scheme */}
-                  <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg border text-xs flex-wrap">
-                    {currentSchemeMatrices.length > 0 ? (
-                      currentSchemeMatrices.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => applyMatrix(m)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                            matrixId === m.id
-                              ? m.status === "Approved"
-                                ? "bg-emerald-600 text-white shadow-xs"
-                                : "bg-amber-500 text-white shadow-xs"
-                              : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-                          }`}
-                          title={`Switch to version ${m.version} (${m.status})`}
-                        >
-                          {m.status === "Approved" ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                          <span>{m.status === "Approved" ? "Approved" : "Draft"} (v{m.version})</span>
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground px-2 py-0.5 font-medium">
-                        (No matrix saved in PostgreSQL)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+        <div className="p-4 sm:p-5 border-b bg-muted/15 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary flex items-center justify-center font-bold shadow-2xs">
+              <Layers size={18} />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold tracking-tight text-foreground">
+                Commission Rate Matrix
+              </h1>
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  status === "Draft"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                }`}
+              >
+                {status === "Draft" ? (
+                  <>
+                    <Clock size={12} /> Draft
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={12} /> Approved
+                  </>
+                )}
+              </span>
             </div>
           </div>
 
@@ -1267,7 +1247,7 @@ export function CommissionRateMatrixView({
               variant="outline"
               size="icon"
               onClick={() => setShowExportModal(true)}
-              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
               title="Export Matrix"
             >
               <Download size={14} />
@@ -1279,7 +1259,7 @@ export function CommissionRateMatrixView({
               size="sm"
               onClick={() => setShowImportModal(true)}
               disabled={status !== "Draft"}
-              className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-background"
+              className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
               title={
                 status !== "Draft"
                   ? "Import only allowed in Draft state"
@@ -1299,7 +1279,7 @@ export function CommissionRateMatrixView({
                 className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
               >
                 {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+                <span>Save Changes</span>
               </Button>
             )}
 
@@ -1309,7 +1289,7 @@ export function CommissionRateMatrixView({
                 size="sm"
                 onClick={() => setShowApprovalModal(true)}
                 disabled={isSaving}
-                className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
               >
                 <CheckCircle2 size={14} />
                 <span>Approve Matrix</span>
@@ -1319,7 +1299,7 @@ export function CommissionRateMatrixView({
                 size="sm"
                 onClick={handleCreateNewDraftVersion}
                 disabled={isSaving}
-                className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
+                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs"
                 title="Create a new draft version and save immediately to PostgreSQL"
               >
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -1327,7 +1307,7 @@ export function CommissionRateMatrixView({
               </Button>
             )}
 
-            {/* + New Matrix Button */}
+            {/* New Matrix Button */}
             <Button
               variant="outline"
               size="sm"
@@ -1344,11 +1324,11 @@ export function CommissionRateMatrixView({
                 });
                 setShowNewMatrixModal(true);
               }}
-              className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary border-primary/30"
+              className="h-8 gap-1.5 text-xs font-semibold cursor-pointer border-dashed hover:border-solid"
               title="Initialize a new rate matrix in PostgreSQL"
             >
               <Plus size={13} />
-              <span>+ New Matrix</span>
+              <span>New Matrix</span>
             </Button>
           </div>
         </div>
@@ -1436,24 +1416,53 @@ export function CommissionRateMatrixView({
                   <label className="text-xs font-semibold text-foreground block">
                     Version <span className="text-destructive font-bold">*</span>
                   </label>
-                  <span className="text-[10px] text-muted-foreground">Select Version to View</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {currentSchemeMatrices.length > 1
+                      ? `${currentSchemeMatrices.length} Versions in Database`
+                      : "Active Version"}
+                  </span>
                 </div>
-                <select
-                  value={status}
-                  onChange={(e) => handleSwitchStatus(e.target.value as MatrixStatus)}
-                  className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium shadow-xs focus:ring-1 focus:ring-ring cursor-pointer ${
-                    status === "Draft"
-                      ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
-                      : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
-                  }`}
-                >
-                  <option value="Approved">
-                    Version {selectedScheme === "RLC-REP-PAY" ? "3" : "v3.3"} — Approved (Current Active)
-                  </option>
-                  <option value="Draft">
-                    Version {selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4"} — Draft (Work in Progress / Editable)
-                  </option>
-                </select>
+                {currentSchemeMatrices.length > 1 ? (
+                  <select
+                    value={matrixId}
+                    onChange={(e) => {
+                      const selected = currentSchemeMatrices.find((m) => m.id === e.target.value);
+                      if (selected) applyMatrix(selected);
+                    }}
+                    className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium shadow-xs focus:ring-1 focus:ring-ring cursor-pointer ${
+                      status === "Draft"
+                        ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
+                        : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
+                    }`}
+                  >
+                    {currentSchemeMatrices.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        Version {m.version} — {m.status} {m.status === "Approved" ? "(Current Active)" : "(Editable Draft)"}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div
+                    className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium flex items-center justify-between shadow-xs ${
+                      status === "Draft"
+                        ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
+                        : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
+                    }`}
+                  >
+                    <span className="font-semibold font-mono">Version {selectedVersion}</span>
+                    <span className="text-[11px] font-semibold flex items-center gap-1">
+                      {status === "Approved" ? (
+                        <>
+                          <CheckCircle2 size={12} className="text-emerald-600" /> Approved (Active)
+                        </>
+                      ) : (
+                        <>
+                          <Clock size={12} className="text-amber-600" /> Draft (In Progress)
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* 5. Column Dimension */}
