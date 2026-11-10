@@ -355,6 +355,12 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       return await handleSessionRequest(request);
     }
 
+    // Public reachability check. Must not require a token — the app calls this
+    // on a timer, and /api/auth/session returns 401 when no bearer is sent.
+    if (path === "/api/health" && method === "GET") {
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+    }
+
     // 1. /api/sync — Synchronization endpoint for Dexie.js offline records to PostgreSQL
     if (path === "/api/sync" && method === "POST") {
       const authRole = request.headers.get("x-auth-role") || "TECHNICIAN";

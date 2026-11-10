@@ -110,8 +110,7 @@ class GlobalSyncManager {
     this.autoSyncInterval = setInterval(() => {
       void this.refreshConnectivity("heartbeat_timer").then(() => {
         if (this.getIsOnline() && this.pendingCount > 0 && this.syncState !== "syncing") {
-          console.log("[SyncManager] Background heartbeat sync triggered for pending records.");
-          this.triggerSync("heartbeat_timer");
+          void this.triggerSync("heartbeat_timer");
         }
       });
     }, 20000);

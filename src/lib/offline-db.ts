@@ -346,14 +346,15 @@ export async function probeBackendReachable(timeoutMs = 3500): Promise<boolean> 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    await window.fetch(`${window.location.origin}/api/auth/session`, {
+    const response = await window.fetch(`${window.location.origin}/api/health`, {
       method: "GET",
       cache: "no-store",
       signal: controller.signal,
       headers: { Accept: "application/json" },
     });
-    setBackendReachable(true);
-    return true;
+    const reachable = response.ok;
+    setBackendReachable(reachable);
+    return reachable;
   } catch {
     setBackendReachable(false);
     return false;
@@ -518,14 +519,40 @@ export async function saveDexieJob(
   return dexieJob;
 }
 
+function isSyncDue(nextRetryAt?: number): boolean {
+  return nextRetryAt == null || nextRetryAt <= Date.now();
+}
+
 /**
- * Fetch all unsynced changes to be pushed to /api/sync
+ * Drop queue rows for transactions that are already on the server.
+ * Those leftovers were counted as "1 update" and never uploaded again.
  */
+export async function reconcileStaleSyncQueue(): Promise<number> {
+  await ensureOfflineDatabaseReady();
+  const queue = await offlineDB.syncQueue
+    .where("status")
+    .anyOf(["pending", "failed", "processing"])
+    .toArray();
+  const staleIds: number[] = [];
+  for (const item of queue) {
+    if (item.action !== "TRANSACTION_UPSERT" && item.action !== "TRANSACTION_DELETE") continue;
+    if (item.id == null || !item.entityId) continue;
+    const tx = await offlineDB.transactions.get(item.entityId);
+    if (!tx || tx.syncStatus === "synced") staleIds.push(item.id);
+  }
+  if (staleIds.length > 0) await offlineDB.syncQueue.bulkDelete(staleIds);
+  return staleIds.length;
+}
+
+/** Fetch unsynced changes that are due to be pushed to /api/sync. */
 export async function getUnsyncedDexieRecords(): Promise<{
   queueItems: DexieSyncQueueItem[];
   pendingJobs: DexieJob[];
 }> {
-  const queueItems = await offlineDB.syncQueue.where("status").equals("pending").toArray();
+  await reconcileStaleSyncQueue();
+  const queueItems = (
+    await offlineDB.syncQueue.where("status").anyOf(["pending", "failed"]).toArray()
+  ).filter((item) => isSyncDue(item.nextRetryAt));
   const pendingJobs = await offlineDB.jobs.where("syncStatus").equals("pending").toArray();
 
   return { queueItems, pendingJobs };
@@ -1267,16 +1294,23 @@ export async function ensureOfflineReferenceData(): Promise<void> {
 export async function getPendingSyncCount(): Promise<number> {
   try {
     await ensureOfflineDatabaseReady();
-    const countJobs = await offlineDB.jobs.where("syncStatus").equals("pending").count();
-    const countQueue = await offlineDB.syncQueue
-      .where("status")
-      .anyOf(["pending", "failed"])
-      .count();
-    const countTx = await offlineDB.transactions
-      .where("syncStatus")
-      .anyOf(["pending", "failed"])
-      .count();
-    return Math.max(countJobs, countQueue, countTx);
+    await reconcileStaleSyncQueue();
+    const { userId } = readActiveUserScope();
+    const queue = (
+      await offlineDB.syncQueue.where("status").anyOf(["pending", "failed"]).toArray()
+    ).filter((item) => {
+      if (!isSyncDue(item.nextRetryAt)) return false;
+      if (item.action === "TRANSACTION_UPSERT" || item.action === "TRANSACTION_DELETE") {
+        return false;
+      }
+      if (item.userId && item.userId !== userId && item.userId !== "anonymous") return false;
+      return true;
+    });
+    const coveredJobs = new Set(queue.map((item) => item.entityId));
+    const jobs = await offlineDB.jobs.where("syncStatus").equals("pending").toArray();
+    const orphanJobs = jobs.filter((job) => !coveredJobs.has(job.id));
+    const transactions = await getPendingTransactionRecords(userId);
+    return queue.length + orphanJobs.length + transactions.length;
   } catch {
     return 0;
   }

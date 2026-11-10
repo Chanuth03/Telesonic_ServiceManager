@@ -35,7 +35,8 @@ export function UnsyncedDataGuard() {
     };
   }, []);
 
-  const hasUnsynced = status.pendingCount > 0 || status.syncState === "syncing";
+  const isSyncing = status.syncState === "syncing";
+  const hasUnsynced = status.pendingCount > 0 || isSyncing;
   const isOffline = !status.isOnline;
 
   return (
@@ -47,12 +48,16 @@ export function UnsyncedDataGuard() {
             {isOffline ? (
               <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 animate-pulse" />
             ) : (
-              <RefreshCw className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 animate-spin" />
+              <RefreshCw
+                className={`h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 ${isSyncing ? "animate-spin" : ""}`}
+              />
             )}
             <span>
               {isOffline
                 ? `You have ${status.pendingCount} offline update${status.pendingCount > 1 ? "s" : ""} saved on this device. Turn mobile data or Wi‑Fi back on to sync.`
-                : `Syncing ${status.pendingCount} update${status.pendingCount > 1 ? "s" : ""} to the server... Please do not refresh.`}
+                : isSyncing
+                  ? `Syncing ${status.pendingCount} update${status.pendingCount > 1 ? "s" : ""} to the server... Please do not refresh.`
+                  : `${status.pendingCount} saved change${status.pendingCount > 1 ? "s" : ""} will upload automatically.`}
             </span>
           </div>
         </div>

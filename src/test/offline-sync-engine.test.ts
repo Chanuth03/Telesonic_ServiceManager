@@ -9,6 +9,7 @@ import {
 } from "@/lib/offline-sync/engine";
 import {
   getCachedMasterOptions,
+  getPendingSyncCount,
   offlineDB,
   putSyncMetadata,
   setBackendReachable,
@@ -186,6 +187,32 @@ describe("offline sync engine", () => {
     expect(notifications.find((n) => n.id === "N-SRV-1")?.read).toBe(true);
     expect(notifications.some((n) => n.id === "N-SRV-2")).toBe(false);
     expect((await offlineDB.stockCount.toArray()).map((s) => s.sku)).toEqual(["SKU-LOCAL"]);
+  });
+
+  it("does not keep a banner count for a transaction that is already synced", async () => {
+    await offlineDB.transactions.put({
+      id: "TRX-05::SC-1",
+      code: "TRX-05",
+      storageKey: "telesonic_trx_TRX-05",
+      recordRef: "SC-1",
+      payload: { recordNo: "SC-1" },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      syncStatus: "synced",
+      idempotencyKey: "trx:upsert:TRX-05:SC-1",
+      apiPath: "/api/call-assignments",
+      operation: "upsert",
+    });
+    await offlineDB.syncQueue.add({
+      action: "TRANSACTION_UPSERT",
+      entityId: "TRX-05::SC-1",
+      payload: { type: "TRANSACTION" },
+      createdAt: Date.now(),
+      status: "failed",
+    });
+
+    expect(await getPendingSyncCount()).toBe(0);
+    expect(await offlineDB.syncQueue.count()).toBe(0);
   });
 
   it("marks data not ready when the server is unreachable, keeping the app usable", async () => {
