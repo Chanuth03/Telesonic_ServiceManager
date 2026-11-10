@@ -398,44 +398,93 @@ export function CommissionRateMatrixView({
   // PostgreSQL Database & Async States
   const [matrixId, setMatrixId] = useState<string>("mat-rlc-pay");
   const [matrixName, setMatrixName] = useState<string>("RLC Dealer Sales Staff Payment Commission Matrix");
+  const [allMatrices, setAllMatrices] = useState<any[]>([]);
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showNewMatrixModal, setShowNewMatrixModal] = useState<boolean>(false);
+  const [newMatrixForm, setNewMatrixForm] = useState({
+    schemeCode: "RLC-REP-PAY",
+    matrixName: "RLC Dealer Sales Staff Payment Commission Matrix",
+    version: "1.0",
+    rowDimension: "Capacity band x Inverter type",
+    columnDimension: "Credit age band",
+    rateUnit: "LKR per unit",
+    currency: "LKR",
+    templateType: "rlc" as "rlc" | "solar" | "blank",
+  });
   const [availableSchemes, setAvailableSchemes] = useState<Array<{ schemeCode: string; schemeName: string }>>([
     { schemeCode: "RLC-REP-PAY", schemeName: "RLC Dealer Sales Staff Payment Commission" },
     { schemeCode: "SCH-MAJ-2026-03", schemeName: "Commercial Solar Solutions" },
+    { schemeCode: "SCH-MAJ-2026-01", schemeName: "Commercial Solar Inverter & ESS Matrix" },
     { schemeCode: "SCH-MOB-2026", schemeName: "Retail Smartphone Sales Scheme" },
   ]);
 
-  // Handler to switch scheme and automatically load associated matrix profile
+  // Function to apply a matrix record directly to component state
+  const applyMatrix = (matrix: any) => {
+    setMatrixId(matrix.id);
+    setSelectedScheme(matrix.schemeCode);
+    setMatrixName(matrix.matrixName || `${matrix.schemeCode} Commission Matrix`);
+    setSelectedVersion(matrix.version || "1.0");
+    setRowDimension(matrix.rowDimension || "Capacity band x Inverter type");
+    setColumnDimension(matrix.columnDimension || "Credit age band");
+    setRateUnit(matrix.rateUnit || "LKR per unit");
+    setCurrency(matrix.currency || "LKR");
+    setStatus(matrix.status || "Draft");
+    if (matrix.bands && matrix.bands.length > 0) setBands(matrix.bands);
+    if (matrix.matrixData && matrix.matrixData.length > 0) setMatrixData(matrix.matrixData);
+    if (matrix.history && matrix.history.length > 0) setHistory(matrix.history);
+  };
+
+  // Handler to switch scheme and automatically load associated matrix profile from PostgreSQL
   const handleSchemeChange = (schemeCode: string) => {
     setSelectedScheme(schemeCode);
-    if (schemeCode === "RLC-REP-PAY") {
-      setMatrixName("RLC Dealer Sales Staff Payment Commission Matrix");
-      setRowDimension("Capacity band x Inverter type");
-      setColumnDimension("Credit age band");
-      setRateUnit("LKR per unit");
-      setCurrency("LKR");
-      setSelectedVersion("3");
-      setStatus("Approved");
-      setMatrixData(SPEC_RLC_MATRIX_ROWS);
-    } else if (schemeCode.includes("SOLAR") || schemeCode.includes("MAJ")) {
-      setMatrixName("Commercial Solar Inverter & ESS Matrix");
-      setRowDimension("Capacity Band + Item Type");
-      setColumnDimension("Payment-term / Credit-age Bands");
-      setRateUnit("% of Net Invoiced Value");
-      setCurrency("USD ($)");
-      setSelectedVersion("v0.3");
-      setStatus("Approved");
-      setMatrixData(INITIAL_MATRIX_ROWS);
+    const matches = allMatrices.filter((m) => m.schemeCode === schemeCode);
+    if (matches.length > 0) {
+      const preferred = matches.find((m) => m.status === "Approved") || matches[0];
+      applyMatrix(preferred);
     } else {
-      setSelectedVersion("v1.0");
-      setStatus("Draft");
-      setRateUnit("% of Net Invoiced Value");
-      setCurrency("LKR");
-      setMatrixData(INITIAL_MATRIX_ROWS);
+      if (schemeCode === "RLC-REP-PAY") {
+        setMatrixId("mat-rlc-pay");
+        setMatrixName("RLC Dealer Sales Staff Payment Commission Matrix");
+        setRowDimension("Capacity band x Inverter type");
+        setColumnDimension("Credit age band");
+        setRateUnit("LKR per unit");
+        setCurrency("LKR");
+        setSelectedVersion("3");
+        setStatus("Approved");
+        setMatrixData(SPEC_RLC_MATRIX_ROWS);
+        setBands(INITIAL_BANDS);
+      } else if (schemeCode.includes("SOLAR") || schemeCode.includes("MAJ")) {
+        setMatrixId("mat-solar-q4");
+        setMatrixName("Commercial Solar Inverter & ESS Matrix");
+        setRowDimension("Capacity Band + Item Type");
+        setColumnDimension("Payment-term / Credit-age Bands");
+        setRateUnit("% of Net Invoiced Value");
+        setCurrency("USD ($)");
+        setSelectedVersion("v3.3");
+        setStatus("Approved");
+        setMatrixData(INITIAL_MATRIX_ROWS);
+        setBands(INITIAL_BANDS);
+      } else {
+        setMatrixId(`mat-${schemeCode.toLowerCase().replace(/[^a-z0-9]/g, "-")}-v1-0`);
+        setMatrixName(`${schemeCode} Commission Matrix`);
+        setRowDimension("Capacity Band + Item Type");
+        setColumnDimension("Payment-term / Credit-age Bands");
+        setRateUnit("% of Net Invoiced Value");
+        setCurrency("LKR");
+        setSelectedVersion("1.0");
+        setStatus("Draft");
+        setMatrixData(INITIAL_MATRIX_ROWS);
+        setBands(INITIAL_BANDS);
+      }
     }
   };
+
+  // Versions available for the current scheme
+  const currentSchemeMatrices = useMemo(() => {
+    return allMatrices.filter((m) => m.schemeCode === selectedScheme);
+  }, [allMatrices, selectedScheme]);
 
   // Add Dimension Row Modal State
   const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
@@ -451,46 +500,38 @@ export function CommissionRateMatrixView({
 
   // Switch between Approved and Draft Matrix modes
   const handleSwitchStatus = (newStatus: MatrixStatus) => {
-    if (newStatus === "Draft") {
-      const draftVer = selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4";
-      setStatus("Draft");
-      setSelectedVersion(draftVer);
-      toast.info(`Switched to Draft Matrix (Version ${draftVer})`, {
-        description: "Cells are unlocked. Click any cell to modify rates or import from Excel.",
-      });
+    const target = currentSchemeMatrices.find((m) => m.status === newStatus);
+    if (target) {
+      applyMatrix(target);
+      toast.info(`Switched to ${newStatus} matrix (Version ${target.version}) from PostgreSQL.`);
     } else {
-      const approvedVer = selectedScheme === "RLC-REP-PAY" ? "3" : "v3.3";
-      setStatus("Approved");
-      setSelectedVersion(approvedVer);
-      toast.success(`Switched to Approved Matrix (Version ${approvedVer})`, {
-        description: "Viewing certified read-only rates currently active for calculations.",
-      });
+      if (newStatus === "Draft") {
+        handleCreateNewDraftVersion();
+      } else {
+        setStatus("Approved");
+      }
     }
   };
 
   // Load Commission Rate Matrix from PostgreSQL
-  const loadMatrixFromDb = async (silent: boolean = false) => {
+  const loadMatrixFromDb = async (silent: boolean = false, targetScheme?: string, targetVersion?: string) => {
     try {
       if (!silent) setIsLoading(true);
       const res = await apiFetch("/api/incentives/rate-matrices");
       if (res.ok) {
         const data = await res.json();
-        if (data.matrices && data.matrices.length > 0) {
-          const matching = data.matrices.find(
-            (m: any) => m.schemeCode === selectedScheme,
-          );
-          if (matching) {
-            setMatrixId(matching.id);
-            setMatrixName(matching.matrixName);
-            setSelectedVersion(matching.version);
-            setRowDimension(matching.rowDimension);
-            setColumnDimension(matching.columnDimension);
-            setRateUnit(matching.rateUnit);
-            setCurrency(matching.currency);
-            setStatus(matching.status);
-            if (matching.bands && matching.bands.length > 0) setBands(matching.bands);
-            if (matching.matrixData && matching.matrixData.length > 0) setMatrixData(matching.matrixData);
-            if (matching.history && matching.history.length > 0) setHistory(matching.history);
+        if (data.matrices && Array.isArray(data.matrices)) {
+          setAllMatrices(data.matrices);
+          const currentScheme = targetScheme || selectedScheme;
+          const schemeMatches = data.matrices.filter((m: any) => m.schemeCode === currentScheme);
+          if (schemeMatches.length > 0) {
+            let selected = schemeMatches[0];
+            if (targetVersion) {
+              selected = schemeMatches.find((m: any) => m.version === targetVersion) || selected;
+            } else {
+              selected = schemeMatches.find((m: any) => m.status === "Approved") || schemeMatches[0];
+            }
+            applyMatrix(selected);
           }
           setIsDbConnected(true);
           if (!silent) {
@@ -694,6 +735,10 @@ export function CommissionRateMatrixView({
       return;
     }
 
+    const targetId =
+      matrixId ||
+      `mat-${selectedScheme.toLowerCase().replace(/[^a-z0-9]/g, "-")}-v${selectedVersion.replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
+
     // Add entry to history
     const newLog: HistoryRecord = {
       id: `hist-${Date.now()}`,
@@ -710,12 +755,12 @@ export function CommissionRateMatrixView({
 
     try {
       setIsSaving(true);
-      const res = await apiFetch(`/api/incentives/rate-matrices/${matrixId}`, {
+      const res = await apiFetch(`/api/incentives/rate-matrices/${targetId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           schemeCode: selectedScheme,
-          matrixName: matrixName || "Commission Rate Matrix",
+          matrixName: matrixName || `${selectedScheme} Commission Matrix`,
           version: selectedVersion,
           rowDimension,
           columnDimension,
@@ -732,9 +777,11 @@ export function CommissionRateMatrixView({
       if (res.ok) {
         const data = await res.json();
         if (data.matrix) {
+          if (data.matrix.id) setMatrixId(data.matrix.id);
           if (data.matrix.history) setHistory(data.matrix.history);
           setIsDbConnected(true);
         }
+        await loadMatrixFromDb(true, selectedScheme, selectedVersion);
         toast.success(`Commission Rate Matrix (${selectedVersion}) saved to PostgreSQL!`, {
           description: `Persisted ${matrixData.length} dimension rows and ${bands.length} credit bands to database.`,
         });
@@ -797,6 +844,7 @@ export function CommissionRateMatrixView({
       if (res.ok) {
         const data = await res.json();
         if (data.matrix?.history) setHistory(data.matrix.history);
+        await loadMatrixFromDb(true, selectedScheme, selectedVersion);
         toast.success(`Commission Rate Matrix ${selectedVersion} Approved in PostgreSQL!`, {
           description: "Rates locked and authorized for calculation runs and posting.",
         });
@@ -808,26 +856,131 @@ export function CommissionRateMatrixView({
     }
   };
 
-  const handleCreateNewDraftVersion = () => {
-    const nextVer = selectedScheme === "RLC-REP-PAY" ? "3.1" : "v3.4";
-    setSelectedVersion(nextVer);
-    setStatus("Draft");
+  // Create a new Draft version and immediately persist it to PostgreSQL
+  const handleCreateNewDraftVersion = async () => {
+    try {
+      setIsSaving(true);
+      let nextVer = "3.1";
+      if (selectedVersion.startsWith("v")) {
+        const num = parseFloat(selectedVersion.replace("v", ""));
+        nextVer = `v${(isNaN(num) ? 1.0 : num + 0.1).toFixed(1)}`;
+      } else {
+        const num = parseFloat(selectedVersion);
+        nextVer = isNaN(num) ? `${selectedVersion}.1` : (num + 0.1).toFixed(1);
+      }
 
-    const draftLog: HistoryRecord = {
-      id: `hist-${Date.now()}`,
-      version: nextVer,
-      status: "Draft",
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      author: "Ayesha Asarak",
-      role: "Incentive Administrator",
-      changeSummary: `Created new draft version ${nextVer} from approved ${selectedVersion}`,
-      details: "Cloned all dimension rows and credit bands for upcoming adjustment cycle.",
-    };
-    setHistory([draftLog, ...history]);
+      const newId = `mat-${selectedScheme.toLowerCase().replace(/[^a-z0-9]/g, "-")}-v${nextVer.replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
 
-    toast.info(`Created new draft version: ${nextVer}`, {
-      description: "Cells unlocked for editing. Remember to save draft once updated.",
-    });
+      const newMatrixPayload = {
+        id: newId,
+        schemeCode: selectedScheme,
+        matrixName: matrixName || `${selectedScheme} Commission Matrix`,
+        version: nextVer,
+        rowDimension,
+        columnDimension,
+        rateUnit,
+        currency,
+        status: "Draft" as MatrixStatus,
+        description: `Draft matrix cloned from ${selectedVersion} for scheme ${selectedScheme}`,
+        createdBy: "Incentive Administrator",
+        bands,
+        matrixData,
+      };
+
+      const res = await apiFetch("/api/incentives/rate-matrices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMatrixPayload),
+      });
+
+      if (res.ok) {
+        await loadMatrixFromDb(true, selectedScheme, nextVer);
+        toast.success(`Created & saved new Draft Version ${nextVer} in PostgreSQL!`, {
+          description: "All dimension rows and credit bands were saved to the database. Cells unlocked for editing.",
+        });
+      } else {
+        toast.error("Failed to create new draft matrix in PostgreSQL.");
+      }
+    } catch (err) {
+      console.error("Create draft error:", err);
+      toast.error("Database error while creating draft version.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Create a Brand New Matrix in PostgreSQL
+  const handleCreateNewMatrix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMatrixForm.schemeCode.trim()) {
+      toast.error("Validation Failed: Scheme Code is required.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const newId = `mat-${newMatrixForm.schemeCode.toLowerCase().replace(/[^a-z0-9]/g, "-")}-v${newMatrixForm.version.replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
+
+      let initialCells: RateMatrixCell[] = [];
+      if (newMatrixForm.templateType === "rlc") {
+        initialCells = SPEC_RLC_MATRIX_ROWS;
+      } else if (newMatrixForm.templateType === "solar") {
+        initialCells = INITIAL_MATRIX_ROWS;
+      } else {
+        initialCells = [
+          {
+            capacityBand: "Standard",
+            itemType: "General Item",
+            cashImmediate: 0,
+            creditLt15: 0,
+            creditLt30: 0,
+            creditLte45: 0,
+            creditGt45: 0,
+          },
+        ];
+      }
+
+      const payload = {
+        id: newId,
+        schemeCode: newMatrixForm.schemeCode.trim(),
+        matrixName: newMatrixForm.matrixName.trim() || `${newMatrixForm.schemeCode} Commission Matrix`,
+        version: newMatrixForm.version.trim() || "1.0",
+        rowDimension: newMatrixForm.rowDimension,
+        columnDimension: newMatrixForm.columnDimension,
+        rateUnit: newMatrixForm.rateUnit,
+        currency: newMatrixForm.currency,
+        status: "Draft" as MatrixStatus,
+        description: `New rate matrix initialized for scheme ${newMatrixForm.schemeCode}`,
+        createdBy: "Incentive Administrator",
+        bands: INITIAL_BANDS,
+        matrixData: initialCells,
+      };
+
+      const res = await apiFetch("/api/incentives/rate-matrices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setShowNewMatrixModal(false);
+        setAvailableSchemes((prev) => {
+          if (prev.some((s) => s.schemeCode === payload.schemeCode)) return prev;
+          return [{ schemeCode: payload.schemeCode, schemeName: payload.matrixName }, ...prev];
+        });
+        await loadMatrixFromDb(true, payload.schemeCode, payload.version);
+        toast.success(`New Commission Rate Matrix created & saved in PostgreSQL!`, {
+          description: `Matrix ID: ${newId} (Version ${payload.version}) with ${initialCells.length} dimension rows.`,
+        });
+      } else {
+        toast.error("Failed to create new rate matrix in PostgreSQL database.");
+      }
+    } catch (err) {
+      console.error("Create matrix error:", err);
+      toast.error("Database connection error while creating matrix.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Cell editing handlers
@@ -1063,34 +1216,32 @@ export function CommissionRateMatrixView({
                     {selectedVersion}
                   </span>
 
-                  {/* Status Toggle Pill: Approved Matrix vs Draft Matrix */}
-                  <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg border text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchStatus("Approved")}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        status === "Approved"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      title="View Approved Version"
-                    >
-                      <CheckCircle2 size={12} />
-                      <span>Approved (v{selectedScheme === "RLC-REP-PAY" ? "3" : "3.3"})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchStatus("Draft")}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        status === "Draft"
-                          ? "bg-amber-500 text-white shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      title="View Draft Version"
-                    >
-                      <Clock size={12} />
-                      <span>Draft Matrix (v{selectedScheme === "RLC-REP-PAY" ? "3.1" : "3.4"})</span>
-                    </button>
+                  {/* Dynamic Version Selector for Current Scheme */}
+                  <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg border text-xs flex-wrap">
+                    {currentSchemeMatrices.length > 0 ? (
+                      currentSchemeMatrices.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => applyMatrix(m)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                            matrixId === m.id
+                              ? m.status === "Approved"
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "bg-amber-500 text-white shadow-xs"
+                              : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                          }`}
+                          title={`Switch to version ${m.version} (${m.status})`}
+                        >
+                          {m.status === "Approved" ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                          <span>{m.status === "Approved" ? "Approved" : "Draft"} (v{m.version})</span>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground px-2 py-0.5 font-medium">
+                        (No matrix saved in PostgreSQL)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1157,6 +1308,7 @@ export function CommissionRateMatrixView({
               <Button
                 size="sm"
                 onClick={() => setShowApprovalModal(true)}
+                disabled={isSaving}
                 className="h-8 gap-1.5 text-xs font-medium cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <CheckCircle2 size={14} />
@@ -1166,12 +1318,38 @@ export function CommissionRateMatrixView({
               <Button
                 size="sm"
                 onClick={handleCreateNewDraftVersion}
+                disabled={isSaving}
                 className="h-8 gap-1.5 text-xs font-medium cursor-pointer"
+                title="Create a new draft version and save immediately to PostgreSQL"
               >
-                <Plus size={14} />
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 <span>Create New Draft Version</span>
               </Button>
             )}
+
+            {/* + New Matrix Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setNewMatrixForm({
+                  schemeCode: selectedScheme,
+                  matrixName: `${selectedScheme} Commission Matrix`,
+                  version: "1.0",
+                  rowDimension: "Capacity band x Inverter type",
+                  columnDimension: "Credit age band",
+                  rateUnit: "LKR per unit",
+                  currency: "LKR",
+                  templateType: "rlc",
+                });
+                setShowNewMatrixModal(true);
+              }}
+              className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary border-primary/30"
+              title="Initialize a new rate matrix in PostgreSQL"
+            >
+              <Plus size={13} />
+              <span>+ New Matrix</span>
+            </Button>
           </div>
         </div>
 
@@ -2472,6 +2650,224 @@ export function CommissionRateMatrixView({
                 Confirm &amp; Approve Matrix
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* DIALOG 4: CREATE NEW RATE MATRIX MODAL */}
+      {/* -------------------------------------------------------------------- */}
+      {showNewMatrixModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-card border rounded-xl shadow-xl w-full max-w-xl p-6 space-y-5 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary flex items-center justify-center">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Create New Commission Rate Matrix</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Initializes a new matrix in PostgreSQL with associated credit bands and dimension rows.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNewMatrixModal(false)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewMatrix} className="space-y-4 text-xs">
+              {/* Scheme Code */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">
+                  Scheme Code <span className="text-destructive">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={newMatrixForm.schemeCode}
+                    onChange={(e) => {
+                      const sc = e.target.value;
+                      const sName = availableSchemes.find((s) => s.schemeCode === sc)?.schemeName || "";
+                      setNewMatrixForm({
+                        ...newMatrixForm,
+                        schemeCode: sc,
+                        matrixName: sName ? `${sName} Commission Matrix` : `${sc} Commission Matrix`,
+                      });
+                    }}
+                    className="w-1/2 text-xs rounded-md border border-input bg-background px-2.5 py-1.5 font-medium"
+                  >
+                    {availableSchemes.map((s) => (
+                      <option key={s.schemeCode} value={s.schemeCode}>
+                        {s.schemeCode}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Or enter custom scheme code"
+                    value={newMatrixForm.schemeCode}
+                    onChange={(e) =>
+                      setNewMatrixForm({
+                        ...newMatrixForm,
+                        schemeCode: e.target.value.toUpperCase().replace(/\s+/g, "-"),
+                      })
+                    }
+                    className="w-1/2 text-xs rounded-md border border-input bg-background px-2.5 py-1.5 font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Matrix Name */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">
+                  Matrix Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newMatrixForm.matrixName}
+                  onChange={(e) => setNewMatrixForm({ ...newMatrixForm, matrixName: e.target.value })}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                  required
+                />
+              </div>
+
+              {/* Version & Currency */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground block">
+                    Version <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newMatrixForm.version}
+                    onChange={(e) => setNewMatrixForm({ ...newMatrixForm, version: e.target.value })}
+                    className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground block">
+                    Currency <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newMatrixForm.currency}
+                    onChange={(e) => setNewMatrixForm({ ...newMatrixForm, currency: e.target.value })}
+                    className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                  >
+                    <option value="LKR">LKR (Rs) – Sri Lankan Rupee</option>
+                    <option value="USD ($)">USD ($) – US Dollar</option>
+                    <option value="EUR (€)">EUR (€) – Euro</option>
+                    <option value="SGD ($)">SGD ($) – Singapore Dollar</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Dimensions */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground block">
+                    Row Dimension <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newMatrixForm.rowDimension}
+                    onChange={(e) => setNewMatrixForm({ ...newMatrixForm, rowDimension: e.target.value })}
+                    className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                  >
+                    <option value="Capacity band x Inverter type">Capacity band x Inverter type</option>
+                    <option value="Capacity Band + Item Type">Capacity Band + Item Type</option>
+                    <option value="Capacity Band Only">Capacity Band Only</option>
+                    <option value="Inverter & Battery Type">Inverter & Battery Type</option>
+                    <option value="Product Classification Group">Product Classification Group</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground block">
+                    Column Dimension <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newMatrixForm.columnDimension}
+                    onChange={(e) => setNewMatrixForm({ ...newMatrixForm, columnDimension: e.target.value })}
+                    className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                  >
+                    <option value="Credit age band">Credit age band</option>
+                    <option value="Payment-term / Credit-age Bands">Payment-term / Credit-age Bands</option>
+                    <option value="Payment Terms (Days)">Payment Terms (Days)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Rate Unit */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">
+                  Rate Unit <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={newMatrixForm.rateUnit}
+                  onChange={(e) => setNewMatrixForm({ ...newMatrixForm, rateUnit: e.target.value })}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                >
+                  <option value="LKR per unit">LKR per unit (Fixed Amount)</option>
+                  <option value="% of Net Invoiced Value">% of Net Invoiced Value</option>
+                  <option value="% of Gross Margin">% of Gross Margin</option>
+                  <option value="Fixed Amount per kW">Fixed Amount per kW</option>
+                  <option value="Fixed Amount per Item Unit">Fixed Amount per Item Unit</option>
+                </select>
+              </div>
+
+              {/* Starter Template */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">
+                  Initial Dimension Rows Template
+                </label>
+                <select
+                  value={newMatrixForm.templateType}
+                  onChange={(e) =>
+                    setNewMatrixForm({
+                      ...newMatrixForm,
+                      templateType: e.target.value as "rlc" | "solar" | "blank",
+                    })
+                  }
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5"
+                >
+                  <option value="rlc">RLC Air Conditioning Template (6 BTU x Type Rows)</option>
+                  <option value="solar">Commercial Solar Template (12 Capacity kW Rows)</option>
+                  <option value="blank">Blank Template (1 Row to start)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowNewMatrixModal(false)}
+                  className="text-xs h-8 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  size="sm"
+                  className="text-xs h-8 cursor-pointer bg-primary text-primary-foreground font-semibold"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin mr-1.5" />
+                      Creating in PostgreSQL...
+                    </>
+                  ) : (
+                    <>
+                      <Database size={13} className="mr-1.5" />
+                      Create &amp; Save in Database
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

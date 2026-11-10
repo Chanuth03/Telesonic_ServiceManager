@@ -288,17 +288,9 @@ export async function updateRateMatrix(
   try {
     await client.query("BEGIN");
 
-    // Fetch existing by ID, fallback to scheme_code if temporary client ID was passed
-    let existingRes = await client.query(`SELECT * FROM commission_rate_matrices WHERE id = $1;`, [id]);
-    let current = existingRes.rows?.[0];
-
-    if (!current && updates.schemeCode) {
-      existingRes = await client.query(
-        `SELECT * FROM commission_rate_matrices WHERE UPPER(scheme_code) = UPPER($1);`,
-        [updates.schemeCode.trim()],
-      );
-      current = existingRes.rows?.[0];
-    }
+    // Fetch existing by ID
+    const existingRes = await client.query(`SELECT * FROM commission_rate_matrices WHERE id = $1;`, [id]);
+    const current = existingRes.rows?.[0];
 
     if (!current) {
       // Upsert: Create matrix if it doesn't exist
