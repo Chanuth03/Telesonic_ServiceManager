@@ -1,13 +1,13 @@
-// Telesonic Service Worker — real offline (Airplane Mode / data+Wi‑Fi off)
-const CACHE_NAME = "telesonic-pwa-v7";
+// Telesonic Service Worker — keep the real SPA working when data/Wi‑Fi is off
+const CACHE_NAME = "telesonic-pwa-v8";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
+  "/mobile/",
   "/mobile/login",
   "/mobile/jobs",
   "/mobile/stock-count",
   "/mobile/notifications",
-  "/mobile-apk-download",
   "/transactions",
   "/manifest.json",
   "/favicon.ico",
@@ -95,43 +95,15 @@ function isStaticAsset(request) {
   );
 }
 
-function offlineShellResponse() {
-  const body = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#2563eb" />
-  <title>Telesonic Mobile — Offline</title>
-  <style>
-    body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:system-ui,-apple-system,sans-serif; background:#f8fafc; color:#0f172a; padding:24px; text-align:center; }
-    .card { max-width:360px; width:100%; border:1px solid #e2e8f0; border-radius:16px; background:#fff; padding:24px; }
-    h1 { font-size:1.15rem; margin:0 0 8px; }
-    p { margin:0 0 16px; color:#64748b; font-size:0.9rem; line-height:1.45; }
-    a { appearance:none; border:0; border-radius:10px; padding:10px 14px; background:#2563eb; color:#fff; font-weight:600; text-decoration:none; display:inline-block; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>You're offline</h1>
-    <p>Open a mobile screen you used while online. Jobs, photos, parts, labour and transactions stay on this device.</p>
-    <a href="/mobile">Open mobile app</a>
-  </div>
-</body>
-</html>`;
-  return new Response(body, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-  });
-}
-
+/** Prefer a cached SPA document (with JS), never a dead-end offline HTML card. */
 async function cachedAppShell() {
   return (
     (await caches.match("/mobile", { ignoreSearch: true })) ||
-    (await caches.match("/mobile/jobs", { ignoreSearch: true })) ||
+    (await caches.match("/mobile/", { ignoreSearch: true })) ||
     (await caches.match("/", { ignoreSearch: true })) ||
-    (await caches.match("/mobile/login", { ignoreSearch: true })) ||
-    offlineShellResponse()
+    (await caches.match("/transactions", { ignoreSearch: true })) ||
+    (await caches.match("/mobile/jobs", { ignoreSearch: true })) ||
+    (await caches.match("/mobile/login", { ignoreSearch: true }))
   );
 }
 
@@ -142,7 +114,6 @@ async function putInCache(request, response) {
   await cache.put(request, response.clone());
 }
 
-/** Pull script/module/css URLs out of HTML so Airplane Mode has the SPA bundles. */
 async function cacheHtmlAssets(cache, response) {
   try {
     const contentType = response.headers.get("content-type") || "";
@@ -162,7 +133,7 @@ async function cacheHtmlAssets(cache, response) {
           const abs = new URL(match[1], origin).href;
           if (abs.startsWith(origin)) urls.add(abs);
         } catch {
-          // ignore bad URLs
+          // ignore
         }
       }
     }
@@ -178,7 +149,7 @@ async function cacheHtmlAssets(cache, response) {
       }),
     );
   } catch {
-    // ignore parse failures
+    // ignore
   }
 }
 
@@ -188,11 +159,19 @@ self.addEventListener("fetch", (event) => {
   if (isNavigationRequest(event.request)) {
     event.respondWith(
       (async () => {
-        // Real offline: serve cache first so data-off reopen does not hang on network.
+        // Offline: always serve the real SPA shell so client router can show every page.
         if (!self.navigator.onLine) {
+          const exact = await caches.match(event.request, { ignoreSearch: true });
+          if (exact) return exact;
+          const shell = await cachedAppShell();
+          if (shell) return shell;
+          // Absolute last resort — still avoid a custom dead-end page; retry shell paths.
           return (
-            (await caches.match(event.request, { ignoreSearch: true })) ||
-            (await cachedAppShell())
+            (await caches.match("/mobile", { ignoreSearch: true })) ||
+            new Response("<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content='0;url=/mobile'></head><body></body></html>", {
+              status: 200,
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            })
           );
         }
 
@@ -202,8 +181,11 @@ self.addEventListener("fetch", (event) => {
             await putInCache(event.request, response);
             const path = new URL(event.request.url).pathname;
             const cache = await caches.open(CACHE_NAME);
-            if (path === "/mobile" || path.startsWith("/mobile/")) {
+            if (path === "/" || path === "/mobile" || path.startsWith("/mobile") || path.startsWith("/transactions")) {
               await cache.put("/mobile", response.clone());
+              if (path === "/" || path === "/mobile" || path === "/mobile/") {
+                await cache.put("/", response.clone());
+              }
             }
             event.waitUntil(cacheHtmlAssets(cache, response.clone()));
           }
@@ -211,7 +193,8 @@ self.addEventListener("fetch", (event) => {
         } catch {
           return (
             (await caches.match(event.request, { ignoreSearch: true })) ||
-            (await cachedAppShell())
+            (await cachedAppShell()) ||
+            Response.error()
           );
         }
       })(),
@@ -253,9 +236,10 @@ self.addEventListener("fetch", (event) => {
           return response;
         } catch {
           const path = new URL(event.request.url).pathname;
-          const byPath = await caches.match(path, { ignoreSearch: true });
-          if (byPath) return byPath;
-          return new Response("", { status: 503, statusText: "Offline" });
+          return (
+            (await caches.match(path, { ignoreSearch: true })) ||
+            new Response("", { status: 503, statusText: "Offline" })
+          );
         }
       })(),
     );

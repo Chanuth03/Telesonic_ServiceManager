@@ -1,64 +1,80 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useRole } from "@/context/RoleContext";
 import { resolveTechnicianStartup } from "@/lib/app-initializer";
 import { isOfflineForTransactions } from "@/lib/offline-db";
 
 /**
- * Runs once when the mobile app opens.
- * Offline with a remembered session: skip login and open /mobile.
- * Online: confirm the token with the server when reachable.
+ * Restores the technician session in the background.
+ * Never blocks the mobile UI behind a spinner — pages must render offline
+ * from Dexie the same way they do online.
  */
 export function AppInitializer({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { loginUser, logoutUser } = useRole();
+  const { loginUser, logoutUser, isAuthenticated } = useRole();
   const navigateRef = useRef(navigate);
   const loginRef = useRef(loginUser);
   const logoutRef = useRef(logoutUser);
-  const [ready, setReady] = useState(false);
+  const authedRef = useRef(isAuthenticated);
 
   navigateRef.current = navigate;
   loginRef.current = loginUser;
   logoutRef.current = logoutUser;
+  authedRef.current = isAuthenticated;
 
   useEffect(() => {
     let cancelled = false;
-    // Never leave the technician on a forever spinner if startup hangs.
-    const safety = window.setTimeout(() => {
-      if (!cancelled) setReady(true);
-    }, 4000);
 
     void (async () => {
       const path = window.location.pathname;
       try {
+        // If RoleContext already restored a remembered session, do not block or redirect away.
+        if (authedRef.current) {
+          if (path === "/mobile/login") {
+            void navigateRef.current({ to: "/mobile", replace: true });
+          }
+          if (!isOfflineForTransactions() && navigator.onLine) {
+            try {
+              const { syncManager } = await import("@/lib/sync-manager");
+              void syncManager.triggerSync("app_initializer");
+            } catch {
+              // ignore
+            }
+          }
+          return;
+        }
+
         const result = await Promise.race([
           resolveTechnicianStartup(),
           new Promise<"timeout">((resolve) => {
-            window.setTimeout(() => resolve("timeout"), 3500);
+            window.setTimeout(() => resolve("timeout"), 2500);
           }),
         ]);
         if (cancelled) return;
 
-        if (result === "timeout") {
-          const remembered =
-            localStorage.getItem("telesonic_remember_session") === "true" &&
-            !!localStorage.getItem("auth_user");
-          if (remembered) {
-            try {
-              const raw = localStorage.getItem("auth_user");
-              const token = localStorage.getItem("auth_token") || "offline-session";
-              if (raw) {
-                const user = JSON.parse(raw);
-                await loginRef.current(user, token, true);
-              }
-            } catch {
-              // ignore
+        const rememberLocal = () => {
+          try {
+            const raw = localStorage.getItem("auth_user");
+            const token = localStorage.getItem("auth_token") || "offline-session";
+            if (
+              raw &&
+              localStorage.getItem("telesonic_remember_session") === "true"
+            ) {
+              return { user: JSON.parse(raw), token };
             }
+          } catch {
+            // ignore
+          }
+          return null;
+        };
+
+        if (result === "timeout") {
+          const local = rememberLocal();
+          if (local) {
+            await loginRef.current(local.user, local.token, true);
             if (path === "/mobile/login") {
               void navigateRef.current({ to: "/mobile", replace: true });
             }
-          } else if (path !== "/mobile/login") {
-            void navigateRef.current({ to: "/mobile/login", replace: true });
           }
           return;
         }
@@ -68,7 +84,7 @@ export function AppInitializer({ children }: { children: ReactNode }) {
           if (path === "/mobile/login") {
             void navigateRef.current({ to: "/mobile", replace: true });
           }
-          if (!isOfflineForTransactions()) {
+          if (!isOfflineForTransactions() && navigator.onLine) {
             try {
               const { syncManager } = await import("@/lib/sync-manager");
               void syncManager.triggerSync("app_initializer");
@@ -76,64 +92,40 @@ export function AppInitializer({ children }: { children: ReactNode }) {
               // ignore
             }
           }
-        } else {
-          const offline = isOfflineForTransactions();
-          const remembered =
-            localStorage.getItem("telesonic_remember_session") === "true" &&
-            !!localStorage.getItem("auth_user");
+          return;
+        }
 
-          if ((offline || !navigator.onLine) && remembered) {
-            try {
-              const raw = localStorage.getItem("auth_user");
-              const token = localStorage.getItem("auth_token") || "offline-session";
-              if (raw) {
-                const user = JSON.parse(raw);
-                await loginRef.current(user, token, true);
-              }
-            } catch {
-              // ignore
-            }
-            if (path === "/mobile/login") {
-              void navigateRef.current({ to: "/mobile", replace: true });
-            }
-          } else {
-            const hadStoredToken =
-              !!localStorage.getItem("auth_token") || !!sessionStorage.getItem("auth_token");
-            if (hadStoredToken && !offline && navigator.onLine) await logoutRef.current();
-            if (path !== "/mobile/login") {
-              void navigateRef.current({ to: "/mobile/login", replace: true });
-            }
+        const local = rememberLocal();
+        if (local && (!navigator.onLine || isOfflineForTransactions())) {
+          await loginRef.current(local.user, local.token, true);
+          if (path === "/mobile/login") {
+            void navigateRef.current({ to: "/mobile", replace: true });
           }
+          return;
+        }
+
+        if (path.startsWith("/mobile") && path !== "/mobile/login" && !local) {
+          void navigateRef.current({ to: "/mobile/login", replace: true });
         }
       } catch (err) {
-        console.error("[AppInitializer] Startup failed; continuing with local session if any:", err);
+        console.error("[AppInitializer] Startup failed; showing app with local session if any:", err);
         try {
           const raw = localStorage.getItem("auth_user");
-          const token = localStorage.getItem("auth_token");
-          if (raw && token && localStorage.getItem("telesonic_remember_session") === "true") {
+          const token = localStorage.getItem("auth_token") || "offline-session";
+          if (raw && localStorage.getItem("telesonic_remember_session") === "true") {
             await loginRef.current(JSON.parse(raw), token, true);
           }
         } catch {
           // ignore
         }
-      } finally {
-        if (!cancelled) setReady(true);
       }
     })();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(safety);
     };
   }, []);
 
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
+  // Always render the app immediately — Dexie-backed screens must work offline.
   return children;
 }

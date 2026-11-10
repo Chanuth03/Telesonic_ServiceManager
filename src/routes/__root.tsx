@@ -50,8 +50,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
+  // Soft-recover into the app — never trap the technician on an offline error page.
   useEffect(() => {
-    // Clear any previous recovery counter so the user is never permanently stuck.
     try {
       sessionStorage.removeItem("telesonic_offline_recover");
     } catch {
@@ -60,56 +60,26 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     if (!offline) {
       reportLovableError(error, { boundary: "tanstack_root_error_component" });
     }
-  }, [error, offline]);
+    const timer = window.setTimeout(() => {
+      try {
+        reset();
+        void router.invalidate();
+      } catch {
+        // ignore
+      }
+      const path = window.location.pathname;
+      if (path.startsWith("/mobile") && path !== "/mobile/login") {
+        return;
+      }
+      window.location.replace("/mobile");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [error, offline, reset, router]);
 
-  const reopenMobile = () => {
-    try {
-      reset();
-      void router.invalidate();
-    } catch {
-      // ignore
-    }
-    window.location.assign("/mobile");
-  };
-
+  // Blank while recovering — the real mobile/transaction UI should appear next.
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center space-y-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {offline ? "Connection lost" : "This page didn't load"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {offline
-            ? "You can keep working from data saved on this phone. Open the mobile app below."
-            : "Something went wrong. Open the mobile app or try again."}
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={reopenMobile}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Open mobile app
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              reset();
-              void router.invalidate();
-              window.location.reload();
-            }}
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
-          >
-            Reload
-          </button>
-          <a
-            href="/mobile/login"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
-          >
-            Sign in again
-          </a>
-        </div>
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
   );
 }
@@ -220,7 +190,16 @@ function RootAuthGate({ bare }: { bare: boolean }) {
     offlineRemembered,
   ]);
 
-  if (!isPublicRoute && (!authReady || !isAuthenticated) && !offlineRemembered) {
+  // Remembered mobile session: always show the app (online or offline).
+  // Never block technicians behind a spinner when Dexie data is already on device.
+  const rememberedMobile =
+    pathname.startsWith("/mobile") &&
+    (offlineRemembered ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("telesonic_remember_session") === "true" &&
+        !!localStorage.getItem("auth_user")));
+
+  if (!isPublicRoute && (!authReady || !isAuthenticated) && !rememberedMobile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
