@@ -6,30 +6,10 @@ import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
 import { warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
 import { syncManager } from "@/lib/sync-manager";
 
-function MobileRouteError({ error, reset }: { error: Error; reset: () => void }) {
-  useEffect(() => {
-    console.error("[Mobile] Route error — recovering into app:", error);
-    const t = window.setTimeout(() => {
-      try {
-        reset();
-      } catch {
-        // ignore
-      }
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, [error, reset]);
-  return (
-    <div className="mx-auto w-full max-w-md space-y-3.5 px-1 py-3">
-      <Outlet />
-    </div>
-  );
-}
-
 export const Route = createFileRoute("/mobile")({
   // Client-only so Airplane Mode can reuse cached JS instead of SSR round-trips.
   ssr: false,
   component: MobileLayout,
-  errorComponent: MobileRouteError,
 });
 
 function MobileLayout() {

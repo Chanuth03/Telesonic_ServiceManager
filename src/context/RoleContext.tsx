@@ -98,19 +98,13 @@ function getInitialAuthState(isVitest: boolean): {
       }
     }
 
-    // Sync restore from durable storage so Airplane Mode / data-off reopen
-    // does not flash login or get redirected by RootAuthGate before async vault runs.
+    // Always restore a remembered profile immediately so the UI is never stuck loading.
     const remembered = localStorage.getItem("telesonic_remember_session") === "true";
     const localUserRaw = localStorage.getItem("auth_user");
     const localToken = localStorage.getItem("auth_token") || "";
     if (remembered && localUserRaw) {
       const parsed = JSON.parse(localUserRaw) as UserProfile;
-      const offline = typeof navigator !== "undefined" && !navigator.onLine;
-      const tokenOk =
-        isUsableJwt(localToken) ||
-        (offline && localToken.split(".").length === 3) ||
-        (offline && !!parsed?.name);
-      if (parsed?.name && tokenOk) {
+      if (parsed?.name) {
         try {
           if (localToken) sessionStorage.setItem("auth_token", localToken);
           sessionStorage.setItem("auth_user", localUserRaw);
@@ -134,7 +128,7 @@ function getInitialAuthState(isVitest: boolean): {
     user: ADMIN_PROFILE,
     role: "ADMIN",
     isAuthenticated: isVitest,
-    authReady: isVitest,
+    authReady: true, // never leave the gate waiting forever
   };
 }
 
@@ -155,12 +149,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const restoreAuth = async () => {
       try {
-        // 1. Check active tab sessionStorage first
+        // 1. Active tab session (even if JWT is expired — UI must stay usable)
         const sessionUserRaw = sessionStorage.getItem("auth_user");
         const sessionToken = sessionStorage.getItem("auth_token");
-        if (sessionUserRaw && isUsableJwt(sessionToken)) {
+        if (sessionUserRaw) {
           const parsed = JSON.parse(sessionUserRaw) as UserProfile;
-          if (parsed && parsed.name && !cancelled) {
+          if (parsed?.name && !cancelled) {
             setCurrentUser(parsed);
             if (parsed.role) setRoleState(parsed.role);
             setIsAuthenticated(true);
@@ -170,29 +164,13 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 2. Durable localStorage mirror (survives phone restart / Airplane Mode)
+        // 2. Durable remembered profile
         const isRemembered = localStorage.getItem("telesonic_remember_session") === "true";
         const localUserRaw = localStorage.getItem("auth_user");
-        const localToken = localStorage.getItem("auth_token");
-        if (isRemembered && localUserRaw && localToken && localToken.split(".").length === 3) {
+        const localToken = localStorage.getItem("auth_token") || "offline-session";
+        if (isRemembered && localUserRaw) {
           const parsed = JSON.parse(localUserRaw) as UserProfile;
-          const jwtOk = isUsableJwt(localToken);
-          const offline = isOfflineForTransactions();
-          const policyOk =
-            jwtOk ||
-            offline ||
-            isWithinOfflineAccessPolicy(
-              {
-                token: localToken,
-                user: parsed as unknown as Record<string, unknown>,
-                rememberMe: true,
-                savedAt: new Date().toISOString(),
-                userId: String(parsed.id),
-                organizationId: parsed.organizationId || DEFAULT_ORGANIZATION_ID,
-              } satisfies SecureAuthSession,
-              { offline: true, jwtStillValid: jwtOk },
-            );
-          if (parsed?.name && policyOk && !cancelled) {
+          if (parsed?.name && !cancelled) {
             setActiveSessionMemory(localToken, localUserRaw);
             sessionStorage.setItem("mobile_authenticated", "true");
             sessionStorage.setItem("mobile_tech_id", parsed.name);
@@ -209,20 +187,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         const vaultSession = await getOfflineAuthSession();
         if (vaultSession?.rememberMe && vaultSession.user && !cancelled) {
           const parsed = vaultSession.user as unknown as UserProfile;
-          const jwtOk = isUsableJwt(vaultSession.token);
-          const offline = isOfflineForTransactions();
-          const policyOk =
-            jwtOk ||
-            offline ||
-            isWithinOfflineAccessPolicy(vaultSession as SecureAuthSession, {
-              offline: true,
-              jwtStillValid: jwtOk,
-            });
-          if (parsed?.name && policyOk) {
+          if (parsed?.name) {
             const userJson = JSON.stringify(parsed);
             localStorage.setItem("telesonic_remember_session", "true");
             localStorage.setItem("auth_user", userJson);
-            // Mirror token so Airplane Mode reopen works even if vault decrypt fails later.
             localStorage.setItem("auth_token", vaultSession.token);
             setActiveSessionMemory(vaultSession.token, userJson);
             sessionStorage.setItem("mobile_authenticated", "true");
@@ -239,8 +207,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         // Ignore parse errors
       }
 
+      // Keep whatever initial state we already had — never wipe a working session.
       if (!cancelled) {
-        setIsAuthenticated(isVitest);
         setAuthReady(true);
       }
     };

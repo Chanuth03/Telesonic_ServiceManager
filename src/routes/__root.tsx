@@ -47,39 +47,39 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
-  const router = useRouter();
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
-  // Soft-recover into the app — never trap the technician on an offline error page.
   useEffect(() => {
-    try {
-      sessionStorage.removeItem("telesonic_offline_recover");
-    } catch {
-      // ignore
-    }
     if (!offline) {
       reportLovableError(error, { boundary: "tanstack_root_error_component" });
     }
-    const timer = window.setTimeout(() => {
-      try {
-        reset();
-        void router.invalidate();
-      } catch {
-        // ignore
-      }
-      const path = window.location.pathname;
-      if (path.startsWith("/mobile") && path !== "/mobile/login") {
-        return;
-      }
-      window.location.replace("/mobile");
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [error, offline, reset, router]);
+  }, [error, offline]);
 
-  // Blank while recovering — the real mobile/transaction UI should appear next.
+  // No auto-reset loop (that caused endless loading). One clear action into the app.
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-sm w-full text-center space-y-4">
+        <h1 className="text-lg font-semibold text-foreground">Reload the mobile app</h1>
+        <p className="text-sm text-muted-foreground">
+          {offline
+            ? "You are offline. Open the mobile app to use jobs and transactions saved on this phone."
+            : "The last screen failed to open. Continue to the mobile app."}
+        </p>
+        <button
+          type="button"
+          className="w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+          onClick={() => {
+            try {
+              reset();
+            } catch {
+              // ignore
+            }
+            window.location.href = "/mobile";
+          }}
+        >
+          Open mobile app
+        </button>
+      </div>
     </div>
   );
 }
@@ -153,29 +153,40 @@ function hasRememberedOfflineSession(): boolean {
 }
 
 function RootAuthGate({ bare }: { bare: boolean }) {
-  const { isAuthenticated, authReady } = useRole();
+  const { isAuthenticated, authReady, loginUser } = useRole();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isPublicRoute =
     pathname === "/login" ||
     pathname === "/mobile/login" ||
     pathname === "/mobile-apk-download";
-  const offlineRemembered =
-    typeof navigator !== "undefined" &&
-    !navigator.onLine &&
-    hasRememberedOfflineSession();
+  const isMobilePath = pathname.startsWith("/mobile");
+  const remembered = hasRememberedOfflineSession();
+
+  // Force-restore remembered session so the gate never waits forever.
+  useEffect(() => {
+    if (isAuthenticated || !remembered) return;
+    try {
+      const raw = localStorage.getItem("auth_user");
+      const token = localStorage.getItem("auth_token") || "offline-session";
+      if (raw) {
+        void loginUser(JSON.parse(raw), token, true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isAuthenticated, remembered, loginUser]);
 
   useEffect(() => {
-    if (!authReady) return;
-    // Never force login while mobile data/Wi‑Fi is off and a remembered session exists.
-    if (offlineRemembered && pathname.startsWith("/mobile")) {
+    if (!authReady && !remembered) return;
+    if (remembered && isMobilePath) {
       if (pathname === "/mobile/login") {
         void router.navigate({ to: "/mobile", replace: true });
       }
       return;
     }
-    if (!isAuthenticated && !isPublicRoute) {
-      if (pathname.startsWith("/mobile")) {
+    if (!isAuthenticated && !isPublicRoute && !remembered) {
+      if (isMobilePath) {
         void router.navigate({ to: "/mobile/login", replace: true });
       } else {
         void router.navigate({ to: "/login", replace: true });
@@ -187,29 +198,23 @@ function RootAuthGate({ bare }: { bare: boolean }) {
     isPublicRoute,
     pathname,
     router,
-    offlineRemembered,
+    remembered,
+    isMobilePath,
   ]);
 
-  // Remembered mobile session: always show the app (online or offline).
-  // Never block technicians behind a spinner when Dexie data is already on device.
-  const rememberedMobile =
-    pathname.startsWith("/mobile") &&
-    (offlineRemembered ||
-      (typeof window !== "undefined" &&
-        localStorage.getItem("telesonic_remember_session") === "true" &&
-        !!localStorage.getItem("auth_user")));
-
-  if (!isPublicRoute && (!authReady || !isAuthenticated) && !rememberedMobile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
+  // Mobile app: NEVER block on a loading spinner. Always render the screens.
+  if (isMobilePath || isPublicRoute || isAuthenticated || remembered) {
+    return bare || isMobilePath ? (
+      <Outlet />
+    ) : (
+      <AppShell>
+        <Outlet />
+      </AppShell>
     );
   }
 
-  return bare ? (
-    <Outlet />
-  ) : (
+  // Desktop only short wait — then show app shell anyway.
+  return (
     <AppShell>
       <Outlet />
     </AppShell>
