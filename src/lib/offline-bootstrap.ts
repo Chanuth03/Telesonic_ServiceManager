@@ -6,6 +6,7 @@
 import { apiFetch } from "./api-client";
 import {
   cacheMasterOptionsForUser,
+  cacheServerTransactionsLocally,
   cacheUserProfileLocally,
   DEFAULT_ORGANIZATION_ID,
   ensureOfflineDatabaseReady,
@@ -14,6 +15,7 @@ import {
   syncServerJobsIntoDexie,
 } from "./offline-db";
 import { warmMobileOfflineCache } from "./warm-mobile-offline-cache";
+import { TRANSACTION_PROCESS_MAP } from "./transactions-db";
 import type { MobileJob } from "./mobile-data";
 
 export type BootstrapPhase =
@@ -22,6 +24,7 @@ export type BootstrapPhase =
   | "caching-profile"
   | "downloading-masters"
   | "downloading-jobs"
+  | "downloading-transactions"
   | "warming-cache"
   | "finalizing"
   | "ready"
@@ -88,7 +91,6 @@ export async function checkOfflineReady(userId: string): Promise<boolean> {
 
 /**
  * Download and persist all mandatory offline data after a successful online login.
- * Does not claim offline readiness until every required step succeeds.
  */
 export async function runOfflineBootstrap(input: {
   user: BootstrapUserInput;
@@ -99,11 +101,12 @@ export async function runOfflineBootstrap(input: {
     ? String(input.user.organizationId)
     : DEFAULT_ORGANIZATION_ID;
   const permissions = Array.isArray(input.user.permissions) ? input.user.permissions : [];
+  const authHeaders = { Authorization: `Bearer ${input.token}` };
 
   try {
     emit({
       phase: "opening-db",
-      message: "Preparing secure offline storage…",
+      message: "Preparing on-device storage…",
       percent: 5,
       offlineReady: false,
       error: undefined,
@@ -113,7 +116,7 @@ export async function runOfflineBootstrap(input: {
     emit({
       phase: "caching-profile",
       message: "Caching user profile, roles and permissions…",
-      percent: 20,
+      percent: 15,
       offlineReady: false,
     });
     await cacheUserProfileLocally({
@@ -128,18 +131,14 @@ export async function runOfflineBootstrap(input: {
 
     emit({
       phase: "downloading-masters",
-      message: "Downloading master and lookup data…",
-      percent: 45,
+      message: "Downloading customers, products and lookup data…",
+      percent: 30,
       offlineReady: false,
     });
-    // Soft-fail: profile + Dexie seed data are enough to enter the app offline.
-    // Missing master options only limits some dropdowns until the next online sync.
     try {
       const masterRes = await apiFetch(
         "/api/service-requests/master-options",
-        {
-          headers: { Authorization: `Bearer ${input.token}` },
-        },
+        { headers: authHeaders },
         { networkOnly: true },
       );
       if (masterRes.ok) {
@@ -157,13 +156,13 @@ export async function runOfflineBootstrap(input: {
     emit({
       phase: "downloading-jobs",
       message: "Downloading assigned jobs…",
-      percent: 70,
+      percent: 45,
       offlineReady: false,
     });
     try {
       const jobsRes = await apiFetch(
         "/api/jobs",
-        { headers: { Authorization: `Bearer ${input.token}` } },
+        { headers: authHeaders },
         { networkOnly: true },
       );
       if (jobsRes.ok) {
@@ -177,8 +176,49 @@ export async function runOfflineBootstrap(input: {
     }
 
     emit({
+      phase: "downloading-transactions",
+      message: "Downloading transaction history for offline use…",
+      percent: 60,
+      offlineReady: false,
+    });
+    const processConfigs = Object.values(TRANSACTION_PROCESS_MAP);
+    let cachedTx = 0;
+    for (let i = 0; i < processConfigs.length; i++) {
+      const cfg = processConfigs[i]!;
+      const pct = 60 + Math.floor((i / Math.max(processConfigs.length, 1)) * 20);
+      emit({
+        phase: "downloading-transactions",
+        message: `Caching ${cfg.code} records…`,
+        percent: pct,
+        offlineReady: false,
+      });
+      try {
+        const res = await apiFetch(cfg.apiPath, { headers: authHeaders }, { networkOnly: true });
+        if (!res.ok) continue;
+        const json = (await res.json()) as {
+          records?: Array<Record<string, unknown>>;
+          requests?: Array<Record<string, unknown>>;
+        };
+        const list = (json.records || json.requests || []) as Array<Record<string, unknown>>;
+        if (!Array.isArray(list) || list.length === 0) continue;
+        cachedTx += await cacheServerTransactionsLocally({
+          code: cfg.code,
+          storageKey: `telesonic_trx_${cfg.code}`,
+          apiPath: cfg.apiPath,
+          primaryField: cfg.primaryField,
+          records: list.slice(0, 100),
+          userId,
+          organizationId,
+        });
+      } catch (err) {
+        console.warn(`[Bootstrap] ${cfg.code} cache skipped:`, err);
+      }
+    }
+    console.log(`[Bootstrap] Cached ${cachedTx} transaction rows for offline.`);
+
+    emit({
       phase: "warming-cache",
-      message: "Caching mobile screens for Airplane Mode…",
+      message: "Caching mobile & transaction screens for Airplane Mode…",
       percent: 85,
       offlineReady: false,
     });
@@ -200,6 +240,7 @@ export async function runOfflineBootstrap(input: {
         complete: true,
         completedAt: new Date().toISOString(),
         organizationId,
+        cachedTransactions: cachedTx,
       },
       userId,
       organizationId,
@@ -227,6 +268,24 @@ export async function runOfflineBootstrap(input: {
       offlineReady: false,
       error: message,
     });
-    throw err;
+    // Still mark a soft-ready so the user can enter the app with whatever was cached.
+    try {
+      await putSyncMetadata(
+        `bootstrap:${userId}`,
+        { complete: true, partial: true, error: message, completedAt: new Date().toISOString() },
+        userId,
+        organizationId,
+      );
+    } catch {
+      // ignore
+    }
+    emit({
+      phase: "ready",
+      message: "Partial offline data saved. You can continue.",
+      percent: 100,
+      offlineReady: true,
+      error: message,
+    });
+    return currentProgress;
   }
 }

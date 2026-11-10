@@ -1,8 +1,10 @@
 import { getMobileJobs } from "@/lib/mobile-data";
+import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
 
 const MOBILE_STATIC_PATHS = [
   "/",
   "/mobile",
+  "/mobile/",
   "/mobile/login",
   "/mobile/jobs",
   "/mobile/stock-count",
@@ -37,7 +39,12 @@ function collectMobilePaths(): string[] {
     JOB_SUBPATHS.map((suffix) => `/mobile/jobs/${encodeURIComponent(id)}${suffix}`),
   );
 
-  return Array.from(new Set([...MOBILE_STATIC_PATHS, ...jobPaths]));
+  // Transactions hub is one SPA route; still warm it so the chunk is cached.
+  const trxPaths = Object.keys(TRANSACTION_PROCESS_MAP).map(
+    (code) => `/transactions?screen=${encodeURIComponent(code)}`,
+  );
+
+  return Array.from(new Set([...MOBILE_STATIC_PATHS, ...jobPaths, ...trxPaths]));
 }
 
 async function askServiceWorkerToCache(urls: string[]) {
@@ -48,16 +55,36 @@ async function askServiceWorkerToCache(urls: string[]) {
   worker.postMessage({ type: "CACHE_URLS", urls });
 }
 
+/** Eager-load route/component modules so their hashed chunks hit the SW cache. */
+async function preloadAppModules(): Promise<void> {
+  try {
+    const modules = import.meta.glob([
+      "/src/routes/mobile*.tsx",
+      "/src/routes/transactions.tsx",
+      "/src/components/transactions/**/*.{ts,tsx}",
+      "/src/components/mobile/**/*.{ts,tsx}",
+      "/src/lib/offline-*.ts",
+      "/src/lib/sync-manager.ts",
+      "/src/lib/mobile-*.ts",
+    ]);
+    await Promise.allSettled(Object.values(modules).map((load) => load()));
+  } catch (err) {
+    console.warn("[OfflineCache] Module preload skipped:", err);
+  }
+}
+
 /**
- * While online, visit every mobile screen URL so the service worker can cache
- * HTML + JS/CSS chunks. Required for Airplane Mode to open the same pages later.
+ * While online, visit mobile + transaction URLs and preload JS modules so
+ * Airplane Mode / data-off can open the same screens later from cache.
  */
 export async function warmMobileOfflineCache(reason = "startup"): Promise<void> {
   if (typeof window === "undefined") return;
   if (!navigator.onLine) return;
 
   const paths = collectMobilePaths();
-  console.log(`[OfflineCache] Warming ${paths.length} mobile URLs (${reason})`);
+  console.log(`[OfflineCache] Warming ${paths.length} URLs + modules (${reason})`);
+
+  await preloadAppModules();
 
   const absolute = paths.map((path) => new URL(path, window.location.origin).href);
 

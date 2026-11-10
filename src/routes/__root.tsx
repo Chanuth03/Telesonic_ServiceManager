@@ -49,22 +49,74 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (offline) return;
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error, offline]);
 
+  // Offline: do not leave the technician on a dead-end error page.
+  // Reset the boundary and reopen the cached mobile shell (with loop guard).
+  useEffect(() => {
+    if (!offline || recovering) return;
+    setRecovering(true);
+    let attempts = 0;
+    try {
+      attempts = Number(sessionStorage.getItem("telesonic_offline_recover") || "0");
+    } catch {
+      attempts = 0;
+    }
+    if (attempts >= 3) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem("telesonic_offline_recover", String(attempts + 1));
+      } catch {
+        // ignore
+      }
+      try {
+        reset();
+        void router.invalidate();
+      } catch {
+        // ignore
+      }
+      window.location.replace("/mobile");
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [offline, recovering, reset, router]);
+
+  if (offline) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md text-center space-y-3">
+          <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            Opening offline mode…
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Loading your on-device jobs and transactions. Saves stay on this phone until
+            connection returns.
+          </p>
+          <a
+            href="/mobile"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Continue offline
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {offline ? "You're offline" : "This page didn't load"}
+          This page didn't load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {offline
-            ? "Airplane Mode is on. Open the mobile app from a page you used while online, or turn the network back on and try again."
-            : "Something went wrong on our end. You can try refreshing or head back home."}
+          Something went wrong on our end. You can try refreshing or head back home.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -77,10 +129,10 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             Try again
           </button>
           <a
-            href={offline ? "/mobile" : "/"}
+            href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
           >
-            {offline ? "Open mobile app" : "Go home"}
+            Go home
           </a>
         </div>
       </div>

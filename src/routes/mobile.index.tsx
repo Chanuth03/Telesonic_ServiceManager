@@ -19,6 +19,7 @@ import { useRole } from "@/context/RoleContext";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mobile/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Telesonic Mobile App — Service Manager" },

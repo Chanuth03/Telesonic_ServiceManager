@@ -16,6 +16,12 @@ function MobileLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
+    try {
+      sessionStorage.removeItem("telesonic_offline_recover");
+    } catch {
+      // ignore
+    }
+
     let warmTimer: ReturnType<typeof setTimeout> | null = null;
     const scheduleWarm = (reason: string) => {
       if (!syncManager.getIsOnline()) return;

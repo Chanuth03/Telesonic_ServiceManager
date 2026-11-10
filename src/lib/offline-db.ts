@@ -565,6 +565,78 @@ export function isOfflineForTransactions(): boolean {
   return isDeviceOffline();
 }
 
+/**
+ * Cache server transaction rows into Dexie as already-synced so they are
+ * available offline for browse/edit. Does not enqueue sync (already on server).
+ */
+export async function cacheServerTransactionsLocally(input: {
+  code: string;
+  storageKey: string;
+  apiPath: string;
+  primaryField: string;
+  records: Array<Record<string, unknown>>;
+  userId?: string;
+  organizationId?: string;
+}): Promise<number> {
+  await ensureOfflineDatabaseReady();
+  const scope = readActiveUserScope();
+  const userId = input.userId || scope.userId;
+  const organizationId = input.organizationId || scope.organizationId;
+  const now = Date.now();
+  let stored = 0;
+
+  await offlineDB.transaction("rw", [offlineDB.transactions], async () => {
+    for (const rec of input.records) {
+      const recordRef = String(
+        rec[input.primaryField] || rec["requestNo"] || rec["callNo"] || rec["recordNo"] || rec["id"] || "",
+      );
+      if (!recordRef) continue;
+      const id = stableTransactionId(input.code, recordRef);
+      const existing = await offlineDB.transactions.get(id);
+      // Never overwrite a local pending/failed edit with server copy.
+      if (
+        existing &&
+        (existing.syncStatus === "pending" ||
+          existing.syncStatus === "failed" ||
+          existing.syncStatus === "syncing")
+      ) {
+        continue;
+      }
+      const idempotencyKey =
+        existing?.idempotencyKey || stableIdempotencyKey(input.code, recordRef, "upsert");
+      await offlineDB.transactions.put({
+        id,
+        localId: existing?.localId || id,
+        code: input.code,
+        storageKey: input.storageKey,
+        recordRef,
+        payload: {
+          ...rec,
+          [input.primaryField]: recordRef,
+          recordNo: recordRef,
+          idempotencyKey,
+        },
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+        syncStatus: "synced",
+        idempotencyKey,
+        apiPath: input.apiPath,
+        operation: "upsert",
+        deleted: false,
+        lastError: undefined,
+        serverId: String(rec["id"] ?? recordRef),
+        userId,
+        organizationId,
+        transactionType: input.code,
+        retryCount: 0,
+      });
+      stored += 1;
+    }
+  });
+
+  return stored;
+}
+
 function stableTransactionId(code: string, recordRef: string): string {
   return `${code}::${recordRef}`;
 }

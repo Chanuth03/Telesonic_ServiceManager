@@ -1,5 +1,5 @@
 // Telesonic Service Worker — real offline (Airplane Mode / data+Wi‑Fi off)
-const CACHE_NAME = "telesonic-pwa-v6";
+const CACHE_NAME = "telesonic-pwa-v7";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
