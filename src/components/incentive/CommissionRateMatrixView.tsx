@@ -1043,10 +1043,6 @@ export function CommissionRateMatrixView({
                     {selectedVersion}
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Maintain rates by product dimension—such as capacity band, inverter type and
-                  product type—against payment-term or credit-age bands.
-                </p>
               </div>
             </div>
           </div>
@@ -1136,13 +1132,9 @@ export function CommissionRateMatrixView({
             <div className="space-y-4">
               {/* 1. Scheme */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span>Scheme</span>
-                    <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-                  </label>
-                  <span className="text-[10px] text-muted-foreground font-mono">INC-SCR-01 Link</span>
-                </div>
+                <label className="text-xs font-semibold text-foreground block">
+                  Scheme <span className="text-destructive font-bold">*</span>
+                </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1169,9 +1161,8 @@ export function CommissionRateMatrixView({
 
               {/* 2. Row Dimension */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>Row Dimension</span>
-                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Row Dimension <span className="text-destructive font-bold">*</span>
                 </label>
                 <select
                   value={rowDimension}
@@ -1189,9 +1180,8 @@ export function CommissionRateMatrixView({
 
               {/* 3. Rate Unit */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>Rate Unit</span>
-                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Rate Unit <span className="text-destructive font-bold">*</span>
                 </label>
                 <select
                   value={rateUnit}
@@ -1214,9 +1204,8 @@ export function CommissionRateMatrixView({
             <div className="space-y-4">
               {/* 4. Version */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>Version</span>
-                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Version <span className="text-destructive font-bold">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -1239,9 +1228,8 @@ export function CommissionRateMatrixView({
 
               {/* 5. Column Dimension */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>Column Dimension</span>
-                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Column Dimension <span className="text-destructive font-bold">*</span>
                 </label>
                 <select
                   value={columnDimension}
@@ -1264,9 +1252,8 @@ export function CommissionRateMatrixView({
 
               {/* 6. Currency */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>Currency</span>
-                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Currency <span className="text-destructive font-bold">*</span>
                 </label>
                 <select
                   value={currency}
