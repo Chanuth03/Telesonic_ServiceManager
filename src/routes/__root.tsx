@@ -48,11 +48,7 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
-  const offline =
-    typeof navigator !== "undefined" &&
-    (!navigator.onLine ||
-      (typeof localStorage !== "undefined" &&
-        localStorage.getItem("telesonic_simulated_offline") === "true"));
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
   useEffect(() => {
     if (offline) return;
@@ -135,7 +131,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");var token=localStorage.getItem("auth_token")||"";var jwtOk=false;try{var parts=token.split(".");if(parts.length===3){var b64=parts[1].replace(/-/g,"+").replace(/_/g,"/");while(b64.length%4)b64+="=";var body=JSON.parse(atob(b64));jwtOk=!body.exp||body.exp*1000>Date.now();}}catch(err){jwtOk=false;}if(navigator.onLine===false&&rem&&jwtOk&&p==="/mobile/login"){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}if(navigator.onLine===false){document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll('link[href*="fonts.googleapis.com"],link[href*="fonts.gstatic.com"]').forEach(function(n){n.remove();});});}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
+            __html: `(function(){try{var p=window.location.pathname;var rem=localStorage.getItem("telesonic_remember_session")==="true"&&!!localStorage.getItem("auth_user");var offline=navigator.onLine===false;if(offline&&rem&&(p==="/mobile/login"||p==="/login")){window.location.replace("/mobile");return;}if(rem&&p==="/login"){window.location.replace("/");return;}if(offline){var killFonts=function(){document.querySelectorAll('link[href*="fonts.googleapis.com"],link[href*="fonts.gstatic.com"]').forEach(function(n){n.remove();});};killFonts();document.addEventListener("DOMContentLoaded",killFonts);}}catch(e){}window.__telesonicInstall=window.__telesonicInstall||null;window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__telesonicInstall=event;window.dispatchEvent(new Event("telesonic-install-ready"));});})();`,
           }}
         />
         <HeadContent />
@@ -148,6 +144,18 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function hasRememberedOfflineSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      localStorage.getItem("telesonic_remember_session") === "true" &&
+      !!localStorage.getItem("auth_user")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function RootAuthGate({ bare }: { bare: boolean }) {
   const { isAuthenticated, authReady } = useRole();
   const router = useRouter();
@@ -156,9 +164,20 @@ function RootAuthGate({ bare }: { bare: boolean }) {
     pathname === "/login" ||
     pathname === "/mobile/login" ||
     pathname === "/mobile-apk-download";
+  const offlineRemembered =
+    typeof navigator !== "undefined" &&
+    !navigator.onLine &&
+    hasRememberedOfflineSession();
 
   useEffect(() => {
     if (!authReady) return;
+    // Never force login while mobile data/Wi‑Fi is off and a remembered session exists.
+    if (offlineRemembered && pathname.startsWith("/mobile")) {
+      if (pathname === "/mobile/login") {
+        void router.navigate({ to: "/mobile", replace: true });
+      }
+      return;
+    }
     if (!isAuthenticated && !isPublicRoute) {
       if (pathname.startsWith("/mobile")) {
         void router.navigate({ to: "/mobile/login", replace: true });
@@ -166,9 +185,16 @@ function RootAuthGate({ bare }: { bare: boolean }) {
         void router.navigate({ to: "/login", replace: true });
       }
     }
-  }, [authReady, isAuthenticated, isPublicRoute, pathname, router]);
+  }, [
+    authReady,
+    isAuthenticated,
+    isPublicRoute,
+    pathname,
+    router,
+    offlineRemembered,
+  ]);
 
-  if (!isPublicRoute && (!authReady || !isAuthenticated)) {
+  if (!isPublicRoute && (!authReady || !isAuthenticated) && !offlineRemembered) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

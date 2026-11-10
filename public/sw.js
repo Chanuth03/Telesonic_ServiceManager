@@ -1,5 +1,5 @@
-// Telesonic Service Worker — full mobile offline (Airplane Mode)
-const CACHE_NAME = "telesonic-pwa-v5";
+// Telesonic Service Worker — real offline (Airplane Mode / data+Wi‑Fi off)
+const CACHE_NAME = "telesonic-pwa-v6";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -24,7 +24,10 @@ self.addEventListener("install", (event) => {
         PRECACHE_URLS.map(async (url) => {
           try {
             const response = await fetch(url, { cache: "reload" });
-            if (response.ok) await cache.put(url, response.clone());
+            if (response.ok) {
+              await cache.put(url, response.clone());
+              await cacheHtmlAssets(cache, response.clone());
+            }
           } catch {
             // ignore
           }
@@ -139,26 +142,76 @@ async function putInCache(request, response) {
   await cache.put(request, response.clone());
 }
 
+/** Pull script/module/css URLs out of HTML so Airplane Mode has the SPA bundles. */
+async function cacheHtmlAssets(cache, response) {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) return;
+    const html = await response.text();
+    const origin = self.location.origin;
+    const urls = new Set();
+    const patterns = [
+      /<script[^>]+src=["']([^"']+)["']/gi,
+      /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'][^"']*(?:stylesheet|modulepreload|preload)[^"']*["']/gi,
+      /<link[^>]+rel=["'][^"']*(?:stylesheet|modulepreload|preload)[^"']*["'][^>]*href=["']([^"']+)["']/gi,
+    ];
+    for (const re of patterns) {
+      let match;
+      while ((match = re.exec(html))) {
+        try {
+          const abs = new URL(match[1], origin).href;
+          if (abs.startsWith(origin)) urls.add(abs);
+        } catch {
+          // ignore bad URLs
+        }
+      }
+    }
+    await Promise.all(
+      Array.from(urls).map(async (url) => {
+        try {
+          if (await cache.match(url)) return;
+          const asset = await fetch(url, { credentials: "same-origin" });
+          if (asset.ok) await cache.put(url, asset.clone());
+        } catch {
+          // ignore
+        }
+      }),
+    );
+  } catch {
+    // ignore parse failures
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   if (!isAppRequest(event.request)) return;
 
   if (isNavigationRequest(event.request)) {
     event.respondWith(
       (async () => {
+        // Real offline: serve cache first so data-off reopen does not hang on network.
+        if (!self.navigator.onLine) {
+          return (
+            (await caches.match(event.request, { ignoreSearch: true })) ||
+            (await cachedAppShell())
+          );
+        }
+
         try {
           const response = await fetch(event.request);
           if (response && response.ok) {
             await putInCache(event.request, response);
             const path = new URL(event.request.url).pathname;
+            const cache = await caches.open(CACHE_NAME);
             if (path === "/mobile" || path.startsWith("/mobile/")) {
-              const cache = await caches.open(CACHE_NAME);
               await cache.put("/mobile", response.clone());
             }
+            event.waitUntil(cacheHtmlAssets(cache, response.clone()));
           }
           return response;
         } catch {
           return (
-            (await caches.match(event.request, { ignoreSearch: true })) || (await cachedAppShell())
+            (await caches.match(event.request, { ignoreSearch: true })) ||
+            (await cachedAppShell())
           );
         }
       })(),
@@ -171,24 +224,34 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         const cached = await caches.match(event.request, { ignoreSearch: true });
         if (cached) {
-          event.waitUntil(
-            (async () => {
-              try {
-                const fresh = await fetch(event.request);
-                await putInCache(event.request, fresh);
-              } catch {
-                // keep cached
-              }
-            })(),
-          );
+          if (self.navigator.onLine) {
+            event.waitUntil(
+              (async () => {
+                try {
+                  const fresh = await fetch(event.request);
+                  await putInCache(event.request, fresh);
+                } catch {
+                  // keep cached
+                }
+              })(),
+            );
+          }
           return cached;
         }
+
+        if (!self.navigator.onLine) {
+          const path = new URL(event.request.url).pathname;
+          return (
+            (await caches.match(path, { ignoreSearch: true })) ||
+            new Response("", { status: 503, statusText: "Offline" })
+          );
+        }
+
         try {
           const response = await fetch(event.request);
           await putInCache(event.request, response);
           return response;
         } catch {
-          // Last resort: pathname match ignoring full URL variance after deploys.
           const path = new URL(event.request.url).pathname;
           const byPath = await caches.match(path, { ignoreSearch: true });
           if (byPath) return byPath;
@@ -201,6 +264,12 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
+      if (!self.navigator.onLine) {
+        return (
+          (await caches.match(event.request, { ignoreSearch: true })) ||
+          new Response("", { status: 503, statusText: "Offline" })
+        );
+      }
       try {
         const response = await fetch(event.request);
         await putInCache(event.request, response);

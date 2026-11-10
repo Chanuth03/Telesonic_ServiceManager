@@ -98,7 +98,35 @@ function getInitialAuthState(isVitest: boolean): {
       }
     }
 
-    // Do not trust plaintext localStorage tokens — vault restore happens asynchronously.
+    // Sync restore from durable storage so Airplane Mode / data-off reopen
+    // does not flash login or get redirected by RootAuthGate before async vault runs.
+    const remembered = localStorage.getItem("telesonic_remember_session") === "true";
+    const localUserRaw = localStorage.getItem("auth_user");
+    const localToken = localStorage.getItem("auth_token") || "";
+    if (remembered && localUserRaw) {
+      const parsed = JSON.parse(localUserRaw) as UserProfile;
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      const tokenOk =
+        isUsableJwt(localToken) ||
+        (offline && localToken.split(".").length === 3) ||
+        (offline && !!parsed?.name);
+      if (parsed?.name && tokenOk) {
+        try {
+          if (localToken) sessionStorage.setItem("auth_token", localToken);
+          sessionStorage.setItem("auth_user", localUserRaw);
+          sessionStorage.setItem("mobile_authenticated", "true");
+          sessionStorage.setItem("mobile_tech_id", parsed.name);
+        } catch {
+          // ignore
+        }
+        return {
+          user: parsed,
+          role: parsed.role || "ADMIN",
+          isAuthenticated: true,
+          authReady: true,
+        };
+      }
+    }
   } catch {
     // ignore
   }
