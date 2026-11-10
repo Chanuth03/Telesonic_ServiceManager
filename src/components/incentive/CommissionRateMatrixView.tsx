@@ -245,6 +245,64 @@ const INITIAL_MATRIX_ROWS: RateMatrixCell[] = [
   },
 ];
 
+// Specification INC-SCR-02 (RLC Air Conditioners / Consumer Electronics) Matrix Rows
+const SPEC_RLC_MATRIX_ROWS: RateMatrixCell[] = [
+  {
+    capacityBand: "9,000-12,000 BTU",
+    itemType: "Fixed Speed",
+    cashImmediate: 1150,
+    creditLt15: 1000,
+    creditLt30: 800,
+    creditLte45: 500,
+    creditGt45: 0,
+  },
+  {
+    capacityBand: "9,000-12,000 BTU",
+    itemType: "Inverter",
+    cashImmediate: 1400,
+    creditLt15: 1200,
+    creditLt30: 1000,
+    creditLte45: 700,
+    creditGt45: 0,
+  },
+  {
+    capacityBand: "18,000-30,000 BTU",
+    itemType: "Fixed Speed",
+    cashImmediate: 1250,
+    creditLt15: 1100,
+    creditLt30: 900,
+    creditLte45: 600,
+    creditGt45: 0,
+  },
+  {
+    capacityBand: "18,000-30,000 BTU",
+    itemType: "Inverter",
+    cashImmediate: 1500,
+    creditLt15: 1300,
+    creditLt30: 1100,
+    creditLte45: 800,
+    creditGt45: 0,
+  },
+  {
+    capacityBand: "36,000-60,000 BTU",
+    itemType: "Fixed Speed",
+    cashImmediate: 2250,
+    creditLt15: 1900,
+    creditLt30: 1700,
+    creditLte45: 1500,
+    creditGt45: 0,
+  },
+  {
+    capacityBand: "36,000-60,000 BTU",
+    itemType: "Inverter",
+    cashImmediate: 2750,
+    creditLt15: 2300,
+    creditLt30: 2000,
+    creditLte45: 1750,
+    creditGt45: 0,
+  },
+];
+
 // Audit History Logs
 const INITIAL_HISTORY: HistoryRecord[] = [
   {
@@ -295,22 +353,22 @@ export function CommissionRateMatrixView({
   onNavigateScreen,
   onBack,
 }: CommissionRateMatrixViewProps) {
-  // Header Mandatory Fields State
-  const [selectedScheme, setSelectedScheme] = useState("SCH-2025-SOLAR-01");
-  const [selectedVersion, setSelectedVersion] = useState("v3.2");
-  const [rowDimension, setRowDimension] = useState("Capacity Band + Item Type");
-  const [columnDimension, setColumnDimension] = useState("Payment-term / Credit-age Bands");
-  const [rateUnit, setRateUnit] = useState("% of Net Invoiced Value");
-  const [currency, setCurrency] = useState("USD ($)");
+  // Header Mandatory Fields State (Defaulted to SAP B1 INC-SCR-02 Spec)
+  const [selectedScheme, setSelectedScheme] = useState("RLC-REP-PAY");
+  const [selectedVersion, setSelectedVersion] = useState("3");
+  const [rowDimension, setRowDimension] = useState("Capacity band x Inverter type");
+  const [columnDimension, setColumnDimension] = useState("Credit age band");
+  const [rateUnit, setRateUnit] = useState("LKR per unit");
+  const [currency, setCurrency] = useState("LKR");
 
   // Status flow: Draft -> Approved
-  const [status, setStatus] = useState<MatrixStatus>("Draft");
+  const [status, setStatus] = useState<MatrixStatus>("Approved");
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"matrix" | "bands" | "history">("matrix");
 
-  // Grid Data & Bands State
-  const [matrixData, setMatrixData] = useState<RateMatrixCell[]>(INITIAL_MATRIX_ROWS);
+  // Grid Data & Bands State (Initialized with INC-SCR-02 RLC Air Conditioning Data)
+  const [matrixData, setMatrixData] = useState<RateMatrixCell[]>(SPEC_RLC_MATRIX_ROWS);
   const [bands, setBands] = useState<CreditBandDefinition[]>(INITIAL_BANDS);
   const [history, setHistory] = useState<HistoryRecord[]>(INITIAL_HISTORY);
 
@@ -338,16 +396,46 @@ export function CommissionRateMatrixView({
   } | null>(null);
 
   // PostgreSQL Database & Async States
-  const [matrixId, setMatrixId] = useState<string>("mat-solar-q4");
-  const [matrixName, setMatrixName] = useState<string>("Commercial Solar Inverter & ESS Matrix");
+  const [matrixId, setMatrixId] = useState<string>("mat-rlc-pay");
+  const [matrixName, setMatrixName] = useState<string>("RLC Dealer Sales Staff Payment Commission Matrix");
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [availableSchemes, setAvailableSchemes] = useState<Array<{ schemeCode: string; schemeName: string }>>([
-    { schemeCode: "SCH-2025-SOLAR-01", schemeName: "Commercial Solar" },
-    { schemeCode: "SCH-MOB-2026", schemeName: "sales scheama" },
-    { schemeCode: "SCH-MOB-2027", schemeName: "chathuni" },
+    { schemeCode: "RLC-REP-PAY", schemeName: "RLC Dealer Sales Staff Payment Commission" },
+    { schemeCode: "SCH-MAJ-2026-03", schemeName: "Commercial Solar Solutions" },
+    { schemeCode: "SCH-MOB-2026", schemeName: "Retail Smartphone Sales Scheme" },
   ]);
+
+  // Handler to switch scheme and automatically load associated matrix profile
+  const handleSchemeChange = (schemeCode: string) => {
+    setSelectedScheme(schemeCode);
+    if (schemeCode === "RLC-REP-PAY") {
+      setMatrixName("RLC Dealer Sales Staff Payment Commission Matrix");
+      setRowDimension("Capacity band x Inverter type");
+      setColumnDimension("Credit age band");
+      setRateUnit("LKR per unit");
+      setCurrency("LKR");
+      setSelectedVersion("3");
+      setStatus("Approved");
+      setMatrixData(SPEC_RLC_MATRIX_ROWS);
+    } else if (schemeCode.includes("SOLAR") || schemeCode.includes("MAJ")) {
+      setMatrixName("Commercial Solar Inverter & ESS Matrix");
+      setRowDimension("Capacity Band + Item Type");
+      setColumnDimension("Payment-term / Credit-age Bands");
+      setRateUnit("% of Net Invoiced Value");
+      setCurrency("USD ($)");
+      setSelectedVersion("v0.3");
+      setStatus("Approved");
+      setMatrixData(INITIAL_MATRIX_ROWS);
+    } else {
+      setSelectedVersion("v1.0");
+      setStatus("Draft");
+      setRateUnit("% of Net Invoiced Value");
+      setCurrency("LKR");
+      setMatrixData(INITIAL_MATRIX_ROWS);
+    }
+  };
 
   // Add Dimension Row Modal State
   const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
@@ -408,11 +496,18 @@ export function CommissionRateMatrixView({
       .then((r) => r.json())
       .then((data) => {
         if (data.schemes && data.schemes.length > 0) {
+          const dbSchemes = data.schemes.map((s: any) => ({
+            schemeCode: s.schemeCode,
+            schemeName: s.schemeName,
+          }));
+          const hasRlc = dbSchemes.some((s: any) => s.schemeCode === "RLC-REP-PAY");
           setAvailableSchemes(
-            data.schemes.map((s: any) => ({
-              schemeCode: s.schemeCode,
-              schemeName: s.schemeName,
-            })),
+            hasRlc
+              ? dbSchemes
+              : [
+                  { schemeCode: "RLC-REP-PAY", schemeName: "RLC Dealer Sales Staff Payment Commission" },
+                  ...dbSchemes,
+                ],
           );
         }
       })
@@ -1034,139 +1129,163 @@ export function CommissionRateMatrixView({
           </div>
         </div>
 
-        {/* Mandatory Header Fields Section */}
-        <div className="p-5 sm:p-6 bg-card">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {/* 1. Scheme (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Scheme</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <select
-                value={selectedScheme}
-                onChange={(e) => setSelectedScheme(e.target.value)}
-                className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium"
-              >
-                {availableSchemes.map((s) => (
-                  <option key={s.schemeCode} value={s.schemeCode}>
-                    {s.schemeCode} ({s.schemeName})
-                  </option>
-                ))}
-              </select>
-            </div>
+        {/* Enterprise Spec Form - 2 Balanced ERP Columns (SAP B1 INC-SCR-02 Style) */}
+        <div className="p-5 sm:p-6 bg-card border-b">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            {/* Left Column: Scheme, Row Dimension, Rate Unit */}
+            <div className="space-y-4">
+              {/* 1. Scheme */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span>Scheme</span>
+                    <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-mono">INC-SCR-01 Link</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateScreen?.("scheme-master")}
+                    className="h-8 px-2.5 rounded-md border border-primary/30 bg-primary-soft text-primary hover:bg-primary/20 text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                    title="Jump to Scheme Master (INC-SCR-01)"
+                  >
+                    <span className="font-bold">→</span>
+                    <span className="text-[11px] hidden sm:inline">View Scheme</span>
+                  </button>
+                  <select
+                    value={selectedScheme}
+                    onChange={(e) => handleSchemeChange(e.target.value)}
+                    className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium"
+                  >
+                    {availableSchemes.map((s) => (
+                      <option key={s.schemeCode} value={s.schemeCode}>
+                        {s.schemeCode} — {s.schemeName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-            {/* 2. Version (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Version</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={selectedVersion}
-                  readOnly={status === "Approved"}
-                  onChange={(e) => setSelectedVersion(e.target.value)}
-                  className={`w-full text-xs rounded-md border border-input px-2.5 py-1.5 font-mono shadow-xs ${
-                    status === "Approved"
-                      ? "bg-muted text-muted-foreground cursor-not-allowed"
-                      : "bg-background"
-                  }`}
-                  placeholder="e.g. v3.2"
-                />
-                {status === "Approved" && (
-                  <Lock size={12} className="absolute right-2.5 top-2.5 text-muted-foreground" />
-                )}
+              {/* 2. Row Dimension */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Row Dimension</span>
+                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                </label>
+                <select
+                  value={rowDimension}
+                  disabled={status === "Approved"}
+                  onChange={(e) => setRowDimension(e.target.value)}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                >
+                  <option value="Capacity band x Inverter type">Capacity band x Inverter type</option>
+                  <option value="Capacity Band + Item Type">Capacity Band + Item Type</option>
+                  <option value="Capacity Band Only">Capacity Band Only</option>
+                  <option value="Inverter & Battery Type">Inverter & Battery Type</option>
+                  <option value="Product Classification Group">Product Classification Group</option>
+                </select>
+              </div>
+
+              {/* 3. Rate Unit */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Rate Unit</span>
+                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                </label>
+                <select
+                  value={rateUnit}
+                  disabled={status === "Approved"}
+                  onChange={(e) => setRateUnit(e.target.value)}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                >
+                  <option value="LKR per unit">LKR per unit (Fixed Amount)</option>
+                  <option value="% of Net Invoiced Value">% of Net Invoiced Value</option>
+                  <option value="% of Gross Margin">% of Gross Margin</option>
+                  <option value="Fixed Amount per kW (Currency)">Fixed Amount per kW</option>
+                  <option value="Fixed Amount per Item Unit (Currency)">
+                    Fixed Amount per Item Unit
+                  </option>
+                </select>
               </div>
             </div>
 
-            {/* 3. Row Dimension (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Row Dimension</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <select
-                value={rowDimension}
-                disabled={status === "Approved"}
-                onChange={(e) => setRowDimension(e.target.value)}
-                className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
-              >
-                <option value="Capacity Band + Item Type">Capacity Band + Item Type</option>
-                <option value="Capacity Band Only">Capacity Band Only</option>
-                <option value="Inverter & Battery Type">Inverter & Battery Type</option>
-                <option value="Product Classification Group">Product Classification Group</option>
-              </select>
-            </div>
+            {/* Right Column: Version, Column Dimension, Currency */}
+            <div className="space-y-4">
+              {/* 4. Version */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Version</span>
+                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={selectedVersion}
+                    readOnly={status === "Approved"}
+                    onChange={(e) => setSelectedVersion(e.target.value)}
+                    className={`w-full text-xs rounded-md border border-input px-2.5 py-1.5 font-mono shadow-xs ${
+                      status === "Approved"
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-background"
+                    }`}
+                    placeholder="e.g. 3 or v3.2"
+                  />
+                  {status === "Approved" && (
+                    <Lock size={12} className="absolute right-2.5 top-2.5 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
 
-            {/* 4. Column Dimension (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Column Dimension</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <select
-                value={columnDimension}
-                disabled={status === "Approved"}
-                onChange={(e) => setColumnDimension(e.target.value)}
-                className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
-              >
-                <option value="Payment-term / Credit-age Bands">
-                  Payment-term / Credit-age Bands
-                </option>
-                <option value="Milestone Payment Bands (Cash/Credit/COD)">
-                  Milestone Payment Bands
-                </option>
-                <option value="Customer Credit Rating Aging Bands">
-                  Customer Credit Rating Aging Bands
-                </option>
-              </select>
-            </div>
+              {/* 5. Column Dimension */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Column Dimension</span>
+                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                </label>
+                <select
+                  value={columnDimension}
+                  disabled={status === "Approved"}
+                  onChange={(e) => setColumnDimension(e.target.value)}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                >
+                  <option value="Credit age band">Credit age band</option>
+                  <option value="Payment-term / Credit-age Bands">
+                    Payment-term / Credit-age Bands
+                  </option>
+                  <option value="Milestone Payment Bands (Cash/Credit/COD)">
+                    Milestone Payment Bands
+                  </option>
+                  <option value="Customer Credit Rating Aging Bands">
+                    Customer Credit Rating Aging Bands
+                  </option>
+                </select>
+              </div>
 
-            {/* 5. Rate Unit (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Rate Unit</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <select
-                value={rateUnit}
-                disabled={status === "Approved"}
-                onChange={(e) => setRateUnit(e.target.value)}
-                className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
-              >
-                <option value="% of Net Invoiced Value">% of Net Invoiced Value</option>
-                <option value="% of Gross Margin">% of Gross Margin</option>
-                <option value="Fixed Amount per kW (Currency)">Fixed Amount per kW</option>
-                <option value="Fixed Amount per Item Unit (Currency)">
-                  Fixed Amount per Item Unit
-                </option>
-              </select>
-            </div>
-
-            {/* 6. Currency (mandatory) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>Currency</span>
-                <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
-              </label>
-              <select
-                value={currency}
-                disabled={status === "Approved"}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
-              >
-                <option value="USD ($)">USD ($) - US Dollar</option>
-                <option value="MYR (RM)">MYR (RM) - Malaysian Ringgit</option>
-                <option value="EUR (€)">EUR (€) - Euro</option>
-                <option value="SGD (S$)">SGD (S$) - Singapore Dollar</option>
-              </select>
+              {/* 6. Currency */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Currency</span>
+                  <span className="text-[10px] text-destructive font-medium">*Mandatory</span>
+                </label>
+                <select
+                  value={currency}
+                  disabled={status === "Approved"}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                >
+                  <option value="LKR">LKR (Rs) - Sri Lankan Rupee</option>
+                  <option value="USD ($)">USD ($) - US Dollar</option>
+                  <option value="EUR (€)">EUR (€) - Euro</option>
+                  <option value="SGD (S$)">SGD (S$) - Singapore Dollar</option>
+                  <option value="MYR (RM)">MYR (RM) - Malaysian Ringgit</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Validation Status Summary Banner */}
-          <div className="mt-4 pt-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="mt-5 pt-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Overlap Status */}
               <div className="flex items-center gap-1.5">
@@ -1198,7 +1317,10 @@ export function CommissionRateMatrixView({
 
               <div className="text-muted-foreground">
                 Effective Scheme:{" "}
-                <strong className="text-foreground">Commercial Solar Solutions</strong>
+                <strong className="text-foreground">
+                  {availableSchemes.find((s) => s.schemeCode === selectedScheme)?.schemeName ||
+                    "RLC Dealer Sales Staff Payment Commission"}
+                </strong>
               </div>
             </div>
 
@@ -1378,8 +1500,11 @@ export function CommissionRateMatrixView({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-muted/40 border-b text-muted-foreground font-semibold">
+                    <th className="py-3 px-3 w-[45px] text-center border-r font-mono text-muted-foreground">
+                      #
+                    </th>
                     <th className="py-3 px-4 w-[160px] border-r">Capacity Band</th>
-                    <th className="py-3 px-4 w-[200px] border-r">Item Type</th>
+                    <th className="py-3 px-4 w-[180px] border-r">Item Type</th>
                     <th className="py-3 px-4 text-right border-r bg-emerald-500/5">
                       <div className="flex flex-col items-end">
                         <span className="text-foreground">Cash / Immediate Cheque</span>
@@ -1390,7 +1515,7 @@ export function CommissionRateMatrixView({
                     </th>
                     <th className="py-3 px-4 text-right border-r">
                       <div className="flex flex-col items-end">
-                        <span className="text-foreground">Credit &lt; 15 days</span>
+                        <span className="text-foreground">Credit &lt; 15 d</span>
                         <span className="text-[10px] text-muted-foreground font-normal">
                           1 - 14 Days
                         </span>
@@ -1398,7 +1523,7 @@ export function CommissionRateMatrixView({
                     </th>
                     <th className="py-3 px-4 text-right border-r">
                       <div className="flex flex-col items-end">
-                        <span className="text-foreground">Credit &lt; 30 days</span>
+                        <span className="text-foreground">Credit &lt; 30 d</span>
                         <span className="text-[10px] text-muted-foreground font-normal">
                           15 - 29 Days
                         </span>
@@ -1406,7 +1531,7 @@ export function CommissionRateMatrixView({
                     </th>
                     <th className="py-3 px-4 text-right border-r">
                       <div className="flex flex-col items-end">
-                        <span className="text-foreground">Credit ≤ 45 days</span>
+                        <span className="text-foreground">Credit ≤ 45 d</span>
                         <span className="text-[10px] text-muted-foreground font-normal">
                           30 - 45 Days
                         </span>
@@ -1414,7 +1539,7 @@ export function CommissionRateMatrixView({
                     </th>
                     <th className="py-3 px-4 text-right bg-amber-500/5">
                       <div className="flex flex-col items-end">
-                        <span className="text-foreground">Credit &gt; 45 days</span>
+                        <span className="text-foreground">Credit &gt; 45 d</span>
                         <span className="text-[10px] text-muted-foreground font-normal">
                           46+ Days (Degraded)
                         </span>
@@ -1426,7 +1551,7 @@ export function CommissionRateMatrixView({
                 <tbody className="divide-y divide-border">
                   {filteredMatrix.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={9} className="py-8 text-center text-muted-foreground">
                         No product dimension records match your search criteria.
                       </td>
                     </tr>
@@ -1442,7 +1567,11 @@ export function CommissionRateMatrixView({
                           key={`${row.capacityBand}-${row.itemType}`}
                           className="hover:bg-muted/30 transition-colors"
                         >
-                          <td className="py-3 px-4 font-semibold text-foreground border-r bg-muted/10">
+                          {/* Row Index # (INC-SCR-02 Specification) */}
+                          <td className="py-2.5 px-3 text-center text-muted-foreground font-mono text-xs border-r bg-muted/10">
+                            {rowIdx + 1}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-foreground border-r bg-muted/5">
                             {row.capacityBand}
                           </td>
                           <td className="py-3 px-4 text-foreground border-r font-medium">
@@ -1466,6 +1595,7 @@ export function CommissionRateMatrixView({
                           >
                             <CellContent
                               val={row.cashImmediate}
+                              rateUnit={rateUnit}
                               isEditing={
                                 editingCell?.rowIndex === originalIndex &&
                                 editingCell?.colKey === "cashImmediate"
@@ -1496,6 +1626,7 @@ export function CommissionRateMatrixView({
                           >
                             <CellContent
                               val={row.creditLt15}
+                              rateUnit={rateUnit}
                               isEditing={
                                 editingCell?.rowIndex === originalIndex &&
                                 editingCell?.colKey === "creditLt15"
@@ -1526,6 +1657,7 @@ export function CommissionRateMatrixView({
                           >
                             <CellContent
                               val={row.creditLt30}
+                              rateUnit={rateUnit}
                               isEditing={
                                 editingCell?.rowIndex === originalIndex &&
                                 editingCell?.colKey === "creditLt30"
@@ -1556,6 +1688,7 @@ export function CommissionRateMatrixView({
                           >
                             <CellContent
                               val={row.creditLte45}
+                              rateUnit={rateUnit}
                               isEditing={
                                 editingCell?.rowIndex === originalIndex &&
                                 editingCell?.colKey === "creditLte45"
@@ -1586,6 +1719,7 @@ export function CommissionRateMatrixView({
                           >
                             <CellContent
                               val={row.creditGt45}
+                              rateUnit={rateUnit}
                               isEditing={
                                 editingCell?.rowIndex === originalIndex &&
                                 editingCell?.colKey === "creditGt45"
@@ -1597,6 +1731,22 @@ export function CommissionRateMatrixView({
                               onSave={handleSaveCell}
                               onCancel={() => setEditingCell(null)}
                             />
+                          </td>
+
+                          {/* Action Column */}
+                          <td className="py-2.5 px-3 text-center border-l">
+                            {status === "Draft" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRow(originalIndex)}
+                                className="text-muted-foreground hover:text-destructive p-1 rounded-sm transition-colors cursor-pointer"
+                                title="Delete row"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">Locked</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1623,12 +1773,112 @@ export function CommissionRateMatrixView({
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-muted border border-border" />
-                  0.00% Zero (Allowed &amp; Valid)
+                  0.00 / 0% Zero (Allowed &amp; Valid)
                 </span>
               </div>
               <div>
                 Showing <strong>{filteredMatrix.length}</strong> of{" "}
                 <strong>{matrixData.length}</strong> product dimension rows
+              </div>
+            </div>
+
+            {/* Enterprise Specification Bottom Action Bar (INC-SCR-02 Style) */}
+            <div className="p-4 border-t bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Save Button */}
+                <Button
+                  size="sm"
+                  onClick={handleSaveDraft}
+                  disabled={isSaving || status === "Approved"}
+                  className="h-8 gap-1.5 text-xs font-semibold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  <span>Save</span>
+                </Button>
+
+                {/* Close Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => (onBack ? onBack() : onNavigateScreen?.("scheme-master"))}
+                  className="h-8 text-xs cursor-pointer"
+                >
+                  Close
+                </Button>
+
+                {/* Import Excel */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImportModal(true)}
+                  disabled={status !== "Draft"}
+                  className="h-8 gap-1.5 text-xs cursor-pointer bg-background"
+                >
+                  <Upload size={13} />
+                  <span>Import Excel</span>
+                </Button>
+
+                {/* Export Excel / PDF Combined Trigger */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowExportModal(true)}
+                  className="h-8 gap-1.5 text-xs cursor-pointer bg-background"
+                >
+                  <Download size={13} />
+                  <span>Export Excel / PDF</span>
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleExportExcel();
+                  }}
+                  className="h-8 gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer bg-background"
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>Export to Excel</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleExportPDF();
+                  }}
+                  className="h-8 gap-1.5 text-xs text-rose-700 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer bg-background"
+                >
+                  <Printer size={13} />
+                  <span>Export to PDF</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* SAP B1 Specification Form Legend & Illustration Footer */}
+            <div className="px-4 py-2.5 border-t bg-muted/40 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs border bg-background" />
+                  Standard
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs border border-amber-500/40 bg-amber-500/20" />
+                  UDF
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs border border-cyan-500/40 bg-cyan-500/20" />
+                  UDT/UDO form field
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs border border-violet-500/40 bg-violet-500/20" />
+                  Add-on tab / button / field
+                </span>
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground/80">
+                Sample Screen - For Illustration | INC-SCR-02 | Commission Rate Matrix &middot; B1 Add-on Form · Rate UDO + add-on matrix editor
               </div>
             </div>
           </div>
@@ -2191,12 +2441,13 @@ export function CommissionRateMatrixView({
 }
 
 // ----------------------------------------------------------------------------
-// Cell Content Helper Component with Inline Editing
+// Cell Content Helper Component with Inline Editing & Dual Formatting (% vs Currency)
 // ----------------------------------------------------------------------------
 function CellContent({
   val,
   isEditing,
   editVal,
+  rateUnit = "% of Net Invoiced Value",
   onEditChange,
   onSave,
   onCancel,
@@ -2204,16 +2455,19 @@ function CellContent({
   val: number | null;
   isEditing: boolean;
   editVal: string;
+  rateUnit?: string;
   onEditChange: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const isPercent = rateUnit.includes("%");
+
   if (isEditing) {
     return (
       <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
         <input
           type="number"
-          step="0.05"
+          step={isPercent ? "0.05" : "1"}
           value={editVal}
           onChange={(e) => onEditChange(e.target.value)}
           onKeyDown={(e) => {
@@ -2221,19 +2475,19 @@ function CellContent({
             if (e.key === "Escape") onCancel();
           }}
           autoFocus
-          className="w-16 px-1.5 py-0.5 text-right text-xs rounded border border-primary bg-background focus:outline-hidden"
-          placeholder="0.00"
+          className="w-20 px-1.5 py-0.5 text-right text-xs rounded border border-primary bg-background focus:outline-hidden font-mono"
+          placeholder={isPercent ? "0.00" : "0"}
         />
         <button
           onClick={onSave}
-          className="p-1 rounded bg-primary text-primary-foreground hover:opacity-90"
+          className="p-1 rounded bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"
           title="Save rate"
         >
           <Check size={11} />
         </button>
         <button
           onClick={onCancel}
-          className="p-1 rounded bg-muted text-muted-foreground hover:bg-muted/80"
+          className="p-1 rounded bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
           title="Cancel"
         >
           <X size={11} />
@@ -2250,5 +2504,11 @@ function CellContent({
     );
   }
 
-  return <span>{val.toFixed(2)}%</span>;
+  return (
+    <span className="font-mono">
+      {isPercent
+        ? `${val.toFixed(2)}%`
+        : val.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+    </span>
+  );
 }
