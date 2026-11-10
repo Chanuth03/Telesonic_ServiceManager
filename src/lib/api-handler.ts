@@ -222,6 +222,112 @@ export interface SyncResponseBody {
   processedQueueIds: number[];
 }
 
+async function loadEnrichedJobs(since?: Date | null): Promise<Array<Record<string, unknown>>> {
+  const [jobs, detailRows] = await Promise.all([
+    prisma.job.findMany({
+      ...(since ? { where: { updatedAt: { gt: since } } } : {}),
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma
+      .$queryRawUnsafe<Array<{ record_no: string; data: Record<string, unknown> }>>(
+        `SELECT "record_no", "data" FROM "transaction_records" WHERE "process_key" = 'mobile-job-details'`,
+      )
+      .catch(() => []),
+  ]);
+
+  const detailMap = new Map<string, Record<string, unknown>>();
+  for (const row of detailRows) {
+    if (row.record_no && row.data && typeof row.data === "object") {
+      detailMap.set(row.record_no, row.data);
+    }
+  }
+
+  return jobs.map((j) => {
+    const ext = detailMap.get(j.id);
+    if (!ext) return j as unknown as Record<string, unknown>;
+    return {
+      ...ext,
+      ...j,
+      travel: ext["travel"],
+      parts: ext["parts"],
+      labourLogs: ext["labourLogs"],
+      photos: ext["photos"],
+      inspection: ext["inspection"],
+      holdRequests: ext["holdRequests"],
+      completion: ext["completion"],
+    };
+  });
+}
+
+function parseSinceParam(url: URL): Date | null {
+  const raw = url.searchParams.get("since");
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function loadMobileNotifications(
+  jobs: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const [stored, stateRows] = await Promise.all([
+    prisma
+      .$queryRawUnsafe<Array<{ record_no: string; data: Record<string, unknown> }>>(
+        `SELECT "record_no", "data" FROM "transaction_records" WHERE "process_key" = 'mobile-notifications' ORDER BY "updated_at" DESC LIMIT 200`,
+      )
+      .catch(() => []),
+    prisma
+      .$queryRawUnsafe<Array<{ data: Record<string, unknown> }>>(
+        `SELECT "data" FROM "transaction_records" WHERE "process_key" = 'mobile-notification-state'`,
+      )
+      .catch(() => []),
+  ]);
+
+  const readIds = new Set<string>();
+  const deletedIds = new Set<string>();
+  for (const row of stateRows) {
+    const items = Array.isArray(row.data?.["items"]) ? (row.data["items"] as unknown[]) : [];
+    for (const item of items) {
+      const rec = item as { id?: string; read?: boolean; deleted?: boolean };
+      if (!rec?.id) continue;
+      if (rec.read) readIds.add(rec.id);
+      if (rec.deleted) deletedIds.add(rec.id);
+    }
+  }
+
+  const fromStore: Array<Record<string, unknown>> = stored
+    .map((row) => ({ ...(row.data || {}), id: row.record_no }))
+    .filter((n) => typeof n.id === "string");
+
+  const storedJobIds = new Set(fromStore.map((n) => n["jobId"]).filter(Boolean));
+  const fromJobs: Array<Record<string, unknown>> = jobs
+    .filter((j) => j["status"] === "Assigned" && !storedJobIds.has(j["id"]))
+    .map((j) => ({
+      id: `N-JOB-${String(j["id"])}`,
+      title: "Assigned Service Job",
+      message: `${String(j["priority"] || "Normal")} priority job ${String(j["id"])} at ${String(
+        j["customerName"] || "customer",
+      )} (${String(j["town"] || "")}) is assigned to you.`,
+      time: "Today",
+      read: false,
+      type: "assignment",
+      jobId: String(j["id"]),
+    }));
+
+  return [...fromJobs, ...fromStore]
+    .filter((n) => !deletedIds.has(String(n["id"])))
+    .map((n) => ({ ...n, read: Boolean(n["read"]) || readIds.has(String(n["id"])) }));
+}
+
+async function loadVanStock(): Promise<Array<Record<string, unknown>> | null> {
+  const rows = await prisma
+    .$queryRawUnsafe<Array<{ data: Record<string, unknown> }>>(
+      `SELECT "data" FROM "transaction_records" WHERE "process_key" = 'mobile-stock-counts' AND "record_no" = 'VAN-STOCK' LIMIT 1`,
+    )
+    .catch(() => []);
+  const items = rows[0]?.data?.["items"];
+  return Array.isArray(items) ? (items as Array<Record<string, unknown>>) : null;
+}
+
 export async function handleApiRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -412,6 +518,22 @@ export async function handleApiRequest(request: Request): Promise<Response> {
             continue;
           }
 
+          if (payloadObj["type"] === "NOTIFICATION_STATE") {
+            await prisma
+              .$executeRawUnsafe(
+                `INSERT INTO "transaction_records" ("process_key", "record_no", "status", "data", "updated_at")
+                 VALUES ('mobile-notification-state', $1, 'Synced', $2::jsonb, CURRENT_TIMESTAMP)
+                 ON CONFLICT ("process_key", "record_no") DO UPDATE SET
+                   "data" = EXCLUDED."data",
+                   "updated_at" = CURRENT_TIMESTAMP`,
+                String(payloadObj["userId"] || deviceId),
+                JSON.stringify(payloadObj),
+              )
+              .catch(() => {});
+            if (item.id) processedQueueIds.push(item.id);
+            continue;
+          }
+
           if (item.action === "UPDATE_STATUS") {
             const rawStatus = payloadObj["status"];
             const statusStr = typeof rawStatus === "string" ? rawStatus : "In Progress";
@@ -533,47 +655,61 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       });
     }
 
+    // Mobile offline bootstrap: everything the mobile sections need, in one request.
+    // ?since=<ISO> limits jobs to rows changed after the client's last sync.
+    if (path === "/api/mobile/bootstrap" && method === "GET") {
+      const serverTime = new Date().toISOString();
+      const since = parseSinceParam(url);
+      const [jobs, allJobsForNotifications, vanStock, masterOptions] = await Promise.all([
+        loadEnrichedJobs(since),
+        since ? loadEnrichedJobs(null) : Promise.resolve(null),
+        loadVanStock(),
+        url.searchParams.get("masters") === "0"
+          ? Promise.resolve(null)
+          : getMasterDropdownOptions().catch(() => null),
+      ]);
+      const notifications = await loadMobileNotifications(allJobsForNotifications || jobs);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          serverTime,
+          delta: Boolean(since),
+          jobs,
+          notifications,
+          vanStock,
+          masterOptions,
+        }),
+        { status: 200, headers },
+      );
+    }
+
+    if (path === "/api/notifications" && method === "GET") {
+      const jobs = await loadEnrichedJobs(null);
+      const notifications = await loadMobileNotifications(jobs);
+      return new Response(
+        JSON.stringify({ success: true, serverTime: new Date().toISOString(), notifications }),
+        { status: 200, headers },
+      );
+    }
+
+    if (path === "/api/van-stock" && method === "GET") {
+      const items = await loadVanStock();
+      return new Response(
+        JSON.stringify({ success: true, serverTime: new Date().toISOString(), items }),
+        { status: 200, headers },
+      );
+    }
+
     // 2. /api/jobs — Fetch or mutate Jobs from PostgreSQL
     if (path === "/api/jobs") {
       if (method === "GET") {
-        const [jobs, detailRows] = await Promise.all([
-          prisma.job.findMany({
-            orderBy: { updatedAt: "desc" },
-          }),
-          prisma
-            .$queryRawUnsafe<Array<{ record_no: string; data: Record<string, unknown> }>>(
-              `SELECT "record_no", "data" FROM "transaction_records" WHERE "process_key" = 'mobile-job-details'`,
-            )
-            .catch(() => []),
-        ]);
-
-        const detailMap = new Map<string, Record<string, unknown>>();
-        for (const row of detailRows) {
-          if (row.record_no && row.data && typeof row.data === "object") {
-            detailMap.set(row.record_no, row.data);
-          }
-        }
-
-        const enrichedJobs = jobs.map((j) => {
-          const ext = detailMap.get(j.id);
-          if (!ext) return j;
-          return {
-            ...ext,
-            ...j,
-            travel: ext["travel"],
-            parts: ext["parts"],
-            labourLogs: ext["labourLogs"],
-            photos: ext["photos"],
-            inspection: ext["inspection"],
-            holdRequests: ext["holdRequests"],
-            completion: ext["completion"],
-          };
-        });
+        const enrichedJobs = await loadEnrichedJobs(parseSinceParam(url));
 
         return new Response(
           JSON.stringify({
             success: true,
             source: "PostgreSQL (via Prisma)",
+            serverTime: new Date().toISOString(),
             count: enrichedJobs.length,
             jobs: enrichedJobs,
           }),

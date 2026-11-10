@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useEffect } from "react";
-import { ensureSessionOfflineBootstrap } from "@/lib/offline-bootstrap";
-import { warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
+import { useState, useMemo } from "react";
 import {
   ArrowLeft,
   Search,
@@ -266,15 +264,6 @@ function TransactionsPage() {
   const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Prefetch every TRX API + page shell while online so unopened screens work offline.
-  useEffect(() => {
-    if (typeof window === "undefined" || !navigator.onLine) return;
-    void ensureSessionOfflineBootstrap({ force: false })
-      .then(() => warmMobileOfflineCache("transactions_hub"))
-      .catch((err) => console.warn("[Transactions] Offline prefetch skipped:", err));
-  }, []);
-
   const activeScreenMeta = useMemo(() => {
     if (!selectedScreenId) return null;
     return (

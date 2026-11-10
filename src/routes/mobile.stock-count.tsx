@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   ScanLine,
@@ -42,9 +42,14 @@ function MobileStockCountScreen() {
   const [scannedSku, setScannedSku] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Unsaved counts on screen must survive a background refresh of van stock.
+  const hasUnsavedCounts = useRef(false);
+
   useEffect(() => {
     return subscribeMobileJobs((event) => {
-      if (event === "hydrate" || event === "stock") setItems(getStockCountItems());
+      if (event !== "hydrate" && event !== "stock") return;
+      if (event === "hydrate" && hasUnsavedCounts.current) return;
+      setItems(getStockCountItems());
     });
   }, []);
 
@@ -59,6 +64,7 @@ function MobileStockCountScreen() {
   });
 
   const handleQtyChange = (sku: string, delta: number) => {
+    hasUnsavedCounts.current = true;
     setItems((prev) =>
       prev.map((item) => {
         if (item.sku === sku) {
@@ -71,6 +77,7 @@ function MobileStockCountScreen() {
   };
 
   const handleReasonChange = (sku: string, reason: string) => {
+    hasUnsavedCounts.current = true;
     setItems((prev) =>
       prev.map((item) => (item.sku === sku ? { ...item, varianceReason: reason } : item)),
     );
@@ -91,6 +98,7 @@ function MobileStockCountScreen() {
     items.forEach((item) => {
       updateStockCountItem(item.sku, item.countedQty, item.varianceReason);
     });
+    hasUnsavedCounts.current = false;
     setFeedback("Van stock count saved on this device.");
     setTimeout(() => setFeedback(null), 4000);
   };

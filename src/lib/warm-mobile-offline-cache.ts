@@ -1,147 +1,90 @@
-import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
-
-const MOBILE_STATIC_PATHS = [
-  "/",
-  "/mobile",
-  "/mobile/",
-  "/mobile/login",
-  "/mobile/jobs",
-  "/mobile/stock-count",
-  "/mobile/notifications",
-  "/mobile-apk-download",
-  "/transactions",
-  "/manifest.json",
-  "/favicon.ico",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/apple-touch-icon.png",
-  "/sw.js",
-];
-
-const JOB_SUBPATHS = [
-  "",
-  "/travel",
-  "/parts",
-  "/labour",
-  "/photos",
-  "/inspection",
-  "/hold",
-  "/completion",
-] as const;
-
-export interface WarmOfflineCacheOptions {
-  /** Job IDs already downloaded into Dexie — used so Airplane Mode can open every job screen. */
-  jobIds?: string[];
-}
-
-function collectMobilePaths(jobIds: string[] = []): string[] {
-  const ids = jobIds.filter(Boolean).slice(0, 60);
-
-  const jobPaths = ids.flatMap((id) =>
-    JOB_SUBPATHS.map((suffix) => `/mobile/jobs/${encodeURIComponent(id)}${suffix}`),
-  );
-
-  // Every TRX screen must be reachable offline without visiting it online first.
-  const trxPaths = Object.keys(TRANSACTION_PROCESS_MAP).flatMap((code) => [
-    `/transactions?screen=${encodeURIComponent(code)}`,
-    `/transactions?code=${encodeURIComponent(code)}`,
-  ]);
-
-  return Array.from(new Set([...MOBILE_STATIC_PATHS, ...jobPaths, ...trxPaths]));
-}
-
-async function askServiceWorkerToCache(urls: string[]) {
-  if (!("serviceWorker" in navigator)) return;
-  const registration = await navigator.serviceWorker.ready.catch(() => null);
-  const worker = registration?.active;
-  if (!worker || urls.length === 0) return;
-  worker.postMessage({ type: "CACHE_URLS", urls });
-}
-
-/** Eager-load route/component modules so their hashed chunks hit the SW cache. */
-async function preloadAppModules(): Promise<void> {
-  try {
-    const modules = import.meta.glob([
-      "/src/routes/mobile*.tsx",
-      "/src/routes/transactions.tsx",
-      "/src/components/transactions/**/*.{ts,tsx}",
-      "/src/components/mobile/**/*.{ts,tsx}",
-      "/src/lib/offline-*.ts",
-      "/src/lib/sync-manager.ts",
-      "/src/lib/mobile-*.ts",
-      "/src/lib/warm-mobile-offline-cache.ts",
-      "/src/data/transactionsSpecData.ts",
-    ]);
-    await Promise.allSettled(Object.values(modules).map((load) => load()));
-  } catch (err) {
-    console.warn("[OfflineCache] Module preload skipped:", err);
-  }
-}
-
-async function fetchInBatches(urls: string[], batchSize = 8): Promise<void> {
-  for (let i = 0; i < urls.length; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
-    await Promise.allSettled(
-      batch.map(async (url) => {
-        try {
-          await fetch(url, {
-            credentials: "same-origin",
-            cache: "reload",
-            headers: {
-              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-          });
-        } catch {
-          // Ignore individual warm failures.
-        }
-      }),
-    );
-  }
-}
-
 /**
- * While online, visit mobile + transaction URLs and preload JS modules so
- * Airplane Mode / data-off can open the same screens later from cache —
- * including screens the user has never opened in this session.
+ * Store all page code for offline use.
+ *
+ * Primary path: the service worker downloads every file listed in the
+ * build-time /offline-manifest.json. Fallback (manifest missing): load every
+ * route's code chunk through the router so the service worker caches it as it
+ * passes through.
  */
-export async function warmMobileOfflineCache(
-  reason = "startup",
-  options: WarmOfflineCacheOptions = {},
-): Promise<void> {
-  if (typeof window === "undefined") return;
-  if (!navigator.onLine) return;
 
-  let jobIds = options.jobIds || [];
-  if (jobIds.length === 0) {
-    try {
-      const { getDexieJobs } = await import("@/lib/offline-db");
-      const jobs = await getDexieJobs();
-      jobIds = jobs.map((j) => j.id).filter(Boolean);
-    } catch {
-      // ignore — still warm static + TRX shells
+interface RouteChunkLoader {
+  routesById: Record<string, unknown>;
+  loadRouteChunk: (route: never) => Promise<void> | undefined;
+}
+
+export interface PrecacheResult {
+  ok: boolean;
+  manifest: boolean;
+  total?: number;
+  stored?: number;
+  version?: string;
+  fallbackRoutes?: number;
+}
+
+let routerRef: RouteChunkLoader | null = null;
+let inFlight: Promise<PrecacheResult> | null = null;
+
+/** Called once from the root component so the fallback can reach every route. */
+export function registerOfflineRouter(router: unknown): void {
+  const candidate = router as Partial<RouteChunkLoader> | null;
+  if (candidate?.routesById && typeof candidate.loadRouteChunk === "function") {
+    routerRef = candidate as RouteChunkLoader;
+  }
+}
+
+async function askServiceWorker(timeoutMs: number): Promise<PrecacheResult> {
+  if (!("serviceWorker" in navigator)) return { ok: false, manifest: false };
+  const registration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000)),
+  ]);
+  const worker = registration?.active;
+  if (!worker) return { ok: false, manifest: false };
+
+  return new Promise<PrecacheResult>((resolve) => {
+    const channel = new MessageChannel();
+    const timer = window.setTimeout(() => resolve({ ok: false, manifest: false }), timeoutMs);
+    channel.port1.onmessage = (event) => {
+      window.clearTimeout(timer);
+      const data = (event.data || {}) as Partial<PrecacheResult>;
+      resolve({ ok: Boolean(data.ok), manifest: Boolean(data.manifest), ...data });
+    };
+    worker.postMessage({ type: "PRECACHE_APP" }, [channel.port2]);
+  });
+}
+
+async function loadAllRouteChunks(): Promise<number> {
+  if (!routerRef) return 0;
+  const routes = Object.values(routerRef.routesById);
+  await Promise.allSettled(
+    routes.map((route) => Promise.resolve(routerRef!.loadRouteChunk(route as never))),
+  );
+  return routes.length;
+}
+
+export async function warmMobileOfflineCache(reason = "startup"): Promise<PrecacheResult> {
+  if (typeof window === "undefined") return { ok: false, manifest: false };
+  if (!navigator.onLine) return { ok: false, manifest: false };
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    const result = await askServiceWorker(120_000);
+    if (!result.manifest) {
+      result.fallbackRoutes = await loadAllRouteChunks();
     }
-  }
+    console.log(`[OfflineCache] Page code precache (${reason}):`, result);
+    try {
+      localStorage.setItem(
+        "telesonic_offline_cache_warmed_at",
+        JSON.stringify({ at: new Date().toISOString(), ...result }),
+      );
+    } catch {
+      // ignore
+    }
+    return result;
+  })().finally(() => {
+    inFlight = null;
+  });
 
-  const paths = collectMobilePaths(jobIds);
-  console.log(`[OfflineCache] Warming ${paths.length} URLs + modules (${reason})`);
-
-  await preloadAppModules();
-
-  const absolute = paths.map((path) => new URL(path, window.location.origin).href);
-  await fetchInBatches(absolute, 8);
-
-  // Cache whatever the browser already downloaded (route chunks, CSS, icons).
-  const loaded = performance
-    .getEntriesByType("resource")
-    .map((entry) => (entry as PerformanceResourceTiming).name)
-    .filter((url) => url.startsWith(window.location.origin));
-
-  await askServiceWorkerToCache([...absolute, ...loaded]);
-
-  try {
-    localStorage.setItem("telesonic_offline_cache_warmed_at", new Date().toISOString());
-    localStorage.setItem("telesonic_offline_cache_warmed_paths", String(paths.length));
-  } catch {
-    // ignore
-  }
+  return inFlight;
 }

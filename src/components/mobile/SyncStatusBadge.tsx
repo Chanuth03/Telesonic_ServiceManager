@@ -1,5 +1,28 @@
+import { useEffect, useState } from "react";
 import { Wifi, WifiOff, RefreshCw, CheckCircle2, AlertCircle, HardDrive } from "lucide-react";
 import { useSyncManager } from "@/hooks/useSyncManager";
+import { useRole } from "@/context/RoleContext";
+import { getOfflineDataUpdatedAt } from "@/lib/offline-sync/engine";
+
+function useOfflineDataUpdatedAt(userId: string | null): Date | null {
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const refresh = () => {
+      void getOfflineDataUpdatedAt(userId).then((iso) => {
+        if (!cancelled) setUpdatedAt(iso ? new Date(iso) : null);
+      });
+    };
+    refresh();
+    window.addEventListener("telesonic:offline-data-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("telesonic:offline-data-updated", refresh);
+    };
+  }, [userId]);
+  return updatedAt;
+}
 
 export function SyncStatusBadge() {
   const {
@@ -10,6 +33,8 @@ export function SyncStatusBadge() {
     lastError,
     triggerSync,
   } = useSyncManager();
+  const { user } = useRole();
+  const dataUpdatedAt = useOfflineDataUpdatedAt(user?.id != null ? String(user.id) : null);
 
   return (
     <div className="flex flex-col gap-1.5 rounded-lg bg-muted/80 p-2.5 text-xs border border-border/60">
@@ -90,6 +115,14 @@ export function SyncStatusBadge() {
             </span>
           ) : null}
         </div>
+      </div>
+
+      <div className="text-[10px] text-muted-foreground">
+        {dataUpdatedAt
+          ? `Offline data downloaded ${dataUpdatedAt.toLocaleString()}`
+          : isOnline
+            ? "Downloading data for offline use…"
+            : "Offline data not downloaded yet — connect once to download."}
       </div>
 
       {!isOnline ? (

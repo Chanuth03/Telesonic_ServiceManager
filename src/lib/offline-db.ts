@@ -1136,9 +1136,115 @@ export async function getDexieStock(): Promise<StockCountItem[]> {
   return rows.map(({ updatedAt: _updatedAt, ...item }) => item);
 }
 
-export async function saveDexieNotifications(items: MobileNotification[]): Promise<void> {
-  await offlineDB.notifications.clear();
-  if (items.length > 0) await offlineDB.notifications.bulkPut(items);
+const DELETED_NOTIFICATIONS_KEY = "deleted_notification_ids";
+
+async function getDeletedNotificationIds(): Promise<Set<string>> {
+  const row = await offlineDB.offlineMeta.get(DELETED_NOTIFICATIONS_KEY);
+  return new Set(Array.isArray(row?.value) ? (row.value as string[]) : []);
+}
+
+/**
+ * Persist the technician's notification list. User edits (read / delete) are
+ * queued so the read state follows the user to other devices.
+ */
+export async function saveDexieNotifications(
+  items: MobileNotification[],
+  options: { queue?: boolean } = {},
+): Promise<void> {
+  const queue = options.queue !== false;
+  const now = Date.now();
+  const previous = await offlineDB.notifications.toArray();
+  const nextIds = new Set(items.map((item) => item.id));
+  const deleted = await getDeletedNotificationIds();
+  if (queue) {
+    for (const prev of previous) {
+      if (!nextIds.has(prev.id)) deleted.add(prev.id);
+    }
+  }
+
+  await offlineDB.transaction(
+    "rw",
+    [offlineDB.notifications, offlineDB.offlineMeta, offlineDB.syncQueue],
+    async () => {
+      await offlineDB.notifications.clear();
+      if (items.length > 0) await offlineDB.notifications.bulkPut(items);
+      await offlineDB.offlineMeta.put({
+        key: DELETED_NOTIFICATIONS_KEY,
+        value: Array.from(deleted),
+        updatedAt: now,
+      });
+      if (!queue) return;
+
+      const stale = await offlineDB.syncQueue
+        .where("entityId")
+        .equals("NOTIFICATION-STATE")
+        .filter((row) => row.status === "pending")
+        .primaryKeys();
+      if (stale.length > 0) await offlineDB.syncQueue.bulkDelete(stale as number[]);
+
+      const { userId } = readActiveUserScope();
+      await offlineDB.syncQueue.add({
+        action: "GENERIC_UPDATE",
+        entityId: "NOTIFICATION-STATE",
+        payload: {
+          type: "NOTIFICATION_STATE",
+          userId,
+          items: [
+            ...items.filter((n) => n.read).map((n) => ({ id: n.id, read: true })),
+            ...Array.from(deleted).map((id) => ({ id, deleted: true })),
+          ],
+          updatedAt: new Date(now).toISOString(),
+        },
+        createdAt: now,
+        status: "pending",
+        userId,
+      });
+    },
+  );
+
+  if (queue && typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("telesonic:dexie-update", { detail: { type: "notifications" } }),
+    );
+  }
+}
+
+/** Merge server notifications; local "read" and local deletes always win. */
+export async function applyServerNotifications(
+  serverItems: MobileNotification[],
+): Promise<MobileNotification[]> {
+  await ensureOfflineDatabaseReady();
+  const local = await offlineDB.notifications.toArray();
+  const localById = new Map(local.map((n) => [n.id, n]));
+  const deleted = await getDeletedNotificationIds();
+  const merged = serverItems
+    .filter((n) => n?.id && !deleted.has(n.id))
+    .map((n) => ({ ...n, read: Boolean(n.read) || Boolean(localById.get(n.id)?.read) }));
+  await saveDexieNotifications(merged, { queue: false });
+  return merged;
+}
+
+/**
+ * Replace van stock with the server copy unless the technician has an
+ * unsent count on this device.
+ */
+export async function applyServerVanStock(
+  serverItems: StockCountItem[] | null | undefined,
+): Promise<boolean> {
+  await ensureOfflineDatabaseReady();
+  if (!Array.isArray(serverItems) || serverItems.length === 0) return false;
+  const pendingCounts = await offlineDB.syncQueue
+    .where("entityId")
+    .startsWith("STOCK-COUNT-")
+    .filter((row) => row.status === "pending" || row.status === "failed")
+    .count();
+  if (pendingCounts > 0) return false;
+  const now = Date.now();
+  await offlineDB.transaction("rw", [offlineDB.stockCount], async () => {
+    await offlineDB.stockCount.clear();
+    await offlineDB.stockCount.bulkPut(serverItems.map((item) => ({ ...item, updatedAt: now })));
+  });
+  return true;
 }
 
 export async function getDexieNotifications(): Promise<MobileNotification[]> {

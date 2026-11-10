@@ -17,6 +17,7 @@ import {
   markMobileNotificationAsRead,
   markAllMobileNotificationsAsRead,
   deleteMobileNotification,
+  subscribeMobileJobs,
   type MobileNotification,
 } from "../lib/mobile-data";
 
@@ -29,7 +30,14 @@ function MobileNotificationsPage() {
   const [filter, setFilter] = useState<"all" | "unread" | "Job Assignment" | "Alert">("all");
 
   useEffect(() => {
-    setNotifications(getMobileNotifications());
+    const refresh = () => setNotifications(getMobileNotifications());
+    refresh();
+    const unsub = subscribeMobileJobs(refresh);
+    window.addEventListener("telesonic:auth-changed", refresh);
+    return () => {
+      unsub();
+      window.removeEventListener("telesonic:auth-changed", refresh);
+    };
   }, []);
 
   const handleMarkAsRead = (id: string) => {

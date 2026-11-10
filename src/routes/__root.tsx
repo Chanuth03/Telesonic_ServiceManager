@@ -20,8 +20,8 @@ import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
 import { ensureOfflineDatabaseReady } from "@/lib/offline-db";
 import { isStandalonePwa } from "@/lib/pwa";
 import { UnsyncedDataGuard } from "@/components/common/UnsyncedDataGuard";
-import { syncManager } from "@/lib/sync-manager";
-import { warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
+import { startOfflineSyncLifecycle } from "@/lib/offline-sync/engine";
+import { registerOfflineRouter, warmMobileOfflineCache } from "@/lib/warm-mobile-offline-cache";
 
 function NotFoundComponent() {
   return (
@@ -218,6 +218,7 @@ function RootAuthGate({ bare }: { bare: boolean }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [standalone, setStandalone] = useState(false);
   useEffect(() => {
@@ -235,17 +236,18 @@ function RootComponent() {
     installedMobile;
   useEffect(() => {
     applyTheme(getSavedTheme());
+    registerOfflineRouter(router);
     void (async () => {
       try {
         await ensureOfflineDatabaseReady();
         await startMobileOfflineBridge();
-        if (syncManager.getIsOnline()) {
-          void syncManager.triggerSync("app_startup");
-          // Warm HTML/JS caches so every mobile page works later in Airplane Mode.
-          window.setTimeout(() => {
-            void warmMobileOfflineCache("app_startup");
-          }, 1500);
-        }
+        // Push outbox, then pull any missing/stale datasets; refreshes on reconnect,
+        // foreground and a timer while the app is open.
+        startOfflineSyncLifecycle();
+        // Store every page's code so screens never opened online still work offline.
+        window.setTimeout(() => {
+          void warmMobileOfflineCache("app_startup");
+        }, 3000);
       } catch (err) {
         console.error("[App] Offline database init failed:", err);
       }

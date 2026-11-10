@@ -24,7 +24,9 @@ import { TransactionExportModal } from "./TransactionExportModal";
 import { AddPartModal } from "@/components/common/AddPartModal";
 import { saveFormData, loadSavedTabData, saveTabData } from "@/data/sparePartsCatalog";
 import { TRANSACTION_PROCESS_MAP } from "@/lib/transactions-db";
+import { TRANSACTION_HISTORY_LIMIT } from "@/lib/offline-sync/registry";
 import {
+  cacheServerTransactionsLocally,
   ensureOfflineDatabaseReady,
   getDexieTransactionsForScreen,
   isOfflineForTransactions,
@@ -317,6 +319,13 @@ export const TransactionScreenView: React.FC<TransactionScreenViewProps> = ({
             const json = await res.json();
             const list = (json.records || json.requests || []) as Record<string, unknown>[];
             if (Array.isArray(list)) {
+              void cacheServerTransactionsLocally({
+                code: meta.code,
+                storageKey,
+                apiPath: processConfig.apiPath,
+                primaryField: processConfig.primaryField,
+                records: list.slice(0, TRANSACTION_HISTORY_LIMIT),
+              }).catch((err) => console.warn("[Dexie] Could not cache server rows:", err));
               const localRefs = new Set(
                 localRecords.map((rec) =>
                   String(

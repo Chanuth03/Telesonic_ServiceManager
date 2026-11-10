@@ -16,9 +16,7 @@ import { useRole } from "@/context/RoleContext";
 import { apiFetch } from "@/lib/api-client";
 import { readStoredTechnicianSession } from "@/lib/app-initializer";
 import { isOfflineForTransactions } from "@/lib/offline-db";
-import { refreshMobileJobsFromServer } from "@/lib/mobile-offline-bridge";
 import {
-  ensureSessionOfflineBootstrap,
   runOfflineBootstrap,
   subscribeBootstrapProgress,
   type BootstrapProgress,
@@ -65,7 +63,7 @@ function MobileLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bootstrap, setBootstrap] = useState<BootstrapProgress | null>(null);
   const [holdForBootstrap, setHoldForBootstrap] = useState(false);
-  const returningBootstrapDone = useRef(false);
+  const signInInProgress = useRef(false);
 
   useEffect(() => {
     return subscribeBootstrapProgress((progress) => {
@@ -81,26 +79,11 @@ function MobileLoginPage() {
       bootstrap.phase !== "error" &&
       bootstrap.phase !== "ready");
 
-  // Keep-me-signed-in: still prefetch ALL APIs/pages while online before entering the app.
+  // Keep-me-signed-in: enter immediately. The offline sync lifecycle refreshes
+  // stale datasets in the background, so returning users never wait on downloads.
   useEffect(() => {
-    if (!authReady || !isAuthenticated || returningBootstrapDone.current) return;
-    returningBootstrapDone.current = true;
-    let cancelled = false;
-    void (async () => {
-      if (!isOfflineForTransactions() && navigator.onLine) {
-        setHoldForBootstrap(true);
-        try {
-          await ensureSessionOfflineBootstrap({ force: true });
-        } catch (err) {
-          console.warn("[Login] Returning-session bootstrap partial:", err);
-        }
-        if (!cancelled) setHoldForBootstrap(false);
-      }
-      if (!cancelled) navigate({ to: "/mobile", replace: true });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (!authReady || !isAuthenticated || signInInProgress.current) return;
+    navigate({ to: "/mobile", replace: true });
   }, [authReady, isAuthenticated, navigate]);
 
   if (!authReady && !isBootstrapping) {
@@ -128,6 +111,8 @@ function MobileLoginPage() {
       return;
     }
 
+    signInInProgress.current = true;
+
     try {
       const response = await apiFetch(
         "/api/auth/login",
@@ -145,6 +130,7 @@ function MobileLoginPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        signInInProgress.current = false;
         setError(data.error || "Invalid Email or Password");
         setIsSubmitting(false);
         return;
@@ -152,13 +138,14 @@ function MobileLoginPage() {
 
       const token = data.token || "session-token";
 
+      // Hold navigation while the required offline data downloads (soft-fail — never block login).
+      setHoldForBootstrap(true);
+
       // Persist session FIRST so Airplane Mode reopen works even if bootstrap is partial.
       if (data.user) {
         await loginUser(data.user, token, rememberMe);
       }
 
-      // Hold navigation while offline data is cached (soft-fail — never block login).
-      setHoldForBootstrap(true);
       try {
         await runOfflineBootstrap({
           user: data.user,
@@ -168,12 +155,11 @@ function MobileLoginPage() {
         console.warn("[Login] Offline bootstrap partial/failed; session kept:", bootErr);
       }
 
-      await refreshMobileJobsFromServer();
       void syncManager.triggerSync("post_login");
-      returningBootstrapDone.current = true;
       setHoldForBootstrap(false);
       navigate({ to: "/mobile", replace: true });
     } catch {
+      signInInProgress.current = false;
       setHoldForBootstrap(false);
       setError(
         navigator.onLine
