@@ -22,6 +22,7 @@ import {
   HelpCircle,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   Lock,
   Unlock,
   AlertTriangle,
@@ -438,6 +439,21 @@ export function CommissionRateMatrixView({
 
   // Handler to switch scheme and automatically load associated matrix profile from PostgreSQL
   const handleSchemeChange = (schemeCode: string) => {
+    if (schemeCode === "__NEW_MATRIX__") {
+      setNewMatrixForm({
+        schemeCode: selectedScheme,
+        matrixName: `${selectedScheme} Commission Matrix`,
+        version: "1.0",
+        rowDimension: "Capacity band x Inverter type",
+        columnDimension: "Credit age band",
+        rateUnit: "LKR per unit",
+        currency: "LKR",
+        templateType: "rlc",
+      });
+      setShowNewMatrixModal(true);
+      return;
+    }
+
     setSelectedScheme(schemeCode);
     const matches = allMatrices.filter((m) => m.schemeCode === schemeCode);
     if (matches.length > 0) {
@@ -455,23 +471,13 @@ export function CommissionRateMatrixView({
         setStatus("Approved");
         setMatrixData(SPEC_RLC_MATRIX_ROWS);
         setBands(INITIAL_BANDS);
-      } else if (schemeCode.includes("SOLAR") || schemeCode.includes("MAJ")) {
-        setMatrixId("mat-solar-q4");
-        setMatrixName("Commercial Solar Inverter & ESS Matrix");
-        setRowDimension("Capacity Band + Item Type");
-        setColumnDimension("Payment-term / Credit-age Bands");
-        setRateUnit("% of Net Invoiced Value");
-        setCurrency("USD ($)");
-        setSelectedVersion("v3.3");
-        setStatus("Approved");
-        setMatrixData(INITIAL_MATRIX_ROWS);
-        setBands(INITIAL_BANDS);
       } else {
         setMatrixId(`mat-${schemeCode.toLowerCase().replace(/[^a-z0-9]/g, "-")}-v1-0`);
-        setMatrixName(`${schemeCode} Commission Matrix`);
-        setRowDimension("Capacity Band + Item Type");
-        setColumnDimension("Payment-term / Credit-age Bands");
-        setRateUnit("% of Net Invoiced Value");
+        const schemeObj = availableSchemes.find((s) => s.schemeCode === schemeCode);
+        setMatrixName(schemeObj?.schemeName || `${schemeCode} Commission Matrix`);
+        setRowDimension("Capacity band x Inverter type");
+        setColumnDimension("Credit age band");
+        setRateUnit("LKR per unit");
         setCurrency("LKR");
         setSelectedVersion("1.0");
         setStatus("Draft");
@@ -513,13 +519,33 @@ export function CommissionRateMatrixView({
     }
   };
 
-  // Load Commission Rate Matrix from PostgreSQL
+  // Load Commission Rate Matrix and Schemes from PostgreSQL
   const loadMatrixFromDb = async (silent: boolean = false, targetScheme?: string, targetVersion?: string) => {
     try {
       if (!silent) setIsLoading(true);
-      const res = await apiFetch("/api/incentives/rate-matrices");
-      if (res.ok) {
-        const data = await res.json();
+      const [matricesRes, schemesRes] = await Promise.all([
+        apiFetch("/api/incentives/rate-matrices"),
+        apiFetch("/api/incentives/schemes").catch(() => null),
+      ]);
+
+      if (schemesRes && schemesRes.ok) {
+        const sData = await schemesRes.json();
+        if (sData.schemes && Array.isArray(sData.schemes)) {
+          setAvailableSchemes((prev) => {
+            const map = new Map(prev.map((s) => [s.schemeCode, s.schemeName]));
+            for (const s of sData.schemes) {
+              map.set(s.schemeCode, s.schemeName);
+            }
+            return Array.from(map.entries()).map(([schemeCode, schemeName]) => ({
+              schemeCode,
+              schemeName,
+            }));
+          });
+        }
+      }
+
+      if (matricesRes.ok) {
+        const data = await matricesRes.json();
         if (data.matrices && Array.isArray(data.matrices)) {
           setAllMatrices(data.matrices);
 
@@ -983,6 +1009,28 @@ export function CommissionRateMatrixView({
           if (prev.some((s) => s.schemeCode === payload.schemeCode)) return prev;
           return [{ schemeCode: payload.schemeCode, schemeName: payload.matrixName }, ...prev];
         });
+
+        // Ensure scheme is also registered in incentive_schemes table if not already present
+        apiFetch("/api/incentives/schemes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schemeCode: payload.schemeCode,
+            schemeName: payload.matrixName,
+            division: "Consumer Electronics",
+            schemeType: "Commission Matrix Units",
+            participantRole: "Dealer Sales Representative",
+            calculationBasis: "Commission Matrix Units",
+            ageBasis: "Invoice Date",
+            payableLagMonths: 1,
+            effectiveFrom: new Date().toISOString().split("T")[0],
+            effectiveTo: "2026-12-31",
+            status: "Approved",
+            version: payload.version,
+            description: payload.description,
+          }),
+        }).catch(() => {});
+
         await loadMatrixFromDb(true, payload.schemeCode, payload.version);
         toast.success(`New Commission Rate Matrix created & saved in PostgreSQL!`, {
           description: `Matrix ID: ${newId} (Version ${payload.version}) with ${initialCells.length} dimension rows.`,
@@ -1225,6 +1273,9 @@ export function CommissionRateMatrixView({
                   </>
                 )}
               </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-muted text-muted-foreground border border-border/60">
+                {selectedVersion}
+              </span>
             </div>
           </div>
 
@@ -1270,7 +1321,7 @@ export function CommissionRateMatrixView({
               <span>Import Excel</span>
             </Button>
 
-            {/* Save Changes */}
+            {/* Save Changes (draft only) */}
             {status === "Draft" && (
               <Button
                 size="sm"
@@ -1299,37 +1350,13 @@ export function CommissionRateMatrixView({
                 size="sm"
                 onClick={handleCreateNewDraftVersion}
                 disabled={isSaving}
-                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs"
+                className="h-8 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
                 title="Create a new draft version and save immediately to PostgreSQL"
               >
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 <span>Create New Draft Version</span>
               </Button>
             )}
-
-            {/* New Matrix Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setNewMatrixForm({
-                  schemeCode: selectedScheme,
-                  matrixName: `${selectedScheme} Commission Matrix`,
-                  version: "1.0",
-                  rowDimension: "Capacity band x Inverter type",
-                  columnDimension: "Credit age band",
-                  rateUnit: "LKR per unit",
-                  currency: "LKR",
-                  templateType: "rlc",
-                });
-                setShowNewMatrixModal(true);
-              }}
-              className="h-8 gap-1.5 text-xs font-semibold cursor-pointer border-dashed hover:border-solid"
-              title="Initialize a new rate matrix in PostgreSQL"
-            >
-              <Plus size={13} />
-              <span>New Matrix</span>
-            </Button>
           </div>
         </div>
 
@@ -1347,11 +1374,11 @@ export function CommissionRateMatrixView({
                   <button
                     type="button"
                     onClick={() => onNavigateScreen?.("scheme-master")}
-                    className="h-8 px-2.5 rounded-md border border-primary/30 bg-primary-soft text-primary hover:bg-primary/20 text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                    className="h-8 px-2.5 rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer transition-colors shadow-2xs"
                     title="Jump to Scheme Master (INC-SCR-01)"
                   >
                     <span className="font-bold">→</span>
-                    <span className="text-[11px] hidden sm:inline">View Scheme</span>
+                    <span className="text-xs">View Scheme</span>
                   </button>
                   <select
                     value={selectedScheme}
@@ -1363,6 +1390,7 @@ export function CommissionRateMatrixView({
                         {s.schemeCode} — {s.schemeName}
                       </option>
                     ))}
+                    <option value="__NEW_MATRIX__">+ Create New Matrix...</option>
                   </select>
                 </div>
               </div>
@@ -1376,7 +1404,7 @@ export function CommissionRateMatrixView({
                   value={rowDimension}
                   disabled={status === "Approved"}
                   onChange={(e) => setRowDimension(e.target.value)}
-                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted/40 disabled:cursor-not-allowed"
                 >
                   <option value="Capacity band x Inverter type">Capacity band x Inverter type</option>
                   <option value="Capacity Band + Item Type">Capacity Band + Item Type</option>
@@ -1395,7 +1423,7 @@ export function CommissionRateMatrixView({
                   value={rateUnit}
                   disabled={status === "Approved"}
                   onChange={(e) => setRateUnit(e.target.value)}
-                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted disabled:cursor-not-allowed"
+                  className="w-full text-xs rounded-md border border-input bg-background px-2.5 py-1.5 shadow-xs focus:ring-1 focus:ring-ring font-medium disabled:bg-muted/40 disabled:cursor-not-allowed"
                 >
                   <option value="LKR per unit">LKR per unit (Fixed Amount)</option>
                   <option value="% of Net Invoiced Value">% of Net Invoiced Value</option>
@@ -1410,59 +1438,43 @@ export function CommissionRateMatrixView({
 
             {/* Right Column: Version, Column Dimension, Currency */}
             <div className="space-y-4">
-              {/* 4. Version & Status Selector */}
+              {/* 4. Version */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Version <span className="text-destructive font-bold">*</span>
-                  </label>
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    {currentSchemeMatrices.length > 1
-                      ? `${currentSchemeMatrices.length} Versions in Database`
-                      : "Active Version"}
-                  </span>
-                </div>
-                {currentSchemeMatrices.length > 1 ? (
-                  <select
-                    value={matrixId}
-                    onChange={(e) => {
-                      const selected = currentSchemeMatrices.find((m) => m.id === e.target.value);
-                      if (selected) applyMatrix(selected);
-                    }}
-                    className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium shadow-xs focus:ring-1 focus:ring-ring cursor-pointer ${
-                      status === "Draft"
-                        ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
-                        : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
-                    }`}
-                  >
-                    {currentSchemeMatrices.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        Version {m.version} — {m.status} {m.status === "Approved" ? "(Current Active)" : "(Editable Draft)"}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div
-                    className={`w-full text-xs rounded-md border px-2.5 py-1.5 font-medium flex items-center justify-between shadow-xs ${
-                      status === "Draft"
-                        ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200"
-                        : "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
-                    }`}
-                  >
-                    <span className="font-semibold font-mono">Version {selectedVersion}</span>
-                    <span className="text-[11px] font-semibold flex items-center gap-1">
-                      {status === "Approved" ? (
-                        <>
-                          <CheckCircle2 size={12} className="text-emerald-600" /> Approved (Active)
-                        </>
-                      ) : (
-                        <>
-                          <Clock size={12} className="text-amber-600" /> Draft (In Progress)
-                        </>
-                      )}
-                    </span>
+                <label className="text-xs font-semibold text-foreground block">
+                  Version <span className="text-destructive font-bold">*</span>
+                </label>
+                <div className="relative flex items-center">
+                  {currentSchemeMatrices.length > 1 ? (
+                    <select
+                      value={matrixId}
+                      onChange={(e) => {
+                        const selected = currentSchemeMatrices.find((m) => m.id === e.target.value);
+                        if (selected) applyMatrix(selected);
+                      }}
+                      className="w-full text-xs rounded-md border border-input bg-muted/30 px-3 py-1.5 pr-8 shadow-xs font-medium focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+                    >
+                      {currentSchemeMatrices.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.version}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      readOnly
+                      value={selectedVersion}
+                      className="w-full text-xs rounded-md border border-input bg-muted/30 px-3 py-1.5 pr-8 shadow-xs font-medium cursor-default"
+                    />
+                  )}
+                  <div className="absolute right-2.5 pointer-events-none text-muted-foreground">
+                    {status === "Approved" ? (
+                      <Lock size={14} className="opacity-70" />
+                    ) : (
+                      <ChevronDown size={14} className="opacity-70" />
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* 5. Column Dimension */}

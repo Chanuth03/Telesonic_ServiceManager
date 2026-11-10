@@ -391,16 +391,27 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       }
 
       if (method === "POST") {
-        const body = await request.json();
-        const created = await createIncentiveScheme(body);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Incentive scheme created successfully in PostgreSQL.",
-            scheme: created,
-          }),
-          { status: 201, headers },
-        );
+        try {
+          const body = await request.json();
+          const created = await createIncentiveScheme(body);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: "Incentive scheme created successfully in PostgreSQL.",
+              scheme: created,
+            }),
+            { status: 201, headers },
+          );
+        } catch (err: any) {
+          console.error("POST scheme error:", err);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: err.message || "Failed to create scheme in database.",
+            }),
+            { status: 400, headers },
+          );
+        }
       }
     }
 
@@ -451,16 +462,27 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 
       // PUT /api/incentives/schemes/:id
       if (!subAction && method === "PUT") {
-        const body = await request.json();
-        const updated = await updateIncentiveScheme(schemeId, body);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "Incentive scheme updated successfully in PostgreSQL.",
-            scheme: updated,
-          }),
-          { status: 200, headers },
-        );
+        try {
+          const body = await request.json();
+          const updated = await updateIncentiveScheme(schemeId, body);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: "Incentive scheme updated successfully in PostgreSQL.",
+              scheme: updated,
+            }),
+            { status: 200, headers },
+          );
+        } catch (err: any) {
+          console.error("PUT scheme error:", err);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: err.message || "Failed to update scheme in database.",
+            }),
+            { status: 400, headers },
+          );
+        }
       }
 
       // DELETE /api/incentives/schemes/:id

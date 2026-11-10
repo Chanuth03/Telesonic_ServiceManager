@@ -992,8 +992,8 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
   // VALIDATION & ACTIONS
   // -------------------------------------------------------------
 
-  // Action: Add Scheme for Incentive Administrator
-  const handleCreateScheme = (e: React.FormEvent) => {
+  // Action: Add Scheme for Incentive Administrator (Persists directly to PostgreSQL)
+  const handleCreateScheme = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Mandatory validations
@@ -1016,167 +1016,168 @@ export function SchemeMasterView({ onNavigateScreen }: SchemeMasterViewProps) {
       return;
     }
 
-    // Validation: Effective periods must not overlap for the same scheme code
-    const existingWithSameCode = schemes.filter(
-      (s) => s.schemeCode.trim().toUpperCase() === newSchemeForm.schemeCode.trim().toUpperCase(),
-    );
+    const schemeCodeUpper = newSchemeForm.schemeCode.trim().toUpperCase();
 
-    if (existingWithSameCode.length > 0) {
-      const newStart = new Date(newSchemeForm.effectiveFrom).getTime();
-      const newEnd = newSchemeForm.effectiveTo
-        ? new Date(newSchemeForm.effectiveTo).getTime()
-        : Infinity;
-
-      for (const ex of existingWithSameCode) {
-        const exStart = new Date(ex.effectiveFrom).getTime();
-        const exEnd = ex.effectiveTo ? new Date(ex.effectiveTo).getTime() : Infinity;
-
-        // Check date overlap
-        if (newStart <= exEnd && newEnd >= exStart) {
-          toast.error(
-            `Validation Error: Effective period overlaps with existing ${ex.schemeCode} (${ex.version}: ${ex.effectiveFrom} to ${ex.effectiveTo || "Ongoing"}). Overlapping periods are prohibited.`,
-          );
-          return;
-        }
-      }
+    // Check duplicate scheme code
+    const duplicate = schemes.some((s) => s.schemeCode.toUpperCase() === schemeCodeUpper);
+    if (duplicate) {
+      toast.error(`Validation Failed: Scheme Code "${schemeCodeUpper}" already exists in the system.`);
+      return;
     }
 
-    const newId = `sch-${Date.now()}`;
-    const createdScheme: IncentiveScheme = {
-      id: newId,
-      schemeCode: newSchemeForm.schemeCode.trim().toUpperCase(),
-      schemeName: newSchemeForm.schemeName.trim(),
-      division: newSchemeForm.division,
-      schemeType: newSchemeForm.schemeType,
-      participantRole: newSchemeForm.participantRole,
-      calculationBasis: newSchemeForm.calculationBasis,
-      ageBasis: newSchemeForm.ageBasis,
-      payableLagMonths: Number(newSchemeForm.payableLagMonths),
-      effectiveFrom: newSchemeForm.effectiveFrom,
-      effectiveTo: newSchemeForm.effectiveTo,
-      status: "Draft",
-      version: newSchemeForm.version || "v1.0",
-      description:
-        newSchemeForm.description || "Incentive scheme configured by Incentive Administrator.",
-      rules: [
-        {
-          id: `r-${Date.now()}-1`,
-          rule: "Minimum Target Threshold",
-          parameter: "Min Target %",
-          value: "80.00%",
-          source: "Monthly Target Entry",
+    try {
+      setIsSaving(true);
+      const newId = `sch-${Date.now().toString().slice(-6)}`;
+      const createdScheme: IncentiveScheme = {
+        id: newId,
+        schemeCode: schemeCodeUpper,
+        schemeName: newSchemeForm.schemeName.trim(),
+        division: newSchemeForm.division,
+        schemeType: newSchemeForm.schemeType,
+        participantRole: newSchemeForm.participantRole,
+        calculationBasis: newSchemeForm.calculationBasis,
+        ageBasis: newSchemeForm.ageBasis,
+        payableLagMonths: Number(newSchemeForm.payableLagMonths) || 1,
+        effectiveFrom: newSchemeForm.effectiveFrom,
+        effectiveTo: newSchemeForm.effectiveTo || "2026-12-31",
+        status: "Draft",
+        version: newSchemeForm.version || "v1.0",
+        description:
+          newSchemeForm.description || "Incentive scheme configured by Incentive Administrator.",
+        rules: [
+          {
+            id: `r-${Date.now()}-1`,
+            rule: "Minimum Target Threshold",
+            parameter: "Min Target %",
+            value: "80.00%",
+            source: "Monthly Target Entry",
+          },
+          {
+            id: `r-${Date.now()}-2`,
+            rule: "Debtor Penalty Compliance",
+            parameter: "Max Aging",
+            value: "60 Days",
+            source: "SAP AR Invoice Aging",
+          },
+        ],
+        slabs: [
+          {
+            slabId: "S-01",
+            minPercent: 0,
+            maxPercent: 79.99,
+            payoutPercent: 0,
+            multiplier: 0,
+            description: "Below qualifier",
+          },
+          {
+            slabId: "S-02",
+            minPercent: 80,
+            maxPercent: 99.99,
+            payoutPercent: 75,
+            multiplier: 0.75,
+            description: "Baseline qualifier",
+          },
+          {
+            slabId: "S-03",
+            minPercent: 100,
+            maxPercent: 120,
+            payoutPercent: 100,
+            multiplier: 1.0,
+            description: "Target achieved",
+          },
+        ],
+        rateItems: [
+          {
+            category: "General Portfolio",
+            productLine: "Standard Line",
+            commissionRate: "2.50%",
+            paymentTermBand: "0-30 Days",
+            basis: newSchemeForm.calculationBasis,
+          },
+        ],
+        exclusions: {
+          customerGroups: ["Inter-company transfers"],
+          itemCategories: ["FOC Samples"],
+          jobCodes: [],
+          clawbackWindowDays: 30,
         },
-        {
-          id: `r-${Date.now()}-2`,
-          rule: "Debtor Penalty Compliance",
-          parameter: "Max Aging",
-          value: "60 Days",
-          source: "SAP AR Invoice Aging",
+        posting: {
+          debitGlAccount: "621000",
+          debitGlName: "Sales Staff Incentive Expense",
+          creditGlAccount: "214050",
+          creditGlName: "Accrued Incentive Payable",
+          costCenter: "CC-DEF-01",
+          projectCode: "PRJ-2026",
+          postingDayOfMonth: 25,
+          journalRemarksTemplate: `INC/{Period}/${schemeCodeUpper}/{EmpNo}`,
         },
-      ],
-      slabs: [
-        {
-          slabId: "S-01",
-          minPercent: 0,
-          maxPercent: 79.99,
-          payoutPercent: 0,
-          multiplier: 0,
-          description: "Below qualifier",
-        },
-        {
-          slabId: "S-02",
-          minPercent: 80,
-          maxPercent: 99.99,
-          payoutPercent: 75,
-          multiplier: 0.75,
-          description: "Baseline qualifier",
-        },
-        {
-          slabId: "S-03",
-          minPercent: 100,
-          maxPercent: 120,
-          payoutPercent: 100,
-          multiplier: 1.0,
-          description: "Target achieved",
-        },
-      ],
-      rateItems: [
-        {
-          category: "General Portfolio",
-          productLine: "Standard Line",
-          commissionRate: "2.50%",
-          paymentTermBand: "0-30 Days",
-          basis: newSchemeForm.calculationBasis,
-        },
-      ],
-      exclusions: {
-        customerGroups: ["Inter-company transfers"],
-        itemCategories: ["FOC Samples"],
-        jobCodes: [],
-        clawbackWindowDays: 30,
-      },
-      posting: {
-        debitGlAccount: "621000",
-        debitGlName: "Sales Staff Incentive Expense",
-        creditGlAccount: "214050",
-        creditGlName: "Accrued Incentive Payable",
-        costCenter: "CC-DEF-01",
-        projectCode: "PRJ-2026",
-        postingDayOfMonth: 25,
-        journalRemarksTemplate: `INC/{Period}/${newSchemeForm.schemeCode.toUpperCase()}/{EmpNo}`,
-      },
-      versions: [
-        {
-          version: newSchemeForm.version || "v1.0",
-          effectiveFrom: newSchemeForm.effectiveFrom,
-          effectiveTo: newSchemeForm.effectiveTo,
-          status: "Draft",
-          createdBy: "Incentive Administrator (A. Perera)",
-          createdDate: new Date().toISOString().split("T")[0] || "2026-01-01",
-          changeSummary: "Initial draft configured.",
-        },
-      ],
-      history: [
-        {
-          id: `h-${Date.now()}`,
-          timestamp: new Date().toLocaleString(),
-          user: "Incentive Administrator",
-          role: "Administrator",
-          action: "Scheme Created",
-          details: `Created new scheme draft ${newSchemeForm.schemeCode} (${newSchemeForm.version || "v1.0"}).`,
-        },
-      ],
-    };
+        versions: [
+          {
+            version: newSchemeForm.version || "v1.0",
+            effectiveFrom: newSchemeForm.effectiveFrom,
+            effectiveTo: newSchemeForm.effectiveTo || "2026-12-31",
+            status: "Draft",
+            createdBy: "Incentive Administrator",
+            createdDate: new Date().toISOString().split("T")[0] || "2026-01-01",
+            changeSummary: "Initial draft configured.",
+          },
+        ],
+        history: [
+          {
+            id: `h-${Date.now()}`,
+            timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
+            user: "Incentive Administrator",
+            role: "Administrator",
+            action: "Scheme Created",
+            details: `Created new scheme draft ${schemeCodeUpper} (${newSchemeForm.version || "v1.0"}).`,
+          },
+        ],
+      };
 
-    setSchemes((prev) => [createdScheme, ...prev]);
-    setSelectedSchemeId(newId);
-    setIsAddModalOpen(false);
-
-    // Persist to PostgreSQL
-    apiFetch("/api/incentives/schemes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createdScheme),
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          if (data.scheme) {
-            setSchemes((prev) => [data.scheme, ...prev.filter((s) => s.id !== newId)]);
-            setSelectedSchemeId(data.scheme.id);
-            setIsDbConnected(true);
-            toast.success(`Scheme ${data.scheme.schemeCode} saved directly to PostgreSQL!`, {
-              description: "Draft created. You can define rules, slabs and rate tables before submitting for approval.",
-            });
-            return;
-          }
-        }
-        toast.info(`Scheme ${createdScheme.schemeCode} created locally in Draft status.`);
-      })
-      .catch((err) => {
-        console.error("PostgreSQL persist error:", err);
-        toast.info(`Scheme ${createdScheme.schemeCode} created locally in Draft status.`);
+      const res = await apiFetch("/api/incentives/schemes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createdScheme),
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        const saved = data.scheme || createdScheme;
+        setSchemes((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+        setSelectedSchemeId(saved.id);
+        setIsDbConnected(true);
+        setIsAddModalOpen(false);
+
+        // Reset form
+        setNewSchemeForm({
+          schemeCode: "",
+          schemeName: "",
+          division: "Mobile & Accessories",
+          schemeType: "Turnover Tier + Slabs",
+          participantRole: "Retail Sales Executive",
+          calculationBasis: "Billed Revenue (Excl. Tax)",
+          ageBasis: "Invoice Date",
+          payableLagMonths: 1,
+          effectiveFrom: "2026-07-01",
+          effectiveTo: "2026-12-31",
+          status: "Draft" as SchemeStatus,
+          version: "v1.0",
+          description: "",
+        });
+
+        toast.success(`Scheme ${saved.schemeCode} saved directly to PostgreSQL!`, {
+          description: "Draft created and persisted to database. You can define rules, slabs and rate tables before submitting for approval.",
+        });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(`Failed to save scheme to database: ${errData.error || "Unknown server error"}`);
+      }
+    } catch (err: any) {
+      console.error("PostgreSQL persist error:", err);
+      toast.error(`Database error: ${err.message || "Failed to reach server"}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Action: Copy to New Version for an active scheme
