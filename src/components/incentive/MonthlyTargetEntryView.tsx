@@ -286,6 +286,18 @@ const INITIAL_TARGETS_DATA: Record<string, MonthlyTargetRecord[]> = {
   ],
 };
 
+// Fallback registered participants matching Screen 05 directory
+const FALLBACK_REGISTERED_PARTICIPANTS = [
+  { id: "EMP-1021", name: "Nimal Perera", designation: "Senior Service Engineer", division: "Consumer Electronics", territory: "Western Province - Colombo Metro", role: "Senior Service Engineer" },
+  { id: "EMP-1045", name: "Kasun Jayasuriya", designation: "Key Account Manager", division: "Enterprise Solutions", territory: "Southern & Central Hub", role: "Enterprise Key Account Manager" },
+  { id: "EMP-1088", name: "Dilshan Silva", designation: "Field Support Specialist", division: "Consumer Electronics", territory: "Western Province - Gampaha", role: "Field Support Specialist" },
+  { id: "EMP-1092", name: "Tharindu Fernando", designation: "Channel Account Executive", division: "Mobile & Accessories", territory: "North Western & Sabaragamuwa", role: "Channel Account Executive" },
+  { id: "EMP-1104", name: "Anura Wickramasinghe", designation: "Retail Sales Executive", division: "Mobile & Accessories", territory: "Colombo Flagship Showroom", role: "Retail Sales Executive" },
+  { id: "EMP-1115", name: "Saman Kumara", designation: "Solar Solutions Specialist", division: "Renewable Energy", territory: "Islandwide Commercial Projects", role: "Solar Solutions Specialist" },
+  { id: "EMP-1128", name: "Chamara Bandara", designation: "Showroom Promoter", division: "Mobile & Accessories", territory: "Kandy City Center Showroom", role: "Showroom Promoter" },
+  { id: "EMP-1142", name: "Pradeep Mendis", designation: "Senior Technician - HVAC", division: "Consumer Electronics", territory: "Southern Province - Galle Hub", role: "Senior Technician - HVAC" },
+];
+
 const INITIAL_HISTORY: TargetHistoryRecord[] = [
   {
     id: "REV-202605-03",
@@ -350,6 +362,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [allDbBatches, setAllDbBatches] = useState<any[]>([]);
   const [availableSchemesList, setAvailableSchemesList] = useState<SchemeOption[]>(AVAILABLE_SCHEMES);
+  const [registeredParticipants, setRegisteredParticipants] = useState<any[]>(FALLBACK_REGISTERED_PARTICIPANTS);
 
   // Targets State
   const [targetsData, setTargetsData] =
@@ -389,6 +402,17 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             setHistoryList(match.history);
           }
         }
+
+        // Also refresh participants from Screen 05
+        apiFetch("/api/incentives/participants?activeOnly=true")
+          .then((res) => res.json())
+          .then((pData) => {
+            if (pData.success && Array.isArray(pData.participants) && pData.participants.length > 0) {
+              setRegisteredParticipants(pData.participants);
+            }
+          })
+          .catch(() => {});
+
         setHasUnsavedChanges(false);
         if (!silent) {
           toast.success("Synchronized with PostgreSQL database.", {
@@ -423,6 +447,16 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
       })
       .catch((err) => console.warn("Using offline schemes fallback:", err));
 
+    // Load registered participants from Screen 05 (Participant Profile)
+    apiFetch("/api/incentives/participants?activeOnly=true")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.participants) && data.participants.length > 0) {
+          setRegisteredParticipants(data.participants);
+        }
+      })
+      .catch((err) => console.warn("Using offline participants fallback:", err));
+
     loadTargetsFromDb(true);
   }, []);
 
@@ -442,7 +476,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
   // Add Target Modal Dialog
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [newTarget, setNewTarget] = useState<Partial<MonthlyTargetRecord>>({
-    participantId: "EMP-1150",
+    participantId: "",
     employeeName: "",
     role: "Retail Sales Executive",
     division: "Mobile & Accessories",
@@ -517,7 +551,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
     };
   }, [activePeriodTargets]);
 
-  // Division Rollup aggregation
+  // Division Rollup aggregation (includes all active divisions dynamically)
   const divisionRollup = useMemo(() => {
     const map = new Map<
       string,
@@ -529,6 +563,17 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
         totalActual: number;
       }
     >();
+
+    // Pre-populate with all registered active divisions from Division Master
+    divisionNames.forEach((divName) => {
+      map.set(divName, {
+        division: divName,
+        participants: 0,
+        totalBase: 0,
+        totalStretch: 0,
+        totalActual: 0,
+      });
+    });
 
     activePeriodTargets.forEach((t) => {
       const existing = map.get(t.division) || {
@@ -550,7 +595,7 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
       achievementPct: row.totalBase > 0 ? (row.totalActual / row.totalBase) * 100 : 0,
       variance: row.totalActual - row.totalBase,
     }));
-  }, [activePeriodTargets]);
+  }, [activePeriodTargets, divisionNames]);
 
   // Helpers
   const formatLKR = (val: number) => {
@@ -1381,7 +1426,17 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
                 <Button
                   size="sm"
                   variant="default"
-                  onClick={() => setIsAddModalOpen(true)}
+                  onClick={() => {
+                    setNewTarget((prev) => ({
+                      ...prev,
+                      division:
+                        selectedDivision !== "All Divisions"
+                          ? selectedDivision
+                          : (divisionNames[0] || "Mobile & Accessories"),
+                      schemeCode: selectedSchemeCode,
+                    }));
+                    setIsAddModalOpen(true);
+                  }}
                   className="h-8 gap-1 text-xs cursor-pointer"
                 >
                   <Plus size={13} />
@@ -1423,10 +1478,31 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
                       <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Target size={32} className="text-muted-foreground/40" />
-                          <p className="text-sm font-medium">No target records found</p>
-                          <p className="text-xs text-muted-foreground">
-                            Try adjusting your search query, division filter, or add a participant.
+                          <p className="text-sm font-semibold text-foreground">No target records found</p>
+                          <p className="text-xs text-muted-foreground max-w-md">
+                            No targets allocated yet for this division/filter in {selectedPeriod}. You can allocate targets directly to participants registered in Screen 05.
                           </p>
+                          {!isPeriodLocked && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setNewTarget((prev) => ({
+                                  ...prev,
+                                  division:
+                                    selectedDivision !== "All Divisions"
+                                      ? selectedDivision
+                                      : (divisionNames[0] || "Mobile & Accessories"),
+                                  schemeCode: selectedSchemeCode,
+                                }));
+                                setIsAddModalOpen(true);
+                              }}
+                              className="mt-2 h-8 text-xs gap-1.5 cursor-pointer bg-primary-soft text-primary border-primary/30 hover:bg-primary/20"
+                            >
+                              <Plus size={13} />
+                              <span>Allocate Target to Registered Participant</span>
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1823,6 +1899,77 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
             </div>
 
             <form onSubmit={handleAddTargetSubmit} className="space-y-3.5 text-xs">
+              {/* Quick Select from Screen 05 Registered Directory */}
+              <div className="space-y-1.5 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Users size={14} className="text-primary" />
+                    Select Registered Participant (from Screen 05 Directory)
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {registeredParticipants.length} Registered
+                  </span>
+                </div>
+                <select
+                  value={
+                    registeredParticipants.some((p) => p.id === newTarget.participantId)
+                      ? newTarget.participantId
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const found = registeredParticipants.find((p) => p.id === e.target.value);
+                    if (found) {
+                      setNewTarget((prev) => ({
+                        ...prev,
+                        participantId: found.id,
+                        employeeName: found.name,
+                        role: found.designation || found.role || prev.role || "Sales Executive",
+                        division: found.division || prev.division,
+                        territory:
+                          found.territory ||
+                          found.areaManager ||
+                          found.segmentChannel ||
+                          prev.territory ||
+                          "Western Territory",
+                        schemeCode:
+                          found.assignments && found.assignments.length > 0
+                            ? found.assignments.some((a: any) => a.schemeCode === selectedSchemeCode)
+                              ? selectedSchemeCode
+                              : found.assignments[0].schemeCode
+                            : selectedSchemeCode,
+                      }));
+                      toast.info(`Selected ${found.name} (${found.id}) from Screen 05.`, {
+                        description: `Division: ${found.division} · Role: ${found.designation || "Staff"}`,
+                      });
+                    }
+                  }}
+                  className="w-full h-8.5 px-2.5 rounded border border-input bg-background text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Choose from Screen 05 Registered Participants --</option>
+                  {registeredParticipants.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.id} — {p.name} ({p.designation || p.role || "Staff"} · {p.division})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                  <span>Auto-populates ID, Name, Role, Division and Territory from Screen 05.</span>
+                  {onNavigateScreen && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddModalOpen(false);
+                        onNavigateScreen("participant-profile");
+                      }}
+                      className="text-primary hover:underline font-semibold flex items-center gap-0.5 cursor-pointer shrink-0"
+                    >
+                      <ExternalLink size={10} />
+                      <span>Manage in Screen 05</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">Employee ID *</label>
@@ -1862,10 +2009,11 @@ export function MonthlyTargetEntryView({ onNavigateScreen, onBack }: MonthlyTarg
                     }
                     className="w-full h-8 px-2.5 rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <option value="Mobile & Accessories">Mobile & Accessories</option>
-                    <option value="Consumer Electronics">Consumer Electronics</option>
-                    <option value="Enterprise Solutions">Enterprise Solutions</option>
-                    <option value="Renewable Energy">Renewable Energy</option>
+                    {divisionNames.map((div) => (
+                      <option key={div} value={div}>
+                        {div}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">

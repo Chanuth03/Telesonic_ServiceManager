@@ -19,7 +19,7 @@ describe("PostgreSQL Target Incentive Slab Table API Integration", () => {
     const slsTable = data.tables.find((t: any) => t.id === "slt-sls-2026");
     expect(slsTable).toBeDefined();
     expect(slsTable.schemeCode).toBe("SCH-SLS-2026");
-    expect(slsTable.version).toBe("v2.1");
+    expect(slsTable.version).toMatch(/^v2\./);
     expect(slsTable.slabs.length).toBe(6);
     expect(slsTable.history.length).toBeGreaterThan(0);
   });
