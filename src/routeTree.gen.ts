@@ -20,6 +20,7 @@ import { Route as IncidentsRouteImport } from './routes/incidents'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LoyaltyRouteImport } from './routes/loyalty'
 import { Route as MastersRouteImport } from './routes/masters'
 import { Route as MobileRouteImport } from './routes/mobile'
 import { Route as MobileApkDownloadRouteImport } from './routes/mobile-apk-download'
@@ -94,6 +95,11 @@ const KnowledgeRoute = KnowledgeRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoyaltyRoute = LoyaltyRouteImport.update({
+  id: '/loyalty',
+  path: '/loyalty',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MastersRoute = MastersRouteImport.update({
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/loyalty': typeof LoyaltyRoute
   '/masters': typeof MastersRoute
   '/mobile': typeof MobileRouteWithChildren
   '/mobile-apk-download': typeof MobileApkDownloadRoute
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/loyalty': typeof LoyaltyRoute
   '/masters': typeof MastersRoute
   '/mobile-apk-download': typeof MobileApkDownloadRoute
   '/problems': typeof ProblemsRoute
@@ -277,6 +285,7 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/loyalty': typeof LoyaltyRoute
   '/masters': typeof MastersRoute
   '/mobile': typeof MobileRouteWithChildren
   '/mobile-apk-download': typeof MobileApkDownloadRoute
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/loyalty'
     | '/masters'
     | '/mobile'
     | '/mobile-apk-download'
@@ -345,6 +355,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/loyalty'
     | '/masters'
     | '/mobile-apk-download'
     | '/problems'
@@ -377,6 +388,7 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/knowledge'
     | '/login'
+    | '/loyalty'
     | '/masters'
     | '/mobile'
     | '/mobile-apk-download'
@@ -411,6 +423,7 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
+  LoyaltyRoute: typeof LoyaltyRoute
   MastersRoute: typeof MastersRoute
   MobileRoute: typeof MobileRouteWithChildren
   MobileApkDownloadRoute: typeof MobileApkDownloadRoute
@@ -497,6 +510,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loyalty': {
+      id: '/loyalty'
+      path: '/loyalty'
+      fullPath: '/loyalty'
+      preLoaderRoute: typeof LoyaltyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/masters': {
@@ -709,6 +729,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
+  LoyaltyRoute: LoyaltyRoute,
   MastersRoute: MastersRoute,
   MobileRoute: MobileRouteWithChildren,
   MobileApkDownloadRoute: MobileApkDownloadRoute,

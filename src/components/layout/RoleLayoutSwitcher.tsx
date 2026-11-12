@@ -11,6 +11,7 @@ import {
   ClipboardList,
   MonitorCog,
   Trophy,
+  Award,
   ArrowUpRight,
   Database,
   Headphones,
@@ -100,6 +101,7 @@ const desktopModules = [
     tone: "bg-warning-soft text-warning",
   },
   { to: "/incentive", label: "Incentive", icon: Trophy, tone: "bg-success-soft text-success" },
+  { to: "/loyalty", label: "Loyalty Points", icon: Award, tone: "bg-primary-soft text-primary" },
 ] as const;
 
 export function RoleLayoutSwitcher() {
