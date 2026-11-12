@@ -17,6 +17,7 @@ import {
   type HoldRequestRecord,
 } from "@/lib/mobile-data";
 import { Button } from "@/components/ui/button";
+import { useMobileI18n } from "@/lib/mobile-i18n";
 
 type HoldReason = HoldRequestRecord["reason"];
 
@@ -42,8 +43,9 @@ function MobileHoldRequestScreen() {
   const [notes, setNotes] = useState(
     "Compressor capacitor 45uF not available in van stock. Ordered from central warehouse.",
   );
-  const [delayHours, setDelayHours] = useState(24);
+  const [resumeDate, setResumeDate] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const { t } = useMobileI18n();
 
   useEffect(() => {
     setJob(getMobileJobById(jobId));
@@ -66,20 +68,29 @@ function MobileHoldRequestScreen() {
       setFeedback("Please enter detailed notes explaining the hold reason.");
       return;
     }
+    if (!resumeDate) {
+      setFeedback("Enter the expected resume date before sending this to the coordinator.");
+      return;
+    }
 
     const timeStr = new Date().toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+    const resume = new Date(`${resumeDate}T00:00:00`);
+    const delayHours = Number.isNaN(resume.getTime())
+      ? 24
+      : Math.max(1, Math.round((resume.getTime() - Date.now()) / 36e5));
     const newHold: HoldRequestRecord = {
       id: `HR-${Date.now().toString().slice(-4)}`,
       reason,
       notes,
       estimatedDelayHours: delayHours,
+      expectedResumeDate: resumeDate,
       requestedAt: timeStr,
-      status: "Submitted",
+      status: "Pending Review",
     };
 
     submitJobHoldRequest(job.id, newHold);
     setJob(getMobileJobById(job.id));
-    setFeedback(`Hold request submitted. Job ${job.id} status set to 'On Hold'.`);
+    setFeedback(t("holdWaiting"));
 
     setTimeout(() => {
       navigate({ to: "/mobile/jobs/$jobId", params: { jobId: job.id } });
@@ -146,17 +157,15 @@ function MobileHoldRequestScreen() {
 
           <div>
             <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
-              Estimated Delay Duration (Hours)
+              {t("expectedResume")} *
             </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={delayHours}
-                onChange={(e) => setDelayHours(Number(e.target.value))}
-                className="input-field py-1.5 text-xs font-mono w-28 font-bold"
-              />
-              <span className="text-muted-foreground text-[11px]">Hours delay expected</span>
-            </div>
+            <input
+              type="date"
+              value={resumeDate}
+              onChange={(e) => setResumeDate(e.target.value)}
+              className="input-field py-1.5 text-xs font-mono w-44 font-bold"
+              required
+            />
           </div>
 
           <div>
@@ -177,7 +186,7 @@ function MobileHoldRequestScreen() {
             onClick={handleSubmitHold}
           >
             <PauseCircle size={15} className="mr-1.5" />
-            Submit Job Hold Request
+            {t("submitHold")}
           </Button>
         </div>
 
@@ -195,6 +204,11 @@ function MobileHoldRequestScreen() {
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground">{hr.notes}</p>
+                  <p className="text-[10px] font-semibold text-foreground">
+                    {hr.status}
+                    {hr.expectedResumeDate ? ` · resume ${hr.expectedResumeDate}` : ""}
+                    {hr.reviewedBy ? ` · ${hr.reviewedBy}` : ""}
+                  </p>
                 </div>
               ))}
             </div>

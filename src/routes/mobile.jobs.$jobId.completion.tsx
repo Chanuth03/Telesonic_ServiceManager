@@ -18,6 +18,8 @@ import {
   type MobileJob,
 } from "@/lib/mobile-data";
 import { Button } from "@/components/ui/button";
+import { useMobileI18n } from "@/lib/mobile-i18n";
+import { downloadServiceReport } from "@/lib/service-report-pdf";
 
 export const Route = createFileRoute("/mobile/jobs/$jobId/completion")({
   head: ({ params }) => ({
@@ -49,6 +51,12 @@ function MobileCompletionScreen() {
     !!job?.completion?.signatureDataUrl || !!job?.completion?.completedAt,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [refusedToSign, setRefusedToSign] = useState(!!job?.completion?.refusedToSign);
+  const [refusalReason, setRefusalReason] = useState(job?.completion?.refusalReason || "");
+  const [partialCompletion, setPartialCompletion] = useState(!!job?.completion?.partialCompletion);
+  const [partialReason, setPartialReason] = useState(job?.completion?.partialReason || "");
+  const [warrantyTriggered, setWarrantyTriggered] = useState(!!job?.completion?.warrantyTriggered);
+  const { t } = useMobileI18n();
 
   // Canvas Signature state & ref
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -238,14 +246,23 @@ function MobileCompletionScreen() {
       return;
     }
 
-    if (!isSigned) {
+    if (refusedToSign) {
+      if (!refusalReason.trim()) {
+        setFeedback("Enter why the customer refused to sign.");
+        return;
+      }
+    } else if (!isSigned) {
       setFeedback("Please ask the customer to sign in the signature pad before submitting.");
+      return;
+    }
+    if (partialCompletion && !partialReason.trim()) {
+      setFeedback("Enter what is still outstanding for this partial completion.");
       return;
     }
 
     const canvas = canvasRef.current;
     let signatureDataUrl: string | undefined = undefined;
-    if (canvas && isSigned) {
+    if (!refusedToSign && canvas && isSigned) {
       signatureDataUrl = canvas.toDataURL("image/png");
     }
 
@@ -260,6 +277,11 @@ function MobileCompletionScreen() {
       feedbackComments: comments,
       completedAt: `${getLocalTodayDateString()} ${timeStr}`,
       workSlipNumber: workSlipNo,
+      refusedToSign,
+      refusalReason: refusedToSign ? refusalReason.trim() : undefined,
+      partialCompletion,
+      partialReason: partialCompletion ? partialReason.trim() : undefined,
+      warrantyTriggered,
     });
 
     setJob(getMobileJobById(job.id));
@@ -395,6 +417,21 @@ function MobileCompletionScreen() {
                 {job.completion.feedbackComments}"
               </p>
 
+              {job.completion.refusedToSign && (
+                <p>
+                  <strong className="text-foreground">Signature:</strong> refused —{" "}
+                  {job.completion.refusalReason}
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 h-9 w-full text-xs"
+                onClick={() => downloadServiceReport(job)}
+              >
+                {t("downloadReport")}
+              </Button>
+
               {job.completion.signatureDataUrl && (
                 <div className="pt-2 border-t border-success/20">
                   <span className="text-[10px] font-semibold text-foreground block mb-1">
@@ -480,7 +517,48 @@ function MobileCompletionScreen() {
               />
             </div>
 
-            {/* Signature Canvas Box with Finger & Stylus Drawing */}
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={refusedToSign}
+                onChange={(event) => setRefusedToSign(event.target.checked)}
+              />
+              {t("refusedToSign")}
+            </label>
+            {refusedToSign ? (
+              <textarea
+                value={refusalReason}
+                onChange={(event) => setRefusalReason(event.target.value)}
+                placeholder={t("refusalReason")}
+                className="input-field text-xs min-h-[50px] py-1.5"
+              />
+            ) : null}
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={partialCompletion}
+                onChange={(event) => setPartialCompletion(event.target.checked)}
+              />
+              {t("partial")}
+            </label>
+            {partialCompletion ? (
+              <textarea
+                value={partialReason}
+                onChange={(event) => setPartialReason(event.target.value)}
+                placeholder="What is still outstanding?"
+                className="input-field text-xs min-h-[50px] py-1.5"
+              />
+            ) : null}
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <input
+                type="checkbox"
+                checked={warrantyTriggered}
+                onChange={(event) => setWarrantyTriggered(event.target.checked)}
+              />
+              {t("warranty")}
+            </label>
+
+            {!refusedToSign ? (
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-semibold text-foreground flex items-center gap-1.5">
@@ -539,6 +617,7 @@ function MobileCompletionScreen() {
                 Touch and drag your finger across the box above to sign.
               </p>
             </div>
+            ) : null}
 
             <Button
               className="w-full text-xs font-bold h-10 bg-success text-success-foreground hover:bg-success/90"

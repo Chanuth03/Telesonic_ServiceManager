@@ -3,6 +3,7 @@ import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { AppInitializer } from "@/components/mobile/AppInitializer";
 import { SyncStatusBadge } from "@/components/mobile/SyncStatusBadge";
 import { startMobileOfflineBridge } from "@/lib/mobile-offline-bridge";
+import { MobileI18nProvider, MobileLanguageSwitch } from "@/lib/mobile-i18n";
 
 export const Route = createFileRoute("/mobile")({
   // Client-only so Airplane Mode can reuse cached JS instead of SSR round-trips.
@@ -25,15 +26,18 @@ function MobileLayout() {
   }, []);
 
   return (
-    <AppInitializer>
-      {pathname !== "/mobile/login" ? (
-        <div className="mx-auto w-full max-w-md space-y-3.5 px-1 py-3">
-          <SyncStatusBadge />
+    <MobileI18nProvider>
+      <AppInitializer>
+        {pathname !== "/mobile/login" ? (
+          <div className="mx-auto w-full max-w-md space-y-3.5 px-1 py-3">
+            <MobileLanguageSwitch />
+            <SyncStatusBadge />
+            <Outlet />
+          </div>
+        ) : (
           <Outlet />
-        </div>
-      ) : (
-        <Outlet />
-      )}
-    </AppInitializer>
+        )}
+      </AppInitializer>
+    </MobileI18nProvider>
   );
 }

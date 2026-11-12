@@ -944,10 +944,39 @@ export async function getPendingTransactionRecords(
     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 }
 
-function computeBackoffMs(retryCount: number): number {
-  const base = 2000;
-  const max = 5 * 60 * 1000;
-  return Math.min(max, base * Math.pow(2, Math.max(0, retryCount)));
+/** MOB-OFF retry schedule: 1 min, 5 min, 15 min, 60 min, then the error queue. */
+const SYNC_RETRY_DELAYS_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
+
+function computeBackoffMs(retryCount: number): number | null {
+  return SYNC_RETRY_DELAYS_MS[retryCount - 1] ?? null;
+}
+
+export async function postponeFailedSyncItems(queueIds: number[], message: string): Promise<void> {
+  if (queueIds.length === 0) return;
+  await ensureOfflineDatabaseReady();
+  for (const id of queueIds) {
+    const item = await offlineDB.syncQueue.get(id);
+    if (!item) continue;
+    const retryCount = (item.retryCount || 0) + 1;
+    const delay = computeBackoffMs(retryCount);
+    await offlineDB.syncQueue.update(id, {
+      status: "failed",
+      errorMessage: delay == null ? `ERROR_QUEUE: ${message}` : message,
+      retryCount,
+      nextRetryAt: delay == null ? Number.MAX_SAFE_INTEGER : Date.now() + delay,
+    });
+  }
+}
+
+export async function countErrorQueueItems(): Promise<number> {
+  await ensureOfflineDatabaseReady();
+  const transactions = await offlineDB.transactions
+    .filter((row) => (row.lastError || "").startsWith("ERROR_QUEUE:"))
+    .count();
+  const queue = await offlineDB.syncQueue
+    .filter((row) => (row.errorMessage || "").startsWith("ERROR_QUEUE:"))
+    .count();
+  return transactions + queue;
 }
 
 export async function markTransactionSyncState(
@@ -1097,10 +1126,13 @@ export async function syncPendingOfflineTransactions(
       failed += 1;
       const message = err instanceof Error ? err.message : "Sync failed";
       const retryCount = (tx.retryCount || 0) + 1;
-      const nextRetryAt = Date.now() + computeBackoffMs(retryCount);
+      const delay = computeBackoffMs(retryCount);
+      const errorQueued = delay == null;
+      const nextRetryAt = errorQueued ? Number.MAX_SAFE_INTEGER : Date.now() + delay;
+      const storedError = errorQueued ? `ERROR_QUEUE: ${message}` : message;
       await offlineDB.transactions.update(tx.id, {
         syncStatus: "failed",
-        lastError: message,
+        lastError: storedError,
         retryCount,
         nextRetryAt,
         updatedAt: Date.now(),
@@ -1109,7 +1141,7 @@ export async function syncPendingOfflineTransactions(
         if (item.id != null) {
           await offlineDB.syncQueue.update(item.id, {
             status: "failed",
-            errorMessage: message,
+            errorMessage: storedError,
             retryCount,
             nextRetryAt,
           });
@@ -1317,6 +1349,29 @@ export async function getPendingSyncCount(): Promise<number> {
 }
 
 
+export interface SyncConflictEntry {
+  entityId: string;
+  serverStatus: string;
+  localStatus: string;
+  at: string;
+}
+
+/** BCR-10: keep the pending local edit and record that the server copy was not applied. */
+export async function recordSyncConflict(entry: SyncConflictEntry): Promise<void> {
+  const key = "bcr10_conflict_log";
+  const existing = await offlineDB.offlineMeta.get(key);
+  const current = Array.isArray(existing?.value) ? (existing.value as SyncConflictEntry[]) : [];
+  const alreadyLogged = current.some(
+    (row) => row.entityId === entry.entityId && row.serverStatus === entry.serverStatus && row.localStatus === entry.localStatus,
+  );
+  if (alreadyLogged) return;
+  await offlineDB.offlineMeta.put({
+    key,
+    value: [entry, ...current].slice(0, 100),
+    updatedAt: Date.now(),
+  });
+}
+
 /**
  * Merge server jobs into Dexie.js without overwriting local unsynced ('pending') edits
  */
@@ -1327,6 +1382,14 @@ export async function syncServerJobsIntoDexie(serverJobs: MobileJob[]): Promise<
     if (!sJob?.id) continue;
     const existing = await offlineDB.jobs.get(sJob.id);
     if (existing && existing.syncStatus === "pending") {
+      if (existing.status !== sJob.status) {
+        await recordSyncConflict({
+          entityId: sJob.id,
+          serverStatus: sJob.status,
+          localStatus: existing.status,
+          at: new Date().toISOString(),
+        });
+      }
       continue;
     }
     await offlineDB.jobs.put({

@@ -41,6 +41,13 @@ export interface PartItem {
   qtyReturned: number;
   returnReason?: "Unused" | "Faulty/Damaged" | "Wrong Specification" | "Customer Cancelled" | undefined;
   serialNo?: string | undefined;
+  pairedComponentSerial?: string | undefined;
+  installArea?: string | undefined;
+  installEquipment?: string | undefined;
+  pressureTestPsi?: string | undefined;
+  pressureTestResult?: "Pass" | "Fail" | "Not Required" | undefined;
+  extraMaterialNote?: string | undefined;
+  supervisorOverrideReason?: string | undefined;
   partSource?: "telesonic" | "external" | undefined;
   supplierName?: string | undefined;
   remarks?: string | undefined;
@@ -57,10 +64,16 @@ export interface LabourLog {
 
 export interface JobPhoto {
   id: string;
-  category: "Before Work" | "Fault / Damage" | "Parts Replaced" | "After Work / Clean Site";
+  category:
+    | "Before Work"
+    | "Fault / Damage"
+    | "Parts Replaced"
+    | "After Work / Clean Site"
+    | "Serial Plate";
   dataUrl: string;
   caption: string;
   capturedAt: string;
+  uploadState?: "pending" | "uploading" | "uploaded" | "failed" | undefined;
 }
 
 export interface JobCompletion {
@@ -71,6 +84,11 @@ export interface JobCompletion {
   feedbackComments?: string | undefined;
   completedAt: string;
   workSlipNumber: string;
+  refusedToSign?: boolean | undefined;
+  refusalReason?: string | undefined;
+  partialCompletion?: boolean | undefined;
+  partialReason?: string | undefined;
+  warrantyTriggered?: boolean | undefined;
 }
 
 export interface SiteInspectionPoint {
@@ -89,6 +107,11 @@ export interface SiteInspectionReport {
   overallStatus: "Pass" | "Fail" | "Conditional Pass";
   points: SiteInspectionPoint[];
   generalNotes?: string | undefined;
+  templateId?: string | undefined;
+  templateName?: string | undefined;
+  inspectorSignerName?: string | undefined;
+  customerSignerName?: string | undefined;
+  customerSignedAt?: string | undefined;
 }
 
 export interface HoldRequestRecord {
@@ -100,8 +123,11 @@ export interface HoldRequestRecord {
     | "Safety Hazard On Site";
   notes: string;
   estimatedDelayHours: number;
+  expectedResumeDate?: string | undefined;
   requestedAt: string;
-  status: "Submitted" | "Approved" | "Pending Review";
+  status: "Submitted" | "Approved" | "Pending Review" | "Rejected";
+  reviewedAt?: string | undefined;
+  reviewedBy?: string | undefined;
 }
 
 export interface MobileNotification {
@@ -988,12 +1014,31 @@ export function addJobLabourLog(id: string, log: LabourLog): MobileJob | undefin
 
 // O1-SCR-MOB-08: PHOTOS
 export function addJobPhoto(id: string, photo: JobPhoto): MobileJob | undefined {
+  const uploadState = photo.uploadState ?? (typeof navigator !== "undefined" && navigator.onLine ? "uploading" : "pending");
+  const stored: JobPhoto = { ...photo, uploadState };
   jobsStore = jobsStore.map((j) => {
     if (j.id === id) {
       const existingPhotos = j.photos || [];
-      return { ...j, photos: [photo, ...existingPhotos] };
+      return { ...j, photos: [stored, ...existingPhotos] };
     }
     return j;
+  });
+  return queueJob(id, "GENERIC_UPDATE");
+}
+
+export function updateJobPhotoUploadState(
+  id: string,
+  photoId: string,
+  uploadState: NonNullable<JobPhoto["uploadState"]>,
+): MobileJob | undefined {
+  jobsStore = jobsStore.map((j) => {
+    if (j.id !== id) return j;
+    return {
+      ...j,
+      photos: (j.photos || []).map((photo) =>
+        photo.id === photoId ? { ...photo, uploadState } : photo,
+      ),
+    };
   });
   return queueJob(id, "GENERIC_UPDATE");
 }
@@ -1039,23 +1084,145 @@ export function saveJobInspection(
 }
 
 // O1-SCR-MOB-13: HOLD REQUEST
+// The job stays in its current status until a coordinator approves the hold.
 export function submitJobHoldRequest(
   id: string,
   holdReq: HoldRequestRecord,
 ): MobileJob | undefined {
+  const pending: HoldRequestRecord = { ...holdReq, status: "Pending Review" };
   jobsStore = jobsStore.map((j) => {
     if (j.id === id) {
       const existingHolds = j.holdRequests || [];
       return {
         ...j,
-        status: "On Hold",
-        holdRequests: [holdReq, ...existingHolds],
+        holdRequests: [pending, ...existingHolds],
       };
     }
     return j;
   });
+  notificationsStore = [
+    {
+      id: `N-HOLD-${pending.id}`,
+      title: "Hold waiting for coordinator",
+      message: `${id} is waiting for approval. Expected resume ${pending.expectedResumeDate || "not set"}.`,
+      time: "Just now",
+      read: false,
+      type: "alert",
+      jobId: id,
+    },
+    ...notificationsStore,
+  ];
+  notifyAll("notifications");
+  emitPersist({ kind: "notifications", items: notificationsStore });
   return queueJob(id, "SUBMIT_HOLD");
 }
+
+export function reviewJobHoldRequest(
+  jobId: string,
+  holdId: string,
+  decision: "Approved" | "Rejected",
+  reviewedBy: string,
+): MobileJob | undefined {
+  jobsStore = jobsStore.map((j) => {
+    if (j.id !== jobId) return j;
+    return {
+      ...j,
+      status: decision === "Approved" ? "On Hold" : j.status,
+      holdRequests: (j.holdRequests || []).map((hold) =>
+        hold.id === holdId
+          ? {
+              ...hold,
+              status: decision,
+              reviewedAt: new Date().toLocaleString(),
+              reviewedBy,
+            }
+          : hold,
+      ),
+    };
+  });
+  return queueJob(jobId, "SUBMIT_HOLD");
+}
+
+export function getPendingHoldReviews(): { job: MobileJob; hold: HoldRequestRecord }[] {
+  const rows: { job: MobileJob; hold: HoldRequestRecord }[] = [];
+  for (const job of getMobileJobs(false)) {
+    for (const hold of job.holdRequests || []) {
+      if (hold.status === "Pending Review" || hold.status === "Submitted") {
+        rows.push({ job, hold });
+      }
+    }
+  }
+  return rows;
+}
+
+export function findSerialInstalledElsewhere(
+  serial: string,
+  currentJobId: string,
+): { jobId: string; partName: string } | null {
+  const needle = serial.trim().toLowerCase();
+  if (!needle) return null;
+  for (const job of getMobileJobs(false)) {
+    if (job.id === currentJobId) continue;
+    for (const part of job.parts || []) {
+      const serials = [part.serialNo, part.pairedComponentSerial].filter(
+        (value): value is string => !!value && value.trim().length > 0,
+      );
+      if (serials.some((value) => value.trim().toLowerCase() === needle)) {
+        return { jobId: job.id, partName: part.name };
+      }
+    }
+  }
+  return null;
+}
+
+export const CHECKLIST_TEMPLATES: {
+  id: string;
+  name: string;
+  points: SiteInspectionPoint[];
+}[] = [
+  {
+    id: "hvac-service",
+    name: "HVAC service",
+    points: [
+      { id: "P-1", label: "On-site safety and PPE", category: "Safety", status: "Pass" },
+      {
+        id: "P-2",
+        label: "Supply voltage",
+        category: "Electrical",
+        status: "Pass",
+        measuredValue: "",
+      },
+      {
+        id: "P-3",
+        label: "Room temperature",
+        category: "Environmental",
+        status: "Pass",
+        measuredValue: "",
+      },
+      { id: "P-4", label: "Casing and piping", category: "Mechanical", status: "Pass" },
+    ],
+  },
+  {
+    id: "commissioning",
+    name: "Commissioning",
+    points: [
+      { id: "C-1", label: "Pressure test completed", category: "Mechanical", status: "Pass", measuredValue: "" },
+      { id: "C-2", label: "Electrical isolation verified", category: "Electrical", status: "Pass" },
+      { id: "C-3", label: "Condensate drain clear", category: "Environmental", status: "Pass" },
+      { id: "C-4", label: "Safety guards in place", category: "Safety", status: "Pass" },
+    ],
+  },
+  {
+    id: "meter-readings",
+    name: "Meter readings",
+    points: [
+      { id: "M-1", label: "Running current", category: "Electrical", status: "Pass", measuredValue: "" },
+      { id: "M-2", label: "Suction pressure", category: "Mechanical", status: "Pass", measuredValue: "" },
+      { id: "M-3", label: "Discharge pressure", category: "Mechanical", status: "Pass", measuredValue: "" },
+      { id: "M-4", label: "Supply air temperature", category: "Environmental", status: "Pass", measuredValue: "" },
+    ],
+  },
+];
 
 // O1-SCR-MOB-14: NOTIFICATIONS
 export function getMobileNotifications(): MobileNotification[] {

@@ -20,6 +20,8 @@ import {
   type StockCountItem,
 } from "@/lib/mobile-data";
 import { Button } from "@/components/ui/button";
+import { BarcodeScanner } from "@/components/mobile/BarcodeScanner";
+import { useMobileI18n } from "@/lib/mobile-i18n";
 
 export const Route = createFileRoute("/mobile/stock-count")({
   head: () => ({
@@ -39,8 +41,10 @@ function MobileStockCountScreen() {
   const [items, setItems] = useState<StockCountItem[]>(() => getStockCountItems());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVan, setSelectedVan] = useState("VAN-04 (Nimal Perera Mobile Store)");
-  const [scannedSku, setScannedSku] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const { t } = useMobileI18n();
 
   // Unsaved counts on screen must survive a background refresh of van stock.
   const hasUnsavedCounts = useRef(false);
@@ -83,15 +87,14 @@ function MobileStockCountScreen() {
     );
   };
 
-  const handleSimulateBarcodeScan = () => {
-    if (items.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * items.length);
-    const randomItem = items[randomIndex];
-    if (!randomItem) return;
-    setScannedSku(randomItem.sku);
-    setSearchQuery(randomItem.sku);
-    setFeedback(`Simulated Barcode Scan: ${randomItem.sku} (${randomItem.name}) detected.`);
-    setTimeout(() => setFeedback(null), 3000);
+  const handleBarcode = (code: string) => {
+    const match = items.find(
+      (item) => item.sku.toLowerCase() === code.toLowerCase() || item.name.toLowerCase() === code.toLowerCase(),
+    );
+    setScannerOpen(false);
+    setSearchQuery(code);
+    setFeedback(match ? `Found ${match.sku} — ${match.name}.` : `No van item matches barcode ${code}.`);
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   const handleSubmitAudit = () => {
@@ -99,7 +102,8 @@ function MobileStockCountScreen() {
       updateStockCountItem(item.sku, item.countedQty, item.varianceReason);
     });
     hasUnsavedCounts.current = false;
-    setFeedback("Van stock count saved on this device.");
+    setRevealed(true);
+    setFeedback("Van stock count saved. System quantities are now visible.");
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -128,8 +132,8 @@ function MobileStockCountScreen() {
               <ScanLine size={18} />
             </span>
             <div>
-              <h1 className="text-sm font-bold">Stock Count Scan</h1>
-              <p className="text-[11px] text-muted-foreground">Physical Inventory Verification</p>
+              <h1 className="text-sm font-bold">{t("stockCount")}</h1>
+              <p className="text-[11px] text-muted-foreground">{t("stockHint")}</p>
             </div>
           </div>
 
@@ -137,10 +141,10 @@ function MobileStockCountScreen() {
             size="sm"
             variant="outline"
             className="text-xs h-8"
-            onClick={handleSimulateBarcodeScan}
+            onClick={() => setScannerOpen(true)}
           >
             <ScanLine size={13} className="mr-1 text-primary" />
-            Scan Barcode
+            {t("scanBarcode")}
           </Button>
         </div>
 
@@ -204,21 +208,27 @@ function MobileStockCountScreen() {
                       Location: {item.binLocation}
                     </p>
                   </div>
-                  <span
-                    className={`font-mono text-xs font-bold px-2 py-0.5 rounded border ${
-                      variance === 0
-                        ? "bg-success-soft text-success border-success/30"
-                        : "bg-destructive-soft text-destructive border-destructive/30"
-                    }`}
-                  >
-                    {variance > 0 ? `+${variance}` : variance}
-                  </span>
+                  {revealed ? (
+                    <span
+                      className={`font-mono text-xs font-bold px-2 py-0.5 rounded border ${
+                        variance === 0
+                          ? "bg-success-soft text-success border-success/30"
+                          : "bg-destructive-soft text-destructive border-destructive/30"
+                      }`}
+                    >
+                      {variance > 0 ? `+${variance}` : variance}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <div>
-                    <span className="text-muted-foreground text-[10px] block">System Qty</span>
-                    <span className="font-mono font-bold text-foreground">{item.systemQty}</span>
+                    <span className="text-muted-foreground text-[10px] block">
+                      {revealed ? "System Qty" : t("noSystemQty")}
+                    </span>
+                    {revealed ? (
+                      <span className="font-mono font-bold text-foreground">{item.systemQty}</span>
+                    ) : null}
                   </div>
 
                   <div className="flex items-center gap-2 bg-muted/60 p-1.5 rounded-lg border">
@@ -243,7 +253,7 @@ function MobileStockCountScreen() {
                   </div>
                 </div>
 
-                {variance !== 0 && (
+                {revealed && variance !== 0 && (
                   <div>
                     <label className="block text-[10px] font-semibold text-warning mb-1">
                       Variance Reason / Notes:
@@ -263,21 +273,32 @@ function MobileStockCountScreen() {
         </div>
 
         {/* Audit Summary */}
-        <div className="p-3 rounded-lg bg-muted border text-xs flex items-center justify-between">
-          <span className="font-semibold text-muted-foreground">Total Physical Variance:</span>
-          <span
-            className={`font-mono font-extrabold text-sm ${
-              totalVariance === 0 ? "text-success" : "text-destructive"
-            }`}
-          >
-            {totalVariance > 0 ? `+${totalVariance}` : totalVariance} Units
-          </span>
-        </div>
+        {revealed ? (
+          <div className="p-3 rounded-lg bg-muted border text-xs flex items-center justify-between">
+            <span className="font-semibold text-muted-foreground">Total Physical Variance:</span>
+            <span
+              className={`font-mono font-extrabold text-sm ${
+                totalVariance === 0 ? "text-success" : "text-destructive"
+              }`}
+            >
+              {totalVariance > 0 ? `+${totalVariance}` : totalVariance} Units
+            </span>
+          </div>
+        ) : null}
 
         <Button className="w-full text-xs font-bold h-10 bg-primary" onClick={handleSubmitAudit}>
           <Save size={15} className="mr-1.5" />
-          Submit Stock Audit Count
+          {t("submitCount")}
         </Button>
+        {scannerOpen ? (
+          <BarcodeScanner
+            title={t("scanBarcode")}
+            closeLabel={t("closeScanner")}
+            manualLabel={t("enterCode")}
+            onDetected={handleBarcode}
+            onClose={() => setScannerOpen(false)}
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -188,7 +188,14 @@ function MobileJobDetailScreen() {
       code: "O1-SCR-MOB-13",
       icon: PauseCircle,
       to: `/mobile/jobs/${job.id}/hold`,
-      statusText: job.status === "On Hold" ? "On Hold Active" : "Request Hold",
+      statusText:
+        job.status === "On Hold"
+          ? "On Hold Active"
+          : (job.holdRequests || []).some(
+                (hold) => hold.status === "Pending Review" || hold.status === "Submitted",
+              )
+            ? "Waiting for coordinator"
+            : "Request Hold",
       highlight: job.status === "On Hold",
     },
     {

@@ -14,9 +14,12 @@ import {
   getMobileNotifications,
   subscribeMobileJobs,
   getActiveTechnicianName,
+  getPendingHoldReviews,
+  reviewJobHoldRequest,
 } from "@/lib/mobile-data";
 import { useRole } from "@/context/RoleContext";
 import { Button } from "@/components/ui/button";
+import { useMobileI18n } from "@/lib/mobile-i18n";
 
 export const Route = createFileRoute("/mobile/")({
   ssr: false,
@@ -42,11 +45,14 @@ function MobileOverviewPage() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState(() => getMobileJobs());
   const [notifications, setNotifications] = useState(() => getMobileNotifications());
+  const [holdReviews, setHoldReviews] = useState(() => getPendingHoldReviews());
+  const { t } = useMobileI18n();
 
   useEffect(() => {
     const syncState = () => {
       setJobs(getMobileJobs());
       setNotifications(getMobileNotifications());
+      setHoldReviews(getPendingHoldReviews());
     };
     syncState();
     const unsub = subscribeMobileJobs(syncState);
@@ -71,7 +77,9 @@ function MobileOverviewPage() {
     <div className="space-y-3.5 max-w-full overflow-hidden pb-4">
       {/* Mobile Welcome Heading */}
       <div className="px-0.5 pt-0.5 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-foreground truncate">Welcome, {activeTechName}</h2>
+        <h2 className="text-lg font-bold text-foreground truncate">
+          {t("welcome")}, {activeTechName}
+        </h2>
         <button
           type="button"
           onClick={async () => {
@@ -82,7 +90,7 @@ function MobileOverviewPage() {
           title="Sign out of Mobile App"
         >
           <LogOut size={13} />
-          <span>Sign out</span>
+          <span>{t("signOut")}</span>
         </button>
       </div>
 
@@ -94,7 +102,7 @@ function MobileOverviewPage() {
         >
           <div className="flex items-center gap-2 text-primary">
             <ClipboardList size={16} />
-            <span className="text-xs font-semibold">Assigned Jobs</span>
+            <span className="text-xs font-semibold">{t("assignedJobs")}</span>
           </div>
           <p className="text-2xl font-bold text-foreground font-mono">{assignedJobs.length}</p>
           <p className="text-[10px] text-muted-foreground">Work orders awaiting site action</p>
@@ -106,7 +114,7 @@ function MobileOverviewPage() {
         >
           <div className="flex items-center gap-2 text-success">
             <CheckCircle2 size={16} />
-            <span className="text-xs font-semibold">Completed</span>
+            <span className="text-xs font-semibold">{t("completed")}</span>
           </div>
           <p className="text-2xl font-bold text-foreground font-mono">{completedJobs.length}</p>
           <p className="text-[10px] text-muted-foreground">Work completion slips signed</p>
@@ -116,7 +124,7 @@ function MobileOverviewPage() {
       {/* Additional Option 01 Workflow Hub Tiles */}
       <div className="space-y-2">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
-          Field Technician Modules
+          {t("fieldModules")}
         </h3>
 
         <div className="grid grid-cols-1 gap-2">
@@ -132,7 +140,7 @@ function MobileOverviewPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                    Van Stock Count Scan
+                    {t("stockCount")}
                   </h4>
                   <span className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded border">
                     O1-SCR-MOB-12
@@ -164,7 +172,7 @@ function MobileOverviewPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                    Notifications Inbox
+                    {t("notifications")}
                   </h4>
                   <span className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded border">
                     O1-SCR-MOB-14
@@ -184,6 +192,47 @@ function MobileOverviewPage() {
           </Link>
         </div>
       </div>
+
+      {role !== "TECHNICIAN" && holdReviews.length > 0 && (
+        <div className="space-y-2 rounded-xl border bg-card p-3">
+          <h3 className="text-xs font-bold">{t("holdApprovals")}</h3>
+          {holdReviews.map(({ job: holdJob, hold }) => (
+            <div key={hold.id} className="space-y-1 rounded-lg border p-2 text-xs">
+              <p className="font-bold">
+                {holdJob.id} · {hold.reason}
+              </p>
+              <p className="text-muted-foreground">
+                Resume {hold.expectedResumeDate || "not set"}. {hold.notes}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    reviewJobHoldRequest(holdJob.id, hold.id, "Approved", user?.name || "Coordinator");
+                    setHoldReviews(getPendingHoldReviews());
+                    setJobs(getMobileJobs());
+                  }}
+                >
+                  {t("approve")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    reviewJobHoldRequest(holdJob.id, hold.id, "Rejected", user?.name || "Coordinator");
+                    setHoldReviews(getPendingHoldReviews());
+                    setJobs(getMobileJobs());
+                  }}
+                >
+                  {t("reject")}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Quick Action Return to Workspace Button (only for Admin / Desktop Roles) */}
       {role !== "TECHNICIAN" && (

@@ -14,6 +14,7 @@ import {
   getMobileJobById,
   saveJobInspection,
   getActiveTechnicianName,
+  CHECKLIST_TEMPLATES,
   type MobileJob,
   type SiteInspectionPoint,
 } from "@/lib/mobile-data";
@@ -90,6 +91,10 @@ function MobileSiteInspectionScreen() {
       "Site condition inspected prior to work. All primary safety protocols verified.",
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState(job?.inspection?.templateId || "hvac-service");
+  const [customerSignerName, setCustomerSignerName] = useState(
+    job?.inspection?.customerSignerName || "",
+  );
 
   useEffect(() => {
     setJob(getMobileJobById(jobId));
@@ -116,6 +121,11 @@ function MobileSiteInspectionScreen() {
   };
 
   const handleSaveInspection = () => {
+    if (!customerSignerName.trim()) {
+      setFeedback("Enter the customer name for the inspection signature.");
+      return;
+    }
+    const template = CHECKLIST_TEMPLATES.find((item) => item.id === templateId);
     saveJobInspection(job.id, {
       id: `INS-${Date.now().toString().slice(-4)}`,
       inspectedAt: new Date().toLocaleString(),
@@ -123,6 +133,11 @@ function MobileSiteInspectionScreen() {
       overallStatus,
       points,
       generalNotes,
+      templateId,
+      templateName: template?.name,
+      inspectorSignerName: getActiveTechnicianName(),
+      customerSignerName: customerSignerName.trim(),
+      customerSignedAt: new Date().toLocaleString(),
     });
 
     setJob(getMobileJobById(job.id));
@@ -188,6 +203,49 @@ function MobileSiteInspectionScreen() {
                 {st}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="space-y-1 text-xs">
+          <label className="block font-bold">Checklist template</label>
+          <select
+            value={templateId}
+            onChange={(event) => {
+              const nextId = event.target.value;
+              const template = CHECKLIST_TEMPLATES.find((item) => item.id === nextId);
+              setTemplateId(nextId);
+              if (template) setPoints(template.points.map((point) => ({ ...point })));
+            }}
+            className="input-field py-1.5 text-xs"
+          >
+            {CHECKLIST_TEMPLATES.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="mb-1 block text-[10px] font-semibold text-muted-foreground">
+              Inspector
+            </label>
+            <input
+              value={getActiveTechnicianName()}
+              readOnly
+              className="input-field py-1.5 text-xs"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-semibold text-muted-foreground">
+              Customer signature name *
+            </label>
+            <input
+              value={customerSignerName}
+              onChange={(event) => setCustomerSignerName(event.target.value)}
+              className="input-field py-1.5 text-xs"
+            />
           </div>
         </div>
 

@@ -19,10 +19,12 @@ import {
   getMobileJobById,
   updateJobPartsList,
   AVAILABLE_PARTS_CATALOG,
+  findSerialInstalledElsewhere,
   type MobileJob,
   type PartItem,
 } from "@/lib/mobile-data";
 import { Button } from "@/components/ui/button";
+import { useMobileI18n } from "@/lib/mobile-i18n";
 
 export const Route = createFileRoute("/mobile/jobs/$jobId/parts")({
   head: ({ params }) => ({
@@ -59,6 +61,7 @@ function MobilePartsScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<string | null>(null);
+  const { t } = useMobileI18n();
 
   useEffect(() => {
     const loaded = getMobileJobById(jobId);
@@ -178,7 +181,31 @@ function MobilePartsScreen() {
     setParts(updated);
   };
 
+  const patchPart = (index: number, patch: Partial<PartItem>) => {
+    setParts(parts.map((part, i) => (i === index ? { ...part, ...patch } : part)));
+  };
+
   const handleSaveParts = () => {
+    const seen = new Set<string>();
+    for (const part of parts) {
+      const serials = [part.serialNo, part.pairedComponentSerial];
+      for (const serial of serials) {
+        const key = serial?.trim().toLowerCase();
+        if (!key) continue;
+        if (seen.has(key)) {
+          setFeedback(`Serial ${serial} is used more than once on this job.`);
+          return;
+        }
+        seen.add(key);
+        const installed = findSerialInstalledElsewhere(key, job.id);
+        if (installed && !part.supervisorOverrideReason?.trim()) {
+          setFeedback(
+            `Serial ${serial} is already installed on ${installed.jobId} (${installed.partName}). Enter a supervisor override to continue.`,
+          );
+          return;
+        }
+      }
+    }
     updateJobPartsList(job.id, parts);
     setFeedback("Parts list saved to work order.");
     setTimeout(() => {
@@ -416,6 +443,89 @@ function MobilePartsScreen() {
                       </select>
                     </div>
                   )}
+
+                  <div className="space-y-1.5 rounded-lg border bg-muted/30 p-2 text-[11px]">
+                    <p className="font-bold text-foreground">{t("pairing")}</p>
+                    <input
+                      value={part.serialNo || ""}
+                      onChange={(event) => patchPart(index, { serialNo: event.target.value })}
+                      placeholder={t("serial")}
+                      className="input-field py-1 text-xs"
+                    />
+                    <input
+                      value={part.pairedComponentSerial || ""}
+                      onChange={(event) =>
+                        patchPart(index, { pairedComponentSerial: event.target.value })
+                      }
+                      placeholder={t("pairedSerial")}
+                      className="input-field py-1 text-xs"
+                    />
+                    <div className="grid grid-cols-2 gap-1">
+                      <select
+                        value={part.installArea || ""}
+                        onChange={(event) => patchPart(index, { installArea: event.target.value })}
+                        className="input-field py-1 text-xs"
+                      >
+                        <option value="">Area</option>
+                        <option value="Indoor unit">Indoor unit</option>
+                        <option value="Outdoor unit">Outdoor unit</option>
+                        <option value="Plant room">Plant room</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <input
+                        value={part.installEquipment || ""}
+                        onChange={(event) =>
+                          patchPart(index, { installEquipment: event.target.value })
+                        }
+                        placeholder="Equipment"
+                        className="input-field py-1 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <input
+                        value={part.pressureTestPsi || ""}
+                        onChange={(event) =>
+                          patchPart(index, { pressureTestPsi: event.target.value })
+                        }
+                        placeholder={t("pressure")}
+                        className="input-field py-1 text-xs"
+                      />
+                      <select
+                        value={part.pressureTestResult || "Not Required"}
+                        onChange={(event) =>
+                          patchPart(index, {
+                            pressureTestResult: event.target.value as PartItem["pressureTestResult"],
+                          })
+                        }
+                        className="input-field py-1 text-xs"
+                      >
+                        <option value="Not Required">Not required</option>
+                        <option value="Pass">Pass</option>
+                        <option value="Fail">Fail</option>
+                      </select>
+                    </div>
+                    <input
+                      value={part.extraMaterialNote || ""}
+                      onChange={(event) =>
+                        patchPart(index, { extraMaterialNote: event.target.value })
+                      }
+                      placeholder={t("extraMaterial")}
+                      className="input-field py-1 text-xs"
+                    />
+                    {(part.serialNo || part.pairedComponentSerial) &&
+                    [part.serialNo, part.pairedComponentSerial].some(
+                      (serial) => serial && findSerialInstalledElsewhere(serial, job.id),
+                    ) ? (
+                      <input
+                        value={part.supervisorOverrideReason || ""}
+                        onChange={(event) =>
+                          patchPart(index, { supervisorOverrideReason: event.target.value })
+                        }
+                        placeholder={t("override")}
+                        className="input-field py-1 text-xs border-warning"
+                      />
+                    ) : null}
+                  </div>
 
                   {isExternal && (
                     <div className="text-[10px] text-amber-700 dark:text-amber-300 flex items-center gap-1 font-medium bg-amber-500/10 p-1.5 rounded border border-amber-500/20">

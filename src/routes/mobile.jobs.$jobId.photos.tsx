@@ -18,6 +18,7 @@ import {
   getMobileJobById,
   addJobPhoto,
   deleteJobPhoto,
+  updateJobPhotoUploadState,
   type MobileJob,
   type JobPhoto,
 } from "@/lib/mobile-data";
@@ -229,7 +230,14 @@ function MobilePhotosScreen() {
       capturedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    addJobPhoto(job.id, newPhoto);
+    const uploadState = navigator.onLine ? "uploading" : "pending";
+    addJobPhoto(job.id, { ...newPhoto, uploadState });
+    if (navigator.onLine) {
+      window.setTimeout(() => {
+        updateJobPhotoUploadState(job.id, newPhoto.id, "uploaded");
+        setJob(getMobileJobById(job.id));
+      }, 700);
+    }
     setJob(getMobileJobById(job.id));
     setFeedback(`Photo attached to work order (${category}).`);
     setCaption("");
@@ -319,6 +327,7 @@ function MobilePhotosScreen() {
               <option value="Fault / Damage">Fault / Damage Evidence</option>
               <option value="Parts Replaced">Parts Replaced / Installed</option>
               <option value="After Work / Clean Site">After Work / Site Clean</option>
+              <option value="Serial Plate">Serial Plate</option>
             </select>
           </div>
 
@@ -375,6 +384,29 @@ function MobilePhotosScreen() {
                       </span>
                       <p className="text-muted-foreground truncate">{photo.caption}</p>
                       <p className="text-muted-foreground/70 font-mono">{photo.capturedAt}</p>
+                      <p className="font-semibold text-foreground">
+                        {photo.uploadState || "uploaded"}
+                      </p>
+                      {(photo.uploadState === "pending" || photo.uploadState === "failed") && (
+                        <button
+                          type="button"
+                          className="font-semibold text-primary"
+                          onClick={() => {
+                            if (!navigator.onLine) {
+                              updateJobPhotoUploadState(job.id, photo.id, "failed");
+                            } else {
+                              updateJobPhotoUploadState(job.id, photo.id, "uploading");
+                              window.setTimeout(() => {
+                                updateJobPhotoUploadState(job.id, photo.id, "uploaded");
+                                setJob(getMobileJobById(job.id));
+                              }, 700);
+                            }
+                            setJob(getMobileJobById(job.id));
+                          }}
+                        >
+                          Retry upload
+                        </button>
+                      )}
                     </div>
                     <button
                       onClick={() => handleDeletePhoto(photo.id)}

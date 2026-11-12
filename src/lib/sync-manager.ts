@@ -16,6 +16,7 @@ import {
   ensureOfflineDatabaseReady,
   isDeviceOffline,
   setBackendReachable,
+  postponeFailedSyncItems,
 } from "./offline-db";
 import { apiFetch } from "./api-client";
 
@@ -282,6 +283,7 @@ class GlobalSyncManager {
       };
     }
 
+    let attemptedQueueIds: number[] = [];
     try {
       const reachable = await probeBackendReachable();
       if (!reachable) {
@@ -311,6 +313,7 @@ class GlobalSyncManager {
       let jobSyncedCount = 0;
 
       if (totalPending > 0) {
+        attemptedQueueIds = jobQueueItems.flatMap((item) => (item.id != null ? [item.id] : []));
         console.log(
           `[SyncManager] Pushing ${jobQueueItems.length} queue actions & ${pendingJobs.length} unsynced jobs to PostgreSQL (/api/sync)...`,
         );
@@ -372,6 +375,9 @@ class GlobalSyncManager {
     } catch (err: unknown) {
       console.error("[SyncManager] Error during sync:", err);
       this.lastError = err instanceof Error ? err.message : "Failed to reach sync endpoint";
+      if (attemptedQueueIds.length > 0) {
+        await postponeFailedSyncItems(attemptedQueueIds, this.lastError);
+      }
       this.syncState = "error";
       this.notify();
       return {
