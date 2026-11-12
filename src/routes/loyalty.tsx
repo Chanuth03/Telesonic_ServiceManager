@@ -14,6 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api-client";
 import { Toaster, toast } from "sonner";
 import {
   loadLoyaltyState,
@@ -21,7 +22,6 @@ import {
   StoredLoyaltyState,
   RedemptionRecord,
   LoyaltyManualAdjustment,
-  LoyaltyLedgerEntry,
 } from "@/lib/loyalty-data";
 import { LOYALTY_SCREENS, LoyaltyScreenItem } from "@/lib/loyalty-screens-data";
 import { LoyaltyScreenWorkspace } from "@/components/loyalty/LoyaltyScreenWorkspace";
@@ -52,10 +52,43 @@ function LoyaltyModulePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
-  // Sync state to local storage
+  const applyServerState = (next: StoredLoyaltyState) => {
+    setState(next);
+    saveLoyaltyState(next);
+  };
+
   useEffect(() => {
-    saveLoyaltyState(state);
-  }, [state]);
+    let cancelled = false;
+    apiFetch("/api/loyalty")
+      .then(async (response) => {
+        const data = (await response.json()) as { success?: boolean; state?: StoredLoyaltyState };
+        if (!cancelled && response.ok && data.state) applyServerState(data.state);
+      })
+      .catch(() => {
+        // Keep the last saved copy when PostgreSQL is unreachable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const postLoyalty = async (url: string, body?: unknown) => {
+    const response = await apiFetch(url, {
+      method: body && url.endsWith("/settings") ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+    const data = (await response.json()) as {
+      success?: boolean;
+      message?: string;
+      state?: StoredLoyaltyState;
+    };
+    if (!response.ok || !data.state) {
+      const payload = data as { message?: string; error?: string };
+      throw new Error(payload.message || payload.error || "The loyalty database rejected this change.");
+    }
+    applyServerState(data.state);
+  };
 
   // Sync with URL query parameter
   useEffect(() => {
@@ -111,225 +144,57 @@ function LoyaltyModulePage() {
     return LOYALTY_SCREENS.find((s) => s.id === selectedScreenId) || null;
   }, [selectedScreenId]);
 
-  // Actions for Redemptions
+  const runLoyaltyAction = async (url: string, success: string, body?: unknown) => {
+    try {
+      await postLoyalty(url, body);
+      toast.success(success);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save the loyalty change.");
+    }
+  };
+
   const handleApproveRedemption = (redemptionNo: string) => {
-    setState((prev) => {
-      const updatedRedemptions = prev.redemptions.map((r) => {
-        if (r.redemptionNo === redemptionNo) {
-          return {
-            ...r,
-            status: "Approved" as const,
-            approvals: [
-              ...r.approvals,
-              {
-                role: "Finance Officer",
-                approver: "Finance Manager",
-                decision: "Approved" as const,
-                date: new Date().toISOString().split("T")[0],
-              },
-            ],
-          };
-        }
-        return r;
-      });
-      return { ...prev, redemptions: updatedRedemptions };
-    });
-    toast.success(`Redemption request ${redemptionNo} approved! Ready to post A/R Credit Memo.`);
+    void runLoyaltyAction(
+      `/api/loyalty/redemptions/${encodeURIComponent(redemptionNo)}/approve`,
+      `Redemption request ${redemptionNo} approved. Ready to post the credit memo.`,
+    );
   };
 
   const handlePostCreditMemo = (redemptionNo: string) => {
-    const target = state.redemptions.find((r) => r.redemptionNo === redemptionNo);
-    if (!target) return;
-
-    const creditMemoDocNo = `CM-26-00${Math.floor(100 + Math.random() * 900)}`;
-    const ledgerEntryNo = `LL-2026-00${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newLedgerEntry: LoyaltyLedgerEntry = {
-      entryNo: ledgerEntryNo,
-      customerCode: target.customerCode,
-      customerName: target.customerName,
-      date: new Date().toISOString().split("T")[0],
-      period: "2026-05",
-      entryType: "Redeem",
-      docType: "Redemption",
-      docNo: target.redemptionNo,
-      baseDoc: creditMemoDocNo,
-      points: -target.pointsToRedeem,
-      runningBalance: target.balanceAfter,
-      conversionRate: 1.0,
-      valueLKR: target.redemptionValueLKR,
-      reason: `Settled open invoice ${target.invoicesToSettle[0]?.invoiceNo || "N/A"}`,
-      createdBy: "Finance (System Add-on)",
-      approvedBy: "Head of Finance",
-    };
-
-    setState((prev) => {
-      const updatedDealers = prev.dealers.map((d) => {
-        if (d.customerCode === target.customerCode) {
-          const newBal = d.loyaltyBalance - target.pointsToRedeem;
-          return {
-            ...d,
-            loyaltyBalance: newBal,
-            loyaltyValueLKR: newBal * 1.0,
-            lastRedeemedDate: new Date().toISOString().split("T")[0],
-          };
-        }
-        return d;
-      });
-
-      const updatedRedemptions = prev.redemptions.map((r) => {
-        if (r.redemptionNo === redemptionNo) {
-          return {
-            ...r,
-            status: "Posted" as const,
-            creditMemoDocNo,
-            loyaltyLedgerRef: ledgerEntryNo,
-          };
-        }
-        return r;
-      });
-
-      return {
-        ...prev,
-        dealers: updatedDealers,
-        redemptions: updatedRedemptions,
-        ledger: [newLedgerEntry, ...prev.ledger],
-      };
-    });
-
-    toast.success(
-      `SAP A/R Credit Memo ${creditMemoDocNo} generated! Points deducted from ${target.customerName}. Excluded from sales commission.`
+    void runLoyaltyAction(
+      `/api/loyalty/redemptions/${encodeURIComponent(redemptionNo)}/post`,
+      `Credit memo posted for ${redemptionNo}. Points were deducted and excluded from sales commission.`,
     );
   };
 
   const handleCancelRedemption = (redemptionNo: string) => {
-    const target = state.redemptions.find((r) => r.redemptionNo === redemptionNo);
-    if (!target) return;
-
-    const reversalLedgerNo = `LL-2026-00${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const reversalEntry: LoyaltyLedgerEntry = {
-      entryNo: reversalLedgerNo,
-      customerCode: target.customerCode,
-      customerName: target.customerName,
-      date: new Date().toISOString().split("T")[0],
-      period: "2026-05",
-      entryType: "Reverse",
-      docType: "Reversal",
-      docNo: `${target.creditMemoDocNo || target.redemptionNo}-REV`,
-      baseDoc: target.redemptionNo,
-      points: target.pointsToRedeem,
-      runningBalance: target.balanceAvailableBefore,
-      reason: `Redemption cancellation reversal; restored ${target.pointsToRedeem} points.`,
-      createdBy: "Finance (Audit Reversal)",
-      reversedByEntry: target.loyaltyLedgerRef,
-    };
-
-    setState((prev) => {
-      const updatedDealers = prev.dealers.map((d) => {
-        if (d.customerCode === target.customerCode) {
-          const restoredBal = d.loyaltyBalance + target.pointsToRedeem;
-          return {
-            ...d,
-            loyaltyBalance: restoredBal,
-            loyaltyValueLKR: restoredBal * 1.0,
-          };
-        }
-        return d;
-      });
-
-      const updatedRedemptions = prev.redemptions.map((r) => {
-        if (r.redemptionNo === redemptionNo) {
-          return {
-            ...r,
-            status: "Cancelled" as const,
-          };
-        }
-        return r;
-      });
-
-      return {
-        ...prev,
-        dealers: updatedDealers,
-        redemptions: updatedRedemptions,
-        ledger: [reversalEntry, ...prev.ledger],
-      };
-    });
-
-    toast.info(`Redemption ${redemptionNo} cancelled. Points restored to customer account balance.`);
+    void runLoyaltyAction(
+      `/api/loyalty/redemptions/${encodeURIComponent(redemptionNo)}/cancel`,
+      `Redemption ${redemptionNo} cancelled.`,
+    );
   };
 
   const handleCreateNewRedemption = (newRec: RedemptionRecord) => {
-    setState((prev) => ({
-      ...prev,
-      redemptions: [newRec, ...prev.redemptions],
-    }));
-    toast.success(`Redemption request ${newRec.redemptionNo} created and submitted for Finance approval!`);
+    void runLoyaltyAction(
+      "/api/loyalty/redemptions",
+      `Redemption request ${newRec.redemptionNo} submitted for finance approval.`,
+      newRec,
+    );
   };
 
   const handleCreateAdjustment = (newAdj: LoyaltyManualAdjustment) => {
-    setState((prev) => ({
-      ...prev,
-      adjustments: [newAdj, ...prev.adjustments],
-    }));
-    toast.success(`Manual adjustment ${newAdj.adjustmentNo} submitted for dual sign-off!`);
+    void runLoyaltyAction(
+      "/api/loyalty/adjustments",
+      `Manual adjustment ${newAdj.adjustmentNo} submitted for approval.`,
+      newAdj,
+    );
   };
 
   const handleApproveAdjustment = (adjNo: string) => {
-    const adj = state.adjustments.find((a) => a.adjustmentNo === adjNo);
-    if (!adj) return;
-
-    const deltaPoints = adj.type === "Addition" ? adj.points : -adj.points;
-    const ledgerEntryNo = `LL-2026-00${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const dealer = state.dealers.find((d) => d.customerCode === adj.customerCode);
-    const newBal = (dealer?.loyaltyBalance || 0) + deltaPoints;
-
-    const newLedgerEntry: LoyaltyLedgerEntry = {
-      entryNo: ledgerEntryNo,
-      customerCode: adj.customerCode,
-      customerName: adj.customerName,
-      date: new Date().toISOString().split("T")[0],
-      period: "2026-05",
-      entryType: "Adjust",
-      docType: "Manual Adjustment",
-      docNo: adj.adjustmentNo,
-      baseDoc: adj.referenceDoc,
-      points: deltaPoints,
-      runningBalance: newBal,
-      reason: adj.reason,
-      createdBy: "Finance (Adjustment Workflow)",
-      approvedBy: "HOD Sales & Finance",
-    };
-
-    setState((prev) => {
-      const updatedDealers = prev.dealers.map((d) => {
-        if (d.customerCode === adj.customerCode) {
-          return {
-            ...d,
-            loyaltyBalance: newBal,
-            loyaltyValueLKR: newBal * 1.0,
-          };
-        }
-        return d;
-      });
-
-      const updatedAdjs = prev.adjustments.map((a) => {
-        if (a.adjustmentNo === adjNo) {
-          return { ...a, status: "Posted" as const };
-        }
-        return a;
-      });
-
-      return {
-        ...prev,
-        dealers: updatedDealers,
-        adjustments: updatedAdjs,
-        ledger: [newLedgerEntry, ...prev.ledger],
-      };
-    });
-
-    toast.success(`Adjustment ${adjNo} approved and posted to ledger.`);
+    void runLoyaltyAction(
+      `/api/loyalty/adjustments/${encodeURIComponent(adjNo)}/approve`,
+      `Adjustment ${adjNo} approved and posted to the ledger.`,
+    );
   };
 
   // If a screen is selected, render the dedicated screen workspace view
@@ -348,8 +213,7 @@ function LoyaltyModulePage() {
             onCancelRedemption={handleCancelRedemption}
             onCreateNewRedemption={handleCreateNewRedemption}
             onSaveSettings={(newSettings) => {
-              setState((prev) => ({ ...prev, settings: newSettings }));
-              toast.success("Settings updated successfully.");
+              void runLoyaltyAction("/api/loyalty/settings", "Settings saved.", newSettings);
             }}
             onApproveAdjustment={handleApproveAdjustment}
             onCreateAdjustment={handleCreateAdjustment}

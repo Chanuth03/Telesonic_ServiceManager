@@ -1192,5 +1192,116 @@ model IncentiveDivision {
   @@map("incentive_divisions")
 }
 
+model LoyaltyDealer {
+  customerCode                String  @id @map("customer_code")
+  customerName                String  @map("customer_name")
+  customerGroup               String  @map("customer_group")
+  division                    String
+  accountBalanceLKR           Decimal @map("account_balance_lkr") @db.Decimal(14, 2)
+  loyaltyBalance              Int     @map("loyalty_balance")
+  loyaltyValueLKR             Decimal @map("loyalty_value_lkr") @db.Decimal(14, 2)
+  loyaltyEligible             Boolean @map("loyalty_eligible")
+  eligibleFrom                String  @map("eligible_from")
+  minimumPointsForRedemption  Int     @map("minimum_points_for_redemption")
+  loyaltyStatus               String  @map("loyalty_status")
+  lastEarnedDate              String  @map("last_earned_date")
+  lastRedeemedDate            String  @map("last_redeemed_date")
+
+  @@map("loyalty_dealers")
+}
+
+model LoyaltyLedgerEntry {
+  entryNo          String   @id @map("entry_no")
+  customerCode     String   @map("customer_code")
+  customerName     String   @map("customer_name")
+  entryDate        String   @map("entry_date")
+  period           String
+  entryType        String   @map("entry_type")
+  docType          String   @map("doc_type")
+  docNo            String   @map("doc_no")
+  baseDoc          String?  @map("base_doc")
+  itemCode         String?  @map("item_code")
+  description      String?
+  quantity         Decimal? @db.Decimal(12, 2)
+  pointsPerUnit    Decimal? @map("points_per_unit") @db.Decimal(12, 2)
+  points           Int
+  runningBalance   Int      @map("running_balance")
+  conversionRate   Decimal? @map("conversion_rate") @db.Decimal(10, 4)
+  valueLKR         Decimal? @map("value_lkr") @db.Decimal(14, 2)
+  reason           String?
+  createdBy        String   @map("created_by")
+  approvedBy       String?  @map("approved_by")
+  reversedByEntry  String?  @map("reversed_by_entry")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("loyalty_ledger")
+}
+
+model LoyaltyRedemption {
+  redemptionNo            String  @id @map("redemption_no")
+  customerCode            String  @map("customer_code")
+  customerName            String  @map("customer_name")
+  requestDate             String  @map("request_date")
+  pointsToRedeem          Int     @map("points_to_redeem")
+  conversionRate          Decimal @map("conversion_rate") @db.Decimal(10, 4)
+  redemptionValueLKR      Decimal @map("redemption_value_lkr") @db.Decimal(14, 2)
+  balanceAvailableBefore  Int     @map("balance_available_before")
+  balanceAfter            Int     @map("balance_after")
+  status                  String
+  creditMemoDocNo         String? @map("credit_memo_doc_no")
+  invoicesToSettle        Json    @map("invoices_to_settle")
+  approvals               Json
+  loyaltyLedgerRef        String? @map("loyalty_ledger_ref")
+  excludeFromIncentive    Boolean @default(true) @map("exclude_from_incentive")
+
+  @@map("loyalty_redemptions")
+}
+
+model LoyaltyAdjustment {
+  adjustmentNo   String  @id @map("adjustment_no")
+  customerCode   String  @map("customer_code")
+  customerName   String  @map("customer_name")
+  adjustmentDate String  @map("adjustment_date")
+  adjustmentType String  @map("adjustment_type")
+  points         Int
+  reason         String
+  referenceDoc   String  @map("reference_doc")
+  remarks        String  @default("")
+  attachmentName String? @map("attachment_name")
+  status         String
+  approvers      Json
+
+  @@map("loyalty_adjustments")
+}
+
+model LoyaltyPriceListItem {
+  itemCode           String @id @map("item_code")
+  description        String
+  division           String
+  capacityAttribute  String @map("capacity_attribute")
+  rateFormula        String @map("rate_formula")
+  pointsPerUnit      Int    @map("points_per_unit")
+  effectiveFrom      String @map("effective_from")
+  status             String
+  version            String
+  approver           String
+
+  @@map("loyalty_price_list")
+}
+
+model LoyaltySettings {
+  id                         String  @id
+  conversionRateLKR          Decimal @map("conversion_rate_lkr") @db.Decimal(10, 4)
+  effectiveFrom              String  @map("effective_from")
+  rounding                   String
+  defaultEligibleGroups      Json    @map("default_eligible_groups")
+  redemptionDocumentType     String  @map("redemption_document_type")
+  redemptionGLAccount        String  @map("redemption_gl_account")
+  pointsExpiryPolicy         String  @map("points_expiry_policy")
+  liabilityAccountingMethod  String  @map("liability_accounting_method")
+
+  @@map("loyalty_settings")
+}
+
 
 

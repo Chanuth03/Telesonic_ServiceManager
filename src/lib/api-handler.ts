@@ -10,6 +10,16 @@ import { prisma, PrismaJobRecord } from "@/lib/prisma";
 import { MobileJobStatus } from "./mobile-data";
 import { handleLoginRequest } from "./auth-handler";
 import {
+  approveLoyaltyAdjustment,
+  approveLoyaltyRedemption,
+  cancelLoyaltyRedemption,
+  createLoyaltyAdjustment,
+  createLoyaltyRedemption,
+  getLoyaltyState,
+  postLoyaltyRedemption,
+  saveLoyaltySettings,
+} from "./loyalty-db";
+import {
   getAllIncentiveSchemes,
   createIncentiveScheme,
   updateIncentiveScheme,
@@ -373,6 +383,54 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         }),
         { status: 200, headers },
       );
+    }
+
+    // 3b. /api/loyalty — Customer loyalty points (PostgreSQL)
+    if (path === "/api/loyalty" && method === "GET") {
+      const state = await getLoyaltyState();
+      return new Response(JSON.stringify({ success: true, source: "PostgreSQL", state }), {
+        status: 200,
+        headers,
+      });
+    }
+
+    if (path === "/api/loyalty/redemptions" && method === "POST") {
+      const body = await request.json();
+      const state = await createLoyaltyRedemption(body);
+      return new Response(JSON.stringify({ success: true, state }), { status: 201, headers });
+    }
+
+    const loyaltyRedemption = path.match(
+      /^\/api\/loyalty\/redemptions\/([^/]+)\/(approve|post|cancel)$/,
+    );
+    if (loyaltyRedemption && method === "POST") {
+      const redemptionNo = decodeURIComponent(loyaltyRedemption[1] || "");
+      const action = loyaltyRedemption[2];
+      const state =
+        action === "approve"
+          ? await approveLoyaltyRedemption(redemptionNo)
+          : action === "post"
+            ? await postLoyaltyRedemption(redemptionNo)
+            : await cancelLoyaltyRedemption(redemptionNo);
+      return new Response(JSON.stringify({ success: true, state }), { status: 200, headers });
+    }
+
+    if (path === "/api/loyalty/adjustments" && method === "POST") {
+      const body = await request.json();
+      const state = await createLoyaltyAdjustment(body);
+      return new Response(JSON.stringify({ success: true, state }), { status: 201, headers });
+    }
+
+    const loyaltyAdjustment = path.match(/^\/api\/loyalty\/adjustments\/([^/]+)\/approve$/);
+    if (loyaltyAdjustment && method === "POST") {
+      const state = await approveLoyaltyAdjustment(decodeURIComponent(loyaltyAdjustment[1] || ""));
+      return new Response(JSON.stringify({ success: true, state }), { status: 200, headers });
+    }
+
+    if (path === "/api/loyalty/settings" && method === "PUT") {
+      const body = await request.json();
+      const state = await saveLoyaltySettings(body);
+      return new Response(JSON.stringify({ success: true, state }), { status: 200, headers });
     }
 
     // 4. /api/incentives/schemes — Incentive Scheme Master CRUD Endpoints
